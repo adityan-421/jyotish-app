@@ -42,10 +42,29 @@ def _get_pool():
 def get_db():
     pool = _get_pool()
     conn = pool.getconn()
+    # Discard already-closed (stale) connections and get a fresh one
+    if conn.closed:
+        pool.putconn(conn, close=True)
+        conn = pool.getconn()
+    ok = False
     try:
         yield conn
+        ok = True
     finally:
-        pool.putconn(conn)
+        # Return healthy connections to pool; close broken ones so they aren't reused
+        pool.putconn(conn, close=not ok)
+
+
+def reset_pool():
+    """Discard the connection pool so it is recreated on next use."""
+    global _pool, _db_initialized
+    if _pool is not None:
+        try:
+            _pool.closeall()
+        except Exception:
+            pass
+        _pool = None
+    _db_initialized = False
 
 
 _db_initialized = False

@@ -15,7 +15,7 @@ from jyotish_engine import compute_chart, compute_btr
 from zoneinfo import ZoneInfo
 from datetime import datetime
 from database import (
-    init_db, upsert_user, save_chart, get_charts, get_chart, delete_chart,
+    init_db, reset_pool, upsert_user, save_chart, get_charts, get_chart, delete_chart,
     update_chart, count_charts, get_question_count_today, save_ai_question, get_ai_history,
 )
 
@@ -167,7 +167,12 @@ def auth_google():
 
 @app.route("/auth/callback")
 def auth_callback():
-    token = google.authorize_access_token()
+    try:
+        token = google.authorize_access_token()
+    except Exception as e:
+        logger.error("OAuth token exchange failed: %s", e)
+        return redirect("/")
+
     userinfo = token.get("userinfo")
     if not userinfo:
         return "Authentication failed", 400
@@ -177,7 +182,20 @@ def auth_callback():
     name = userinfo.get("name", "")
     picture = userinfo.get("picture", "")
 
-    upsert_user(user_id, email, name, picture)
+    # Retry once — handles cold-start or stale-connection DB failures
+    for attempt in range(2):
+        try:
+            upsert_user(user_id, email, name, picture)
+            break
+        except Exception as e:
+            logger.warning("upsert_user attempt %d failed: %s", attempt + 1, e)
+            if attempt == 0:
+                reset_pool()
+                init_db()
+            else:
+                logger.error("upsert_user failed after retry, aborting login")
+                return "Login failed — please try again", 500
+
     session["user"] = {
         "id": user_id,
         "email": email,
