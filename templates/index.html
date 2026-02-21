@@ -1193,6 +1193,10 @@ var CHART_TITLES = {
 // ═══════════════════════════════════════════════════════════════════
 
 function fetchChart() {
+  if (_tzFetching) {
+    _tzDoneCallback = fetchChart;
+    return;
+  }
   var dateVal = document.getElementById("birthDate").value;
   var timeVal = document.getElementById("birthTime").value;
   var parts = dateVal.split("-");
@@ -2273,6 +2277,8 @@ function buildTransitDiamond(c, natalHouses, idx) {
 var placeTimer = null;
 var placeInput = document.getElementById("birthPlace");
 var placeDropdown = document.getElementById("placeDropdown");
+var _tzFetching = false;
+var _tzDoneCallback = null;
 
 placeInput.addEventListener("input", function() {
   clearTimeout(placeTimer);
@@ -2346,6 +2352,10 @@ function selectPlace(name, lat, lon) {
     hour: parseInt(tparts[0]), minute: parseInt(tparts[1])
   };
 
+  _tzFetching = true;
+  var tzField = document.getElementById("birthTz");
+  tzField.style.opacity = "0.4";
+
   fetch("/api/timezone", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
@@ -2354,10 +2364,19 @@ function selectPlace(name, lat, lon) {
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (data.offset !== undefined) {
-      document.getElementById("birthTz").value = data.offset;
+      tzField.value = data.offset;
     }
   })
-  .catch(function() { /* keep existing TZ on error */ });
+  .catch(function() { /* keep existing TZ on error */ })
+  .finally(function() {
+    _tzFetching = false;
+    tzField.style.opacity = "";
+    if (_tzDoneCallback) {
+      var cb = _tzDoneCallback;
+      _tzDoneCallback = null;
+      cb();
+    }
+  });
 }
 
 function escHtml(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
