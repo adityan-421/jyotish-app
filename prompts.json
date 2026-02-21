@@ -1,0 +1,55 @@
+{
+  "model": "gemini-2.5-flash",
+  "steps": [
+    {
+      "name": "categorize_and_factors",
+      "prompt": "You are an expert Vedic astrologer (Jyotishi). Given the following question, do TWO things:\n\n1. Classify the question into exactly ONE of these life-area categories: {categories}\n2. Identify what astrological factors to examine for this category.\n\nReturn a JSON object with these keys:\n- \"category\": the single category name from the list above (lowercase)\n- \"houses\": array of house numbers (1-12) most relevant\n- \"planets\": array of planet names most relevant (e.g. [\"Sun\", \"Moon\", \"Mars\"])\n- \"divisional_charts\": which varga charts to check (e.g. [\"D1\", \"D9\"])\n- \"check_dasha\": boolean - whether to examine dasha periods\n- \"check_yogas\": boolean - whether to look for relevant yogas\n- \"check_ashtakavarga\": boolean - whether ashtakavarga is useful\n- \"special_considerations\": brief note on what to look for\n\nRespond with ONLY valid JSON, no markdown or explanation.\n\nQuestion: {question}",
+      "response_type": "json",
+      "output_var": "factors",
+      "post_process": "extract_category_from_factors",
+      "json_fallback": {
+        "category": "other",
+        "houses": [1, 5, 7, 10],
+        "planets": ["Sun", "Moon", "Jupiter", "Saturn"],
+        "divisional_charts": ["D1"],
+        "check_dasha": true,
+        "check_yogas": true,
+        "check_ashtakavarga": false,
+        "special_considerations": "General analysis"
+      }
+    },
+    {
+      "name": "reading",
+      "prompt": "You are an expert Vedic astrologer (Jyotishi) giving a personalized reading.\n\nTODAY'S DATE: {today}\n\n{conversation}CURRENT QUESTION: {question}\n\nLIFE AREA: {category}\n\nASTROLOGICAL FACTORS TO EXAMINE:\n{factors}\n\nCHART DATA:\n{chart_data}\n\nBased on the chart data and astrological factors above, provide a detailed Jyotish reading that addresses the question. Include:\n1. Key planetary positions and their significance for this question\n2. Relevant house analysis\n3. Any applicable yogas or special combinations\n4. Dasha period influences if relevant\n5. Practical guidance based on the astrological indications\n\nWrite in a warm, knowledgeable tone. Be specific to THIS chart — reference actual planet positions, signs, and houses from the data. Use the current_date and dasha date ranges to determine which Mahadasha and Antardasha is CURRENTLY running — do not guess or assume. If this is a follow-up question, keep the answer focused and concise (1-3 paragraphs). For initial questions, provide a fuller reading (3-5 paragraphs).",
+      "response_type": "text",
+      "output_var": "reading",
+      "is_final": true
+    }
+  ],
+  "btr_questions_steps": [
+    {
+      "name": "generate_questions",
+      "prompt": "You are an expert Vedic astrologer specializing in Birth Time Rectification (BTR). Your task is to generate concrete, verifiable questions to help determine the correct birth time.\n\n{age_context}CHART DATA:\n{chart_data}\n\nBOUNDARY DATA (which divisional Lagnas are near a change point):\n{btr_data}\n\nPREVIOUS CONVERSATION:\n{conversation}\n{additional_context}\nAGE-APPROPRIATE FILTERING — IMPORTANT: Only ask about life areas the person could have already experienced. Use their age as your guide:\n- Skip D9/marriage or spouse questions if the person is under 18\n- Skip D7/children questions if the person is under 20\n- Skip D10/career questions if the person is under 16\n- For children aged 10 or under, focus only on D1 (appearance, personality), D3 (siblings), and D12 (parents)\n- For teenagers (11–17), additionally include D3, D12, and general D1 personality traits; avoid marriage, career, and children charts\n- Always prefer questions about already-occurred events over future possibilities\n\nFor each CRITICAL or SENSITIVE divisional chart (boundary within 15 minutes), generate 2-3 targeted questions about the life area it governs — but only if age-appropriate. Questions must be:\n- Concrete and verifiable (not vague)\n- Designed to discriminate between the current Lagna and the alternate Lagna\n- Based on what each candidate Lagna configuration would predict\n\nLife areas by chart:\n- D1: Physical appearance, personality, overall life direction\n- D2: Wealth patterns, financial stability\n- D3: Siblings (number, gender, relationship), courage, short travels\n- D7: Children (number, gender, timing), fertility\n- D9: Marriage, spouse characteristics, dharma/spiritual life\n- D10: Career type, professional success, public recognition\n- D12: Parents (relationship with father/mother), losses\n- D60: Major life events, unusual circumstances, karmic patterns\n\nFor each question, explain briefly what the current chart predicts vs what the alternate (boundary-shifted) chart would predict.\n\nReturn ONLY a valid JSON array of objects, each with:\n- \"question\": the question text\n- \"type\": \"yes_no\" or \"multiple_choice\"\n- \"options\": array of choices (only for multiple_choice, 3-4 options)\n- \"chart\": which divisional chart this tests (e.g. \"D9\")\n- \"reasoning\": brief explanation of what this question discriminates\n\nGenerate 8-12 questions total. Respond with ONLY valid JSON, no markdown or explanation.",
+      "response_type": "json",
+      "output_var": "questions",
+      "is_final": true,
+      "json_fallback": []
+    }
+  ],
+  "btr_analyze_steps": [
+    {
+      "name": "analyze_answers",
+      "prompt": "You are an expert Vedic astrologer specializing in Birth Time Rectification (BTR). Analyze the user's answers to determine the most likely birth time correction.\n\n{age_context}CHART DATA:\n{chart_data}\n\nBOUNDARY DATA:\n{btr_data}\n\nQUESTION-ANSWER PAIRS:\n{qa_pairs}\n\nPREVIOUS CONVERSATION:\n{conversation}\n{additional_context}\nFor each answer:\n1. Compare what the CURRENT chart predicts for that life area\n2. Compare what the ALTERNATE chart (if the Lagna shifted) would predict\n3. Determine which chart better matches the answer\n\nThen:\n- Tally which time window (current, shifted earlier, shifted later) best matches ALL answers\n- Suggest a specific adjustment in minutes (e.g., \"+4 minutes\" or \"-6 minutes\" or \"No adjustment needed\")\n- Explain which charts would change and how the adjusted chart better matches the person's life\n- Provide a confidence level based on how many answers clearly align\n- If inconclusive, suggest what additional questions might help\n\nReturn ONLY a valid JSON object with:\n- \"suggested_adjustment\": string like \"Move birth time 4 minutes earlier\" or \"No adjustment needed\"\n- \"explanation\": detailed paragraph explaining the reasoning\n- \"chart_changes\": array of strings describing what changes (e.g. \"D9 Lagna shifts from Gemini to Taurus\")\n- \"confidence\": \"low\", \"medium\", or \"high\"\n- \"additional_questions\": array of follow-up question strings if confidence is low (empty array if high confidence)\n\nRespond with ONLY valid JSON, no markdown or explanation.",
+      "response_type": "json",
+      "output_var": "analysis",
+      "is_final": true,
+      "json_fallback": {
+        "suggested_adjustment": "Unable to determine — please answer more questions",
+        "explanation": "Not enough data to make a confident recommendation.",
+        "chart_changes": [],
+        "confidence": "low",
+        "additional_questions": []
+      }
+    }
+  ]
+}

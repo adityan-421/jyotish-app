@@ -1,0 +1,3152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Astrojyoti AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@800&family=Inter:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@800&family=Inter:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet"></noscript>
+<style>
+:root {
+  --bg: #fdf6ec;
+  --surface: #ffffff;
+  --surface-2: #fff4e0;
+  --surface-3: #ffe8c2;
+  --border: #e8d5b0;
+  --border-light: #f0e4cc;
+  --text: #2d1a00;
+  --text-2: #5c3d1a;
+  --text-3: #9a7b52;
+  --accent: #FF6B00;
+  --accent-2: #FF8C33;
+  --accent-bg: rgba(255,107,0,0.1);
+  --blue: #3366FF;
+  --teal: #00BFA5;
+  --pink: #E91E8C;
+  --amber: #FFB300;
+  --red: #E53935;
+  --green: #2ECC40;
+  --orange: #FF6B00;
+  --cyan: #00BCD4;
+  --radius: 14px;
+  --shadow: 0 1px 3px rgba(45,26,0,0.06), 0 1px 2px rgba(45,26,0,0.04);
+  --shadow-md: 0 4px 16px rgba(45,26,0,0.08);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { overflow-x: hidden; }
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+header {
+  background: linear-gradient(135deg, #4a2800 0%, #7a3d00 40%, #b85a00 70%, #e07000 100%);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  position: sticky; top: 0; z-index: 100;
+}
+
+.header-inner {
+  max-width: 1200px; margin: 0 auto; padding: 0.9rem 2rem;
+  display: flex; justify-content: space-between; align-items: center;
+}
+
+.brand { display: flex; align-items: baseline; gap: 0.75rem; }
+.brand h1 {
+  font-family: 'DM Serif Display', serif; font-size: 1.35rem; font-weight: 400;
+  color: #ffd54f;
+  -webkit-text-fill-color: #ffd54f;
+}
+.brand span { font-size: 0.72rem; color: rgba(255,213,79,0.6); }
+
+.container { max-width: 1200px; margin: 0 auto; padding: 1.5rem 2rem; display: flex; flex-direction: column; gap: 1.25rem; }
+
+/* Input Form */
+.input-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
+  gap: 0.75rem;
+  align-items: end;
+}
+.input-form .form-group { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.input-form label { font-size: 0.72rem; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; }
+.input-form input, .input-form select {
+  padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 8px;
+  font-family: inherit; font-size: 0.82rem; color: var(--text); background: var(--surface);
+  outline: none; transition: border-color 0.15s;
+  width: 100%; min-width: 0; max-width: 100%;
+}
+.input-form input:focus, .input-form select:focus { border-color: #FF6B00; }
+.generate-btn {
+  padding: 0.5rem 1.5rem; background: var(--accent); color: #fff; border: none;
+  border-radius: 8px; font-family: inherit; font-size: 0.82rem; font-weight: 600;
+  cursor: pointer; transition: background 0.15s; height: 37px;
+}
+.generate-btn:hover { background: var(--accent-2); }
+.generate-btn { background: var(--accent); }
+.generate-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Loading overlay */
+.loading-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3);
+  z-index: 200; justify-content: center; align-items: center;
+}
+.loading-overlay.active { display: flex; }
+.loading-spinner {
+  width: 48px; height: 48px; border: 4px solid rgba(255,255,255,0.3);
+  border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Error banner */
+.error-banner {
+  display: none; padding: 0.75rem 1rem; background: #fef2f2; border: 1px solid #fecaca;
+  border-radius: 10px; color: var(--red); font-size: 0.82rem;
+}
+.error-banner.active { display: block; }
+
+/* Cards */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+  max-width: 100%;
+}
+.card-header {
+  padding: 0.85rem 1.5rem; border-bottom: 1px solid var(--border-light);
+  display: flex; align-items: baseline; gap: 0.75rem;
+}
+.card-header h2 { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+.card-header .sub { font-size: 0.72rem; color: var(--text-3); }
+.card-body { padding: 1.25rem 1.5rem; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+.card.accent-purple { border-top: 3px solid var(--accent); }
+.card.accent-teal   { border-top: 3px solid var(--teal); }
+.card.accent-pink   { border-top: 3px solid var(--pink); }
+.card.accent-amber  { border-top: 3px solid var(--amber); }
+.card.accent-blue   { border-top: 3px solid var(--blue); }
+.card.accent-green  { border-top: 3px solid var(--green); }
+.card.accent-orange { border-top: 3px solid var(--orange); }
+.card.accent-cyan   { border-top: 3px solid var(--cyan); }
+
+/* KV Grid */
+.kv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr)); gap: 0.4rem 2rem; }
+.kv {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--border-light);
+  gap: 1rem;
+  min-width: 0; /* Allow flex items to shrink below content size */
+}
+.kv .k {
+  font-size: 0.78rem;
+  color: var(--text-3);
+  flex-shrink: 0; /* Prevent label from shrinking */
+  word-break: break-word;
+}
+.kv .v {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text);
+  text-align: right;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  min-width: 0; /* Allow value to wrap */
+}
+
+.pill-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.pill {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 0.55rem 1rem; display: flex; flex-direction: column; gap: 0.15rem;
+}
+.pill .k { font-size: 0.65rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; display: block; }
+.pill .v { font-size: 0.92rem; font-weight: 600; color: #FF6B00; display: block; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; font-size: 0.8rem; table-layout: auto; }
+thead th {
+  text-align: left; padding: 0.5rem 0.75rem; font-size: 0.68rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3);
+  border-bottom: 1px solid var(--border); background: var(--surface-2);
+}
+tbody td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-light); color: var(--text-2); }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--surface-2); }
+.mono { font-variant-numeric: tabular-nums; }
+.bold { font-weight: 600; color: var(--text); }
+.retro { color: var(--red); font-weight: 600; }
+.dim { color: var(--text-3); }
+
+/* Charts */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: 1.25rem;
+}
+.chart-box { text-align: center; }
+.chart-box h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem; color: var(--text); }
+.chart-box .chart-tag {
+  display: inline-block; font-size: 0.65rem; color: var(--text-3);
+  background: var(--surface-3); padding: 0.15rem 0.55rem; border-radius: 4px;
+  margin-bottom: 0.5rem;
+}
+
+/* Chart legend */
+.chart-legend {
+  display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;
+  padding: 0.75rem 1rem; background: var(--surface-2); border-radius: 10px;
+  border: 1px solid var(--border-light);
+}
+.legend-item { display: flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; color: var(--text-2); }
+.legend-sym { font-size: 0.8rem; }
+
+/* Drishti tooltip */
+.drishti-tip {
+  position: fixed;
+  background: rgba(26,29,46,0.94);
+  color: #fff;
+  padding: 0.5rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  pointer-events: none;
+  z-index: 200;
+  max-width: 320px;
+  line-height: 1.6;
+  display: none;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+  backdrop-filter: blur(6px);
+}
+.drishti-tip strong { color: #ffd54f; }
+.drishti-tip .src-lbl { color: #fff5e0; }
+.drishti-tip .asp-lbl { color: #d4956a; }
+
+/* Dasha */
+.dasha-info { font-size: 0.8rem; color: var(--text-2); margin-bottom: 1rem; }
+.dasha-info strong { color: #FF6B00; }
+
+.timeline-bar {
+  display: flex; height: 40px; border-radius: 10px; overflow: hidden;
+  border: 1px solid var(--border); margin-bottom: 1.25rem;
+}
+.t-seg {
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  color: #fff; font-size: 0.64rem; font-weight: 600; cursor: pointer;
+  transition: filter 0.15s; overflow: hidden; user-select: none;
+}
+.t-seg:hover { filter: brightness(1.15); }
+.t-seg .t-yr { font-size: 0.52rem; font-weight: 400; opacity: 0.7; }
+.t-seg.current { box-shadow: inset 0 -3px 0 rgba(255,255,255,0.7); }
+
+.dasha-breadcrumb { display: flex; align-items: center; gap: 0.2rem; margin-bottom: 0.75rem; font-size: 0.78rem; }
+.dasha-breadcrumb .crumb {
+  color: #FF6B00; cursor: pointer; font-weight: 500;
+  padding: 0.2rem 0.5rem; border-radius: 6px; transition: background 0.12s;
+}
+.dasha-breadcrumb .crumb:hover { background: rgba(255,107,0,0.08); }
+.dasha-breadcrumb .crumb.active { color: var(--text); cursor: default; font-weight: 600; }
+.dasha-breadcrumb .crumb.active:hover { background: transparent; }
+.dasha-breadcrumb .sep { color: var(--text-3); font-size: 0.68rem; }
+
+.dasha-view { animation: fadeSlide 0.2s ease; }
+@keyframes fadeSlide { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+.dasha-row {
+  display: flex; align-items: center; padding: 0.55rem 0.75rem; border-radius: 10px;
+  cursor: pointer; transition: background 0.12s; gap: 0.75rem; border: 1px solid transparent;
+  margin-bottom: 2px;
+}
+.dasha-row:hover { background: var(--surface-2); border-color: var(--border); }
+.dasha-row.is-current { background: rgba(255,107,0,0.08); border-color: rgba(255,107,0,0.2); }
+.dasha-planet { font-weight: 600; font-size: 0.85rem; width: 75px; flex-shrink: 0; }
+.dasha-dates { font-size: 0.75rem; color: var(--text-3); width: 210px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.dasha-bar-wrap { flex: 1; height: 5px; background: var(--surface-3); border-radius: 3px; overflow: hidden; }
+.dasha-bar-fill { height: 100%; border-radius: 3px; }
+.dasha-dur { font-size: 0.72rem; color: var(--text-3); width: 50px; text-align: right; flex-shrink: 0; }
+.dasha-arrow { color: var(--text-3); font-size: 0.72rem; width: 14px; text-align: center; flex-shrink: 0; }
+
+/* Ashtakavarga */
+.ashtak-row { display: flex; align-items: center; margin-bottom: 0.3rem; }
+.ashtak-label { width: 95px; font-size: 0.75rem; color: var(--text-2); text-align: right; padding-right: 0.75rem; }
+.ashtak-bar-bg { flex: 1; height: 20px; background: var(--surface-3); border-radius: 5px; overflow: hidden; }
+.ashtak-fill {
+  height: 100%; border-radius: 5px; display: flex; align-items: center;
+  padding-left: 8px; font-size: 0.68rem; font-weight: 600; color: #fff;
+}
+
+/* Yogas */
+.yoga-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 0.6rem; }
+.yoga-item {
+  padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface);
+}
+.yoga-item h4 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.15rem; }
+.yoga-item p { font-size: 0.75rem; color: var(--text-3); line-height: 1.5; }
+.yoga-item.positive { border-left: 3px solid var(--green); }
+.yoga-item.positive h4 { color: var(--green); }
+.yoga-item.caution { border-left: 3px solid var(--red); }
+.yoga-item.caution h4 { color: var(--red); }
+
+/* Doshas */
+.card.accent-red { border-top: 3px solid var(--red); }
+.dosha-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 0.6rem; }
+.dosha-item {
+  padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface);
+}
+.dosha-item h4 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.15rem; }
+.dosha-item p { font-size: 0.75rem; color: var(--text-3); line-height: 1.5; }
+.dosha-item .cancellation { font-size: 0.72rem; color: var(--green); margin-top: 0.3rem; }
+.dosha-item.severe { border-left: 3px solid var(--red); }
+.dosha-item.severe h4 { color: var(--red); }
+.dosha-item.moderate { border-left: 3px solid var(--orange); }
+.dosha-item.moderate h4 { color: var(--orange); }
+
+/* Aspects */
+.aspects-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+@media (max-width: 768px) { .aspects-cols { grid-template-columns: 1fr; } }
+.aspects-cols h3 { font-size: 0.82rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-2); }
+.note-box {
+  margin-top: 1rem; padding: 0.75rem 1rem; background: var(--surface-2);
+  border-radius: 10px; font-size: 0.75rem; color: var(--text-3); line-height: 1.6;
+  border: 1px solid var(--border-light);
+}
+
+footer {
+  border-top: 1px solid var(--border); text-align: center; padding: 1.5rem;
+  font-size: 0.72rem; color: var(--text-3); background: var(--surface);
+}
+footer strong { color: #FF6B00; }
+
+/* Place autocomplete */
+.place-wrap { position: relative; }
+.place-dropdown {
+  display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 50;
+  background: var(--surface); border: 1px solid var(--border); border-top: none;
+  border-radius: 0 0 8px 8px; box-shadow: var(--shadow-md);
+  max-height: 220px; overflow-y: auto;
+}
+.place-dropdown.open { display: block; }
+.place-option {
+  padding: 0.5rem 0.75rem; font-size: 0.78rem; cursor: pointer;
+  border-bottom: 1px solid var(--border-light); color: var(--text-2);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.place-option:last-child { border-bottom: none; }
+.place-option:hover { background: rgba(255,107,0,0.08); color: var(--text); }
+.place-option .place-name { font-weight: 500; }
+.place-option .place-coords { font-size: 0.68rem; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.place-spinner {
+  padding: 0.6rem 0.75rem; font-size: 0.75rem; color: var(--text-3); text-align: center;
+}
+
+#chartContent { display: none; }
+
+/* Auth UI */
+.header-auth { display: flex; align-items: center; gap: 0.75rem; }
+.google-btn {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.45rem 1rem; background: rgba(255,255,255,0.1); color: #ffd54f;
+  border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+  font-family: inherit; font-size: 0.78rem; font-weight: 500;
+  cursor: pointer; transition: background 0.15s; text-decoration: none;
+}
+.google-btn:hover { background: rgba(255,255,255,0.18); }
+.user-info { display: flex; align-items: center; gap: 0.6rem; }
+.user-avatar { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255,213,79,0.3); }
+.user-name { font-size: 0.78rem; color: #ffd54f; font-weight: 500; }
+.header-link {
+  font-size: 0.72rem; color: rgba(255,213,79,0.5); cursor: pointer;
+  text-decoration: none; transition: color 0.15s;
+}
+.header-link:hover { color: rgba(255,213,79,0.8); }
+.save-btn {
+  padding: 0.5rem 1.25rem; background: #00BFA5; color: #fff; border: none;
+  border-radius: 8px; font-family: inherit; font-size: 0.82rem; font-weight: 600;
+  cursor: pointer; transition: background 0.15s; height: 37px; display: none;
+}
+.save-btn:hover { background: #00A893; }
+
+/* My Charts Panel (slide-out) */
+.charts-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 300;
+}
+.charts-overlay.open { display: block; }
+.charts-panel {
+  position: fixed; top: 0; right: -420px; width: 400px; max-width: 90vw;
+  height: 100vh; background: var(--surface); box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+  z-index: 301; transition: right 0.3s ease; display: flex; flex-direction: column;
+}
+.charts-panel.open { right: 0; }
+.panel-header {
+  padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.panel-header h2 { font-size: 1rem; font-weight: 600; }
+.panel-count { font-size: 0.75rem; color: var(--text-3); font-weight: 500; }
+.panel-close {
+  width: 32px; height: 32px; border: none; background: var(--surface-2);
+  border-radius: 8px; font-size: 1.1rem; cursor: pointer; color: var(--text-3);
+  display: flex; align-items: center; justify-content: center;
+}
+.panel-close:hover { background: var(--surface-3); color: var(--text); }
+.panel-body { flex: 1; overflow-y: auto; padding: 1rem 1.5rem; }
+.saved-chart-item {
+  padding: 0.85rem 1rem; border: 1px solid var(--border); border-radius: 10px;
+  margin-bottom: 0.6rem; transition: border-color 0.15s;
+}
+.saved-chart-item:hover { border-color: #FF6B00; }
+.saved-chart-name { font-weight: 600; font-size: 0.85rem; color: var(--text); margin-bottom: 0.2rem; }
+.saved-chart-meta { font-size: 0.72rem; color: var(--text-3); margin-bottom: 0.5rem; }
+.saved-chart-actions { display: flex; gap: 0.5rem; }
+.saved-chart-actions button {
+  padding: 0.3rem 0.8rem; border-radius: 6px; font-family: inherit;
+  font-size: 0.72rem; font-weight: 600; cursor: pointer; border: 1px solid var(--border);
+  transition: all 0.15s;
+}
+.btn-load { background: #FF6B00; color: #fff; border-color: #FF6B00; }
+.btn-load:hover { background: #FF8C33; }
+.btn-delete { background: var(--surface); color: var(--red); border-color: #fecaca; }
+.btn-delete:hover { background: #fef2f2; }
+.btn-edit { background: var(--surface); color: #FF6B00; border-color: #FF6B00; }
+.btn-edit:hover { background: rgba(255,107,0,0.08); }
+
+.edit-banner {
+  display: none; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+  background: rgba(255,107,0,0.08); border: 1px solid rgba(255,107,0,0.25);
+  border-radius: 10px; padding: 0.6rem 1rem; margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+}
+.edit-banner.active { display: flex; }
+.edit-banner-label { flex: 1; font-weight: 600; color: #FF6B00; min-width: 120px; }
+.edit-banner-label span { font-weight: 400; color: var(--text-2); }
+.btn-update { background: #FF6B00; color: #fff; border: none; border-radius: 6px;
+  padding: 0.35rem 0.9rem; font-family: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+.btn-update:hover { background: #FF8C33; }
+.btn-cancel-edit { background: transparent; border: none; font-size: 1.1rem; cursor: pointer;
+  color: var(--text-3); padding: 0 0.2rem; line-height: 1; }
+.btn-cancel-edit:hover { color: var(--text); }
+.panel-empty { text-align: center; padding: 2rem 1rem; color: var(--text-3); font-size: 0.85rem; }
+
+/* AI History Panel (slide-out) */
+.history-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 300;
+}
+.history-overlay.open { display: block; }
+.history-panel {
+  position: fixed; top: 0; right: -480px; width: 460px; max-width: 90vw;
+  height: 100vh; background: var(--surface); box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+  z-index: 301; transition: right 0.3s ease; display: flex; flex-direction: column;
+}
+.history-panel.open { right: 0; }
+.history-date-group {
+  font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--text-3); padding: 0.6rem 0 0.3rem; margin-top: 0.5rem;
+  border-bottom: 1px solid var(--border-light);
+}
+.history-date-group:first-child { margin-top: 0; }
+.history-item {
+  padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 10px;
+  margin-top: 0.5rem; cursor: pointer; transition: border-color 0.15s;
+}
+.history-item:hover { border-color: #FF6B00; }
+.history-item-question { font-weight: 600; font-size: 0.82rem; color: var(--text); }
+.history-item-meta { font-size: 0.68rem; color: var(--text-3); margin-top: 0.15rem; }
+.history-item-reading {
+  display: none; margin-top: 0.6rem; padding-top: 0.6rem;
+  border-top: 1px solid var(--border-light); font-size: 0.8rem; color: var(--text-2); line-height: 1.65;
+}
+.history-item-reading p { margin-bottom: 0.5rem; }
+.history-item-reading ul, .history-item-reading ol { margin: 0.4rem 0 0.4rem 1.2rem; }
+.history-item.expanded .history-item-reading { display: block; }
+
+/* Save modal */
+.save-modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 300; justify-content: center; align-items: center;
+}
+.save-modal-overlay.open { display: flex; }
+.save-modal {
+  background: var(--surface); border-radius: var(--radius); padding: 1.5rem;
+  width: 380px; max-width: 90vw; box-shadow: var(--shadow-md);
+}
+.save-modal h3 { font-size: 1rem; margin-bottom: 1rem; }
+.save-modal input {
+  width: 100%; padding: 0.6rem 0.85rem; border: 1px solid var(--border);
+  border-radius: 8px; font-family: inherit; font-size: 0.85rem; outline: none;
+  margin-bottom: 1rem;
+}
+.save-modal input:focus { border-color: #FF6B00; }
+.save-modal-btns { display: flex; gap: 0.6rem; justify-content: flex-end; }
+.save-modal-btns button {
+  padding: 0.45rem 1.2rem; border-radius: 8px; font-family: inherit;
+  font-size: 0.82rem; font-weight: 600; cursor: pointer; border: none;
+}
+.save-modal-btns .btn-cancel { background: var(--surface-2); color: var(--text-2); }
+.save-modal-btns .btn-save { background: #FF6B00; color: #fff; }
+
+/* BTR (Birth Time Rectification) */
+.btr-boundary-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.btr-boundary-table th { text-align: left; padding: 0.5rem 0.75rem; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.btr-boundary-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-light); color: var(--text-2); }
+.btr-boundary-table tr:last-child td { border-bottom: none; }
+.btr-boundary-table tr:hover { background: var(--surface-2); }
+.btr-badge {
+  display: inline-block; padding: 0.15rem 0.55rem; border-radius: 10px;
+  font-size: 0.68rem; font-weight: 600; letter-spacing: 0.02em;
+}
+.btr-badge-critical { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.btr-badge-sensitive { background: #fff7ed; color: #ea580c; border: 1px solid #fed7aa; }
+.btr-badge-stable { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.btr-timeline {
+  position: relative; height: 24px; background: var(--surface-2); border-radius: 12px;
+  border: 1px solid var(--border-light); margin: 0.5rem 0; overflow: hidden;
+}
+.btr-timeline-fill {
+  position: absolute; top: 0; height: 100%; border-radius: 12px;
+  background: linear-gradient(90deg, rgba(255,107,0,0.15), rgba(255,107,0,0.3));
+}
+.btr-timeline-marker {
+  position: absolute; top: 50%; transform: translate(-50%, -50%);
+  width: 10px; height: 10px; background: var(--accent); border-radius: 50%;
+  border: 2px solid var(--surface); box-shadow: 0 0 4px rgba(255,107,0,0.5);
+}
+.btr-timeline-label {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  font-size: 0.62rem; color: var(--text-3); white-space: nowrap;
+}
+.btr-question-card {
+  background: var(--surface); border: 1px solid var(--border-light); border-radius: 10px;
+  padding: 0.85rem 1rem; margin-bottom: 0.6rem;
+}
+.btr-question-card .btr-q-text { font-size: 0.85rem; color: var(--text); margin-bottom: 0.5rem; font-weight: 500; }
+.btr-question-card .btr-q-meta { font-size: 0.68rem; color: var(--text-3); margin-bottom: 0.4rem; }
+.btr-question-card .btr-q-options { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.btr-question-card .btr-q-options label {
+  display: flex; align-items: center; gap: 0.3rem; padding: 0.35rem 0.75rem;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+  font-size: 0.8rem; cursor: pointer; transition: all 0.15s;
+}
+.btr-question-card .btr-q-options label:hover { border-color: var(--accent); }
+.btr-question-card .btr-q-options input[type="radio"]:checked + span,
+.btr-question-card .btr-q-options input[type="radio"]:checked ~ span { color: var(--accent); font-weight: 600; }
+.btr-result-panel {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 1rem 1.25rem; margin-top: 0.75rem;
+}
+.btr-result-panel h4 { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text); }
+.btr-result-panel .btr-suggestion { font-size: 0.95rem; font-weight: 700; color: var(--accent); margin-bottom: 0.5rem; }
+.btr-result-panel .btr-explanation { font-size: 0.82rem; color: var(--text-2); line-height: 1.7; white-space: pre-wrap; }
+.btr-confidence {
+  display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 0.5rem;
+  font-size: 0.75rem; font-weight: 600;
+}
+.btr-confidence-dot { width: 8px; height: 8px; border-radius: 50%; }
+.btr-confidence-low .btr-confidence-dot { background: #ea580c; }
+.btr-confidence-medium .btr-confidence-dot { background: #ca8a04; }
+.btr-confidence-high .btr-confidence-dot { background: #16a34a; }
+.btr-btn {
+  padding: 0.5rem 1.25rem; background: var(--accent); color: #fff; border: none;
+  border-radius: 8px; font-family: inherit; font-size: 0.82rem; font-weight: 600;
+  cursor: pointer; transition: background 0.15s;
+}
+.btr-btn:hover { background: var(--accent-2); }
+.btr-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btr-btn-secondary {
+  padding: 0.5rem 1.25rem; background: var(--surface); color: var(--accent); border: 1px solid var(--accent);
+  border-radius: 8px; font-family: inherit; font-size: 0.82rem; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.btr-btn-secondary:hover { background: var(--accent-bg); }
+.btr-btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btr-actions { display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap; }
+.btr-loading { display: none; align-items: center; gap: 0.5rem; margin: 0.75rem 0; }
+.btr-loading.active { display: flex; }
+.btr-loading .btr-spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+.btr-loading .btr-step { font-size: 0.78rem; color: var(--text-3); }
+.btr-error { display: none; padding: 0.6rem 0.85rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; color: var(--red); font-size: 0.8rem; margin-top: 0.5rem; }
+.btr-error.active { display: block; }
+
+/* AI Reading */
+.ai-section { display: none; }
+.ai-section.visible { display: block; }
+.ai-chat-thread {
+  display: flex; flex-direction: column; gap: 0.75rem;
+  max-height: 500px; overflow-y: auto; margin-bottom: 1rem;
+  scroll-behavior: smooth;
+}
+.ai-chat-thread:empty { display: none; }
+.ai-chat-thread:empty + .ai-loading:not(.active) + .ai-error:not(.active) + .ai-input-row { margin-top: 0; }
+.ai-msg {
+  padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.85rem; line-height: 1.7;
+  max-width: 92%; animation: fadeSlide 0.2s ease;
+}
+.ai-msg.user {
+  align-self: flex-end; background: var(--accent-bg); color: var(--text);
+  border: 1px solid rgba(255,107,0,0.15); font-weight: 500;
+}
+.ai-msg.assistant {
+  align-self: flex-start; background: var(--surface-2); color: var(--text-2);
+  border: 1px solid var(--border-light);
+}
+.ai-msg-content p { margin: 0 0 0.6rem 0; }
+.ai-msg-content p:last-child { margin-bottom: 0; }
+.ai-msg-content ul, .ai-msg-content ol { margin: 0.3rem 0 0.6rem 1.2rem; padding: 0; }
+.ai-msg-content li { margin-bottom: 0.2rem; }
+.ai-msg-content strong { font-weight: 600; }
+.ai-msg .ai-category-tag { margin-bottom: 0.4rem; }
+.ai-input-row {
+  display: flex; gap: 0.5rem; align-items: flex-end;
+}
+.ai-input-row .ai-textarea {
+  flex: 1; min-height: 44px; max-height: 120px; resize: none;
+}
+.ai-input-row .ai-ask-btn {
+  margin-top: 0; height: 44px; padding: 0 1.25rem; flex-shrink: 0;
+}
+.ai-textarea {
+  width: 100%; min-height: 80px; padding: 0.75rem; border: 1px solid var(--border);
+  border-radius: 10px; font-family: inherit; font-size: 0.85rem; color: var(--text);
+  background: var(--surface); outline: none; resize: vertical; line-height: 1.5;
+}
+.ai-textarea:focus { border-color: #00BFA5; }
+.ai-textarea:disabled { opacity: 0.6; }
+.ai-ask-btn {
+  padding: 0.55rem 1.5rem; background: #00BFA5; color: #fff; border: none;
+  border-radius: 8px; font-family: inherit; font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; transition: background 0.15s; margin-top: 0.75rem;
+}
+.ai-ask-btn:hover { background: #00A893; }
+.ai-ask-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ai-helper { font-size: 0.72rem; color: var(--text-3); margin-top: 0.4rem; }
+.ai-loading {
+  display: none; padding: 1.5rem; text-align: center; color: var(--text-2); font-size: 0.85rem;
+}
+.ai-loading.active { display: block; }
+.ai-loading .ai-spinner {
+  width: 28px; height: 28px; border: 3px solid var(--border);
+  border-top-color: #00BFA5; border-radius: 50%; animation: spin 0.8s linear infinite;
+  margin: 0 auto 0.75rem;
+}
+.ai-loading .ai-step { color: #00BFA5; font-weight: 500; }
+.ai-result { display: none; margin-top: 1rem; }
+.ai-result.active { display: block; }
+.ai-category-tag {
+  display: inline-block; padding: 0.2rem 0.7rem; background: rgba(0,191,165,0.1);
+  color: #00BFA5; border-radius: 6px; font-size: 0.72rem; font-weight: 600;
+  text-transform: capitalize; margin-bottom: 0.5rem;
+}
+.ai-question-echo {
+  font-size: 0.8rem; color: var(--text-3); font-style: italic;
+  margin-bottom: 0.75rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-light);
+}
+.ai-reading-text {
+  font-size: 0.85rem; color: var(--text-2); line-height: 1.75; white-space: pre-wrap;
+}
+.ai-error {
+  display: none; padding: 0.75rem 1rem; background: #fef2f2; border: 1px solid #fecaca;
+  border-radius: 10px; color: var(--red); font-size: 0.82rem; margin-top: 0.75rem;
+}
+.ai-error.active { display: block; }
+
+/* Tab navigation */
+.tab-bar {
+  display: flex; gap: 0.4rem; padding: 0.5rem; background: var(--surface-2);
+  border-radius: 12px; border: 1px solid var(--border-light); margin-bottom: 1.25rem;
+}
+.tab-btn {
+  padding: 0.55rem 1.25rem; border: none; background: transparent; border-radius: 8px;
+  font-family: inherit; font-size: 0.82rem; font-weight: 500; color: var(--text-3);
+  cursor: pointer; transition: all 0.15s; flex: 1; text-align: center;
+}
+.tab-btn:hover { color: var(--text-2); background: rgba(255,107,0,0.05); }
+.tab-btn.active {
+  background: var(--surface); color: var(--text); font-weight: 600;
+  box-shadow: var(--shadow);
+}
+.tab-pane { display: none; flex-direction: column; gap: 1.25rem; }
+.tab-pane.active { display: flex; }
+
+@media (max-width: 768px) {
+  /* Prevent horizontal overflow */
+  html, body { overflow-x: hidden; width: 100%; max-width: 100vw; }
+  header, .container, .card, .tab-pane, footer { max-width: 100vw; box-sizing: border-box; overflow-x: hidden; }
+  .card-body { max-width: 100vw; }
+
+  .header-inner { flex-direction: column; gap: 0.5rem; padding: 0.7rem 1rem; }
+  .brand { flex-direction: column; align-items: center; gap: 0.15rem; }
+  .brand h1 { font-size: 1.15rem; }
+  .brand span { font-size: 0.65rem; }
+  .header-auth { flex-wrap: wrap; justify-content: center; }
+  .container { padding: 0.5rem; gap: 0.75rem; overflow-x: hidden; width: 100%; }
+
+  /* Input form: 2 col with buttons spanning full width */
+  .input-form { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  .input-form .form-group:nth-child(3) { grid-column: 1 / -1; } /* Place full width */
+  .input-form .form-group:nth-child(7) { grid-column: 1 / -1; } /* Generate btn full width */
+  .input-form .form-group:nth-child(8) { grid-column: 1 / -1; } /* Save btn full width */
+  .input-form input, .input-form select { font-size: 16px; } /* prevent iOS zoom on focus */
+  /* iOS date/time inputs: strip native chrome to prevent overflow, restore sizing manually */
+  .input-form input[type="date"], .input-form input[type="time"] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; min-width: 0; box-sizing: border-box;
+    height: 37px; padding: 0.5rem 0.75rem;
+    display: block;
+  }
+  .generate-btn, .save-btn { width: 100%; }
+  .btn-group .btn-label { display: none; }
+  .btn-group { gap: 0; }
+
+  /* Cards */
+  .card { border-radius: 10px; }
+  .card-header { padding: 0.5rem 0.65rem; flex-wrap: wrap; }
+  .card-header h2 { font-size: 0.85rem; }
+  .card-body { padding: 0.5rem 0.65rem; }
+
+  /* Data grids — single column, stacked label above value */
+  .kv-grid { display: flex; flex-direction: column; width: 100%; max-width: 100%; box-sizing: border-box; }
+  .kv { flex-direction: column; padding: 0.35rem 0; gap: 0.05rem; min-width: 0; max-width: 100%; box-sizing: border-box; }
+  .kv .k { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.03em; white-space: normal; }
+  .kv .v { font-size: 0.78rem; text-align: left; word-break: break-all; overflow-wrap: anywhere; white-space: normal; max-width: 100%; }
+  .kv .v * { word-break: break-all; overflow-wrap: anywhere; }
+  .pill-grid { gap: 0.3rem; max-width: 100%; }
+  .pill { padding: 0.35rem 0.6rem; min-width: 0; word-break: break-word; }
+  .pill .k { font-size: 0.6rem; }
+  .pill .v { font-size: 0.8rem; }
+
+  /* Charts: single column on mobile */
+  .charts-grid { grid-template-columns: 1fr !important; }
+  #summaryChartsGrid { grid-template-columns: 1fr !important; }
+  .chart-box { overflow: hidden; }
+
+  /* Chart legend */
+  .chart-legend { gap: 0.4rem 0.6rem; padding: 0.5rem 0.6rem; max-width: 100%; }
+  .legend-item { font-size: 0.6rem; }
+  .chart-box svg { max-width: 100%; height: auto; }
+
+  /* Non-table card-bodies: clip overflow. Table card-bodies have inline overflow-x:auto which wins. */
+  .card-body { overflow-x: hidden; max-width: 100%; box-sizing: border-box; }
+  table { font-size: 0.68rem; min-width: 480px; }
+  thead th { padding: 0.35rem 0.4rem; font-size: 0.6rem; white-space: nowrap; }
+  tbody td { padding: 0.35rem 0.4rem; white-space: nowrap; }
+
+  /* Dasha */
+  .dasha-row { padding: 0.4rem 0.5rem; gap: 0.4rem; }
+  .dasha-planet { width: 55px; font-size: 0.75rem; }
+  .dasha-dates { width: auto; font-size: 0.62rem; flex-shrink: 1; }
+  .dasha-bar-wrap { display: none; }
+  .dasha-dur { font-size: 0.62rem; width: 38px; }
+  .dasha-arrow { width: 12px; }
+  .timeline-bar { height: 30px; }
+  .t-seg { font-size: 0.5rem; }
+  .t-seg .t-yr { font-size: 0.42rem; }
+  .dasha-breadcrumb { font-size: 0.7rem; flex-wrap: wrap; }
+
+  /* Tabs */
+  .tab-bar { gap: 0.15rem; padding: 0.3rem; border-radius: 10px; flex-wrap: wrap; }
+  .tab-btn { padding: 0.4rem 0.4rem; font-size: 0.68rem; border-radius: 6px; flex: 0 1 auto; min-width: 0; white-space: nowrap; }
+
+  /* Yogas */
+  .yoga-grid { grid-template-columns: 1fr; }
+  .yoga-item { padding: 0.6rem 0.75rem; }
+
+  /* Doshas */
+  .dosha-grid { grid-template-columns: 1fr; }
+  .dosha-item { padding: 0.6rem 0.75rem; }
+
+  /* Aspects */
+  .aspects-cols { grid-template-columns: 1fr; gap: 1rem; }
+
+  /* Ashtakavarga */
+  .ashtak-label { width: 60px; font-size: 0.65rem; padding-right: 0.5rem; }
+  .ashtak-fill { font-size: 0.6rem; padding-left: 5px; }
+
+  /* AI section */
+  .ai-msg { max-width: 100%; font-size: 0.78rem; padding: 0.6rem 0.75rem; word-break: break-word; }
+  .ai-chat-thread { max-height: 350px; gap: 0.5rem; }
+  .ai-textarea { font-size: 16px; min-height: 40px; padding: 0.6rem; }
+  .ai-ask-btn { padding: 0.45rem 0.85rem; font-size: 0.78rem; }
+  .ai-helper { font-size: 0.65rem; }
+  .ai-input-row { gap: 0.4rem; }
+
+  /* BTR section */
+  .btr-boundary-table { font-size: 0.72rem; }
+  .btr-boundary-table th, .btr-boundary-table td { padding: 0.35rem 0.5rem; }
+  .btr-question-card { padding: 0.65rem 0.75rem; }
+  .btr-question-card .btr-q-text { font-size: 0.8rem; }
+  .btr-question-card .btr-q-options { gap: 0.35rem; }
+  .btr-question-card .btr-q-options label { padding: 0.3rem 0.55rem; font-size: 0.72rem; }
+  .btr-actions { flex-direction: column; }
+  .btr-btn, .btr-btn-secondary { width: 100%; text-align: center; }
+
+  /* Charts panel */
+  .charts-panel { width: 100%; max-width: 100vw; right: -100%; }
+  .history-panel { width: 100%; max-width: 100vw; right: -100%; }
+  .panel-header { padding: 1rem; }
+  .panel-body { padding: 0.75rem; }
+
+  /* Save modal */
+  .save-modal { padding: 1rem; width: 94vw; max-width: 94vw; }
+
+  /* Note box */
+  .note-box { font-size: 0.7rem; padding: 0.6rem 0.75rem; }
+
+  /* Footer */
+  footer { font-size: 0.62rem; padding: 1rem 0.5rem; }
+}
+
+@media (max-width: 600px) {
+  .input-form { grid-template-columns: 1fr; }
+  .tab-btn { font-size: 0.62rem; padding: 0.35rem 0.3rem; }
+  .brand h1 { font-size: 1rem; }
+  .card-header h2 { font-size: 0.8rem; }
+  .card-header { padding: 0.45rem 0.6rem; }
+  .card-body { padding: 0.4rem 0.5rem; }
+  .kv .k { font-size: 0.6rem; }
+  .kv .v { font-size: 0.7rem; }
+  .container { padding: 0.35rem; gap: 0.5rem; }
+  .input-form input, .input-form select { width: 100%; min-width: 0; }
+}
+
+/* Landscape on short screens (phones rotated) */
+@media (max-height: 500px) and (orientation: landscape) {
+  .input-form { grid-template-columns: repeat(4, 1fr); gap: 0.4rem; }
+  .input-form .form-group:nth-child(3) { grid-column: span 2; } /* Place wider */
+  .input-form .form-group:nth-child(7),
+  .input-form .form-group:nth-child(8) { grid-column: span 1; } /* Buttons inline */
+  .input-form label { font-size: 0.65rem; }
+  .input-form input, .input-form select { padding: 0.35rem 0.5rem; font-size: 0.75rem; }
+  .generate-btn, .save-btn { padding: 0.35rem 0.75rem; font-size: 0.75rem; }
+  .card-header { padding: 0.4rem 0.75rem; }
+  .card-header h2 { font-size: 0.8rem; }
+  .card-body { padding: 0.5rem 0.75rem; }
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="brand"><h1>Astrojyoti AI</h1><span>Ancient Vision. Algorithmic Insight</span></div>
+    <div class="header-auth" id="headerAuth">
+      <a href="/auth/google" class="google-btn" id="signInBtn">Sign in with Google</a>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+<!-- Input Form -->
+<div class="card accent-purple">
+  <div class="card-header"><h2>Birth Data Input</h2></div>
+  <div class="card-body">
+    <div class="input-form" id="inputForm">
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="birthDate">
+      </div>
+      <div class="form-group">
+        <label>Time</label>
+        <input type="time" id="birthTime">
+      </div>
+      <div class="form-group place-wrap">
+        <label>Place</label>
+        <input type="text" id="birthPlace" placeholder="Enter a place" autocomplete="off">
+        <div class="place-dropdown" id="placeDropdown"></div>
+      </div>
+      <div class="form-group">
+        <label>Latitude</label>
+        <input type="number" id="birthLat" step="0.0001">
+      </div>
+      <div class="form-group">
+        <label>Longitude</label>
+        <input type="number" id="birthLon" step="0.0001">
+      </div>
+      <div class="form-group">
+        <label>TZ Offset</label>
+        <input type="number" id="birthTz" step="0.5">
+      </div>
+      <div class="form-group btn-group">
+        <label class="btn-label">&nbsp;</label>
+        <button class="generate-btn" id="generateBtn" onclick="fetchChart()">Generate Chart</button>
+      </div>
+      <div class="form-group btn-group">
+        <label class="btn-label">&nbsp;</label>
+        <button class="save-btn" id="saveBtn" onclick="openSaveModal()">Save Chart</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="error-banner" id="errorBanner"></div>
+
+<!-- Edit mode banner -->
+<div class="edit-banner" id="editBanner">
+  <div class="edit-banner-label">✏️ Editing: <span id="editBannerName"></span></div>
+  <button class="btn-update" onclick="updateEditedChart()">Update Chart</button>
+  <button class="btn-cancel-edit" onclick="cancelEdit()" title="Cancel edit">✕</button>
+</div>
+
+<!-- All chart content sections (hidden until data loads) -->
+<div id="chartContent">
+
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="summary" onclick="switchTab('summary')">Summary</button>
+  <button class="tab-btn" data-tab="charts" onclick="switchTab('charts')">Vargas</button>
+  <button class="tab-btn" data-tab="yogas" onclick="switchTab('yogas')">Yogas</button>
+  <button class="tab-btn" data-tab="dasha" onclick="switchTab('dasha')">Dasha & Transits</button>
+  <button class="tab-btn" data-tab="ai" onclick="switchTab('ai')">AI Reading</button>
+  <button class="tab-btn" data-tab="btr" onclick="switchTab('btr')">BTR</button>
+</div>
+
+<!-- Tab: Summary -->
+<div class="tab-pane active" id="tab-summary">
+
+<div class="card accent-purple">
+  <div class="card-header"><h2>Birth Data</h2></div>
+  <div class="card-body"><div class="kv-grid" id="birthDataGrid"></div></div>
+</div>
+
+<div class="card accent-teal">
+  <div class="card-header"><h2>Lagna</h2><span class="sub">Ascendant</span></div>
+  <div class="card-body"><div class="pill-grid" id="lagnaGrid"></div></div>
+</div>
+
+<div class="card accent-amber">
+  <div class="card-header"><h2>Charts</h2><span class="sub">Rashi & Navamsha</span></div>
+  <div class="card-body">
+    <div class="chart-legend">
+      <div class="legend-item"><span class="legend-sym">🌟</span> Exalted (Uchcha)</div>
+      <div class="legend-item"><span class="legend-sym">💔</span> Debilitated (Neecha)</div>
+      <div class="legend-item"><span class="legend-sym">💎</span> Moolatrikona</div>
+      <div class="legend-item"><span class="legend-sym">⚠️</span> Maranakarak Sthana</div>
+      <div class="legend-item"><span class="legend-sym">🔄</span> Retrograde</div>
+      <div class="legend-item"><span class="legend-sym">🔥</span> Combust</div>
+      <div class="legend-item"><span class="legend-sym">🔶</span> Vargottama</div>
+      <div class="legend-item"><span style="font-weight:700;font-size:0.9rem;color:#FF6B00;">AL</span> Arudha Lagna</div>
+    </div>
+    <div class="charts-grid" id="summaryChartsGrid" style="grid-template-columns: repeat(2, 1fr);"></div>
+  </div>
+</div>
+
+<div class="card accent-amber">
+  <div class="card-header"><h2>Panchang</h2><span class="sub">Five Limbs</span></div>
+  <div class="card-body" style="overflow-x:auto;padding:0;">
+    <table>
+      <thead><tr><th>Element</th><th>Value</th><th>Details</th></tr></thead>
+      <tbody id="panchangBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card accent-pink">
+  <div class="card-header"><h2>Planetary Positions</h2><span class="sub">Graha Sphuta</span></div>
+  <div class="card-body" style="overflow-x:auto;padding:0;">
+    <table>
+      <thead><tr><th>Planet</th><th>Longitude</th><th>Sign</th><th>Deg in Sign</th><th>Nakshatra</th><th>Pada</th><th>House</th><th>R</th><th>Dignity</th></tr></thead>
+      <tbody id="planetsBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card accent-teal">
+  <div class="card-header"><h2>Chara Karakas</h2><span class="sub">Jaimini Significators</span></div>
+  <div class="card-body" style="overflow-x:auto;padding:0;">
+    <table>
+      <thead><tr><th>Karaka</th><th>Abbr</th><th>Planet</th><th>Degree in Sign</th><th>Signifies</th></tr></thead>
+      <tbody id="karakaBody"></tbody>
+    </table>
+  </div>
+</div>
+
+</div><!-- end tab-summary -->
+
+<!-- Tab: Charts & Dasha -->
+<div class="tab-pane" id="tab-charts">
+
+<div class="card accent-amber">
+  <div class="card-header"><h2>Vargas</h2><span class="sub">North Indian Diamond &mdash; D1, D9, D2, D3, D7, D10, D12, D60</span></div>
+  <div class="card-body">
+    <div class="chart-legend">
+      <div class="legend-item"><span class="legend-sym">🌟</span> Exalted (Uchcha)</div>
+      <div class="legend-item"><span class="legend-sym">💔</span> Debilitated (Neecha)</div>
+      <div class="legend-item"><span class="legend-sym">💎</span> Moolatrikona</div>
+      <div class="legend-item"><span class="legend-sym">⚠️</span> Maranakarak Sthana</div>
+      <div class="legend-item"><span class="legend-sym">🔄</span> Retrograde</div>
+      <div class="legend-item"><span class="legend-sym">🔥</span> Combust</div>
+      <div class="legend-item"><span class="legend-sym">🔶</span> Vargottama</div>
+      <div class="legend-item"><span style="font-weight:700;font-size:0.9rem;color:#FF6B00;">AL</span> Arudha Lagna</div>
+    </div>
+    <div class="charts-grid" id="chartsGrid" style="grid-template-columns: repeat(2, 1fr);"></div>
+  </div>
+</div>
+
+<div class="card accent-blue">
+  <div class="card-header"><h2>Bhava Chart</h2><span class="sub">Equal House</span></div>
+  <div class="card-body" style="overflow-x:auto;padding:0;">
+    <table>
+      <thead><tr><th>House</th><th>Cusp Start</th><th>Cusp End</th><th>Planets</th></tr></thead>
+      <tbody id="bhavaBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card accent-green">
+  <div class="card-header"><h2>Sarvashtakavarga</h2><span class="sub" id="ashtakSub">Simplified</span></div>
+  <div class="card-body"><div id="ashtakChart"></div></div>
+</div>
+
+</div><!-- end tab-charts -->
+
+<!-- Tab: Yogas -->
+<div class="tab-pane" id="tab-yogas">
+
+<div class="card accent-orange">
+  <div class="card-header"><h2>Yogas</h2></div>
+  <div class="card-body"><div class="yoga-grid" id="yogaGrid"></div></div>
+</div>
+
+<div class="card accent-red">
+  <div class="card-header"><h2>Doshas</h2></div>
+  <div class="card-body"><div class="dosha-grid" id="doshaGrid"></div></div>
+</div>
+
+</div><!-- end tab-yogas -->
+
+<!-- Tab: Dasha & Transits -->
+<div class="tab-pane" id="tab-dasha">
+
+<div class="card accent-purple">
+  <div class="card-header"><h2>Vimshottari Dasha</h2><span class="sub">Click any period to drill down</span></div>
+  <div class="card-body">
+    <div class="dasha-info" id="dashaInfo"></div>
+    <div class="timeline-bar" id="timelineBar"></div>
+    <div class="dasha-breadcrumb" id="dashaBreadcrumb"></div>
+    <div class="dasha-nav" id="dashaNav"></div>
+  </div>
+</div>
+
+<div class="card accent-cyan">
+  <div class="card-header"><h2>Current Transits</h2><span class="sub" id="transitSub">Gochara — planetary positions now</span></div>
+  <div class="card-body" style="overflow-x:auto;padding:0;">
+    <table>
+      <thead><tr><th>Planet</th><th>Transit Sign</th><th>Deg in Sign</th><th>Nakshatra</th><th>Natal House</th><th>R</th></tr></thead>
+      <tbody id="transitBody"></tbody>
+    </table>
+  </div>
+</div>
+
+</div><!-- end tab-dasha -->
+
+<!-- Tab: AI Reading -->
+<div class="tab-pane" id="tab-ai">
+
+<div class="ai-section visible" id="aiSection">
+<div class="card accent-teal">
+  <div class="card-header"><h2>AI Jyotish Reading</h2><span class="sub">Powered by Gemini</span></div>
+  <div class="card-body">
+    <div class="ai-chat-thread" id="aiChatThread"></div>
+    <div class="ai-loading" id="aiLoading">
+      <div class="ai-spinner"></div>
+      <div class="ai-step" id="aiStep">Analyzing chart...</div>
+    </div>
+    <div class="ai-error" id="aiError"></div>
+    <div class="ai-input-row">
+      <textarea class="ai-textarea" id="aiQuestion" maxlength="500" rows="2"
+        placeholder="Ask about this chart... e.g. career, health, marriage prospects"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();askAI();}"></textarea>
+      <button class="ai-ask-btn" id="aiAskBtn" onclick="askAI()">Ask</button>
+    </div>
+    <span class="ai-helper" id="aiHelper">10 questions per day</span>
+  </div>
+</div>
+</div>
+
+</div><!-- end tab-ai -->
+
+<!-- Tab: BTR (Birth Time Rectification) -->
+<div class="tab-pane" id="tab-btr">
+
+<div class="card accent-orange">
+  <div class="card-header"><h2>Lagna Boundaries</h2><span class="sub">When each divisional Lagna changes</span></div>
+  <div class="card-body">
+    <div id="btrD1Timeline"></div>
+    <div style="overflow-x:auto;padding:0;">
+      <table class="btr-boundary-table">
+        <thead><tr><th>Chart</th><th>Current Lagna</th><th>&larr; Mins Before</th><th>Mins After &rarr;</th><th>Status</th></tr></thead>
+        <tbody id="btrBoundaryBody"></tbody>
+      </table>
+    </div>
+    <div class="btr-loading" id="btrBoundaryLoading">
+      <div class="btr-spinner"></div>
+      <span class="btr-step">Computing boundaries...</span>
+    </div>
+  </div>
+</div>
+
+<div class="card accent-teal">
+  <div class="card-header"><h2>AI Birth Time Rectification</h2><span class="sub">Answer questions to refine birth time</span></div>
+  <div class="card-body">
+    <div id="btrQuestionsContainer"></div>
+    <div class="btr-loading" id="btrAILoading">
+      <div class="btr-spinner"></div>
+      <span class="btr-step" id="btrAIStep">Generating questions...</span>
+    </div>
+    <div class="btr-error" id="btrAIError"></div>
+    <div id="btrResultPanel"></div>
+    <div style="margin-top:0.85rem;">
+      <label style="font-size:0.75rem;color:var(--text-3);display:block;margin-bottom:0.3rem;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;">Additional context (optional)</label>
+      <textarea id="btrAdditionalInfo" rows="3" placeholder="Share any relevant life facts that may help — e.g. 'married in 2010', 'no siblings', 'work in finance', 'had a major accident at age 25'..." style="width:100%;box-sizing:border-box;font-size:0.82rem;padding:0.5rem 0.65rem;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);resize:vertical;font-family:inherit;line-height:1.5;"></textarea>
+    </div>
+    <div class="btr-actions" id="btrActions">
+      <button class="btr-btn" id="btrGenQuestionsBtn" onclick="generateBTRQuestions()">Generate Questions</button>
+      <button class="btr-btn-secondary" id="btrAnalyzeBtn" onclick="submitBTRAnswers()" style="display:none;">Analyze Answers</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- end tab-btr -->
+
+</div><!-- end chartContent -->
+
+</div><!-- end container -->
+
+<footer>Generated with <strong>Swiss Ephemeris</strong> &middot; Ayanamsa: <strong>Lahiri</strong> &middot; House System: <strong>Equal</strong></footer>
+
+<div class="loading-overlay" id="loadingOverlay"><div class="loading-spinner"></div></div>
+<div class="drishti-tip" id="drishtiTip"></div>
+
+<!-- My Charts Panel -->
+<div class="charts-overlay" id="chartsOverlay" onclick="closeMyCharts()"></div>
+<div class="charts-panel" id="chartsPanel">
+  <div class="panel-header">
+    <div><h2>My Charts</h2><span class="panel-count" id="panelCount"></span></div>
+    <button class="panel-close" onclick="closeMyCharts()">&times;</button>
+  </div>
+  <div class="panel-body" id="panelBody">
+    <div class="panel-empty">Loading...</div>
+  </div>
+</div>
+
+<!-- AI Chat History Panel -->
+<div class="history-overlay" id="historyOverlay" onclick="closeAIHistory()"></div>
+<div class="history-panel" id="historyPanel">
+  <div class="panel-header">
+    <div><h2>Chat History</h2><span class="panel-count" id="historyCount"></span></div>
+    <button class="panel-close" onclick="closeAIHistory()">&times;</button>
+  </div>
+  <div class="panel-body" id="historyBody">
+    <div class="panel-empty">Loading...</div>
+  </div>
+</div>
+
+<!-- Save Chart Modal -->
+<div class="save-modal-overlay" id="saveModalOverlay">
+  <div class="save-modal">
+    <h3>Save Chart</h3>
+    <input type="text" id="saveChartName" placeholder="e.g. My Birth Chart" maxlength="60" onkeydown="if(event.key==='Enter')saveCurrentChart()">
+    <div class="save-modal-btns">
+      <button class="btn-cancel" onclick="closeSaveModal()">Cancel</button>
+      <button class="btn-save" onclick="saveCurrentChart()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════
+var chartData = null;
+var ALL_CHARTS = [];
+var dashaPath = [];
+
+var COLORS = {
+  Ketu:"#9575CD",Venus:"#E91E8C",Sun:"#FF6B00",Moon:"#7C4DFF",Mars:"#E53935",
+  Rahu:"#3366FF",Jupiter:"#FFB300",Saturn:"#546E7A",Mercury:"#2ECC40"
+};
+
+var CHART_TITLES = {
+  D1: {title: "D1 \u2014 Rashi (Natal)"},
+  D1RD: {title: "D1 \u2014 Rashi Drishti (Sign Aspects)"},
+  D9: {title: "D9 \u2014 Navamsha (Spouse & Dharma)"},
+  D2: {title: "D2 \u2014 Hora (Wealth)"},
+  D3: {title: "D3 \u2014 Drekkana (Siblings & Courage)"},
+  D7: {title: "D7 \u2014 Saptamsha (Children)"},
+  D10: {title: "D10 \u2014 Dasamsha (Career)"},
+  D12: {title: "D12 \u2014 Dwadasamsha (Parents)"},
+  D60: {title: "D60 \u2014 Shashtiamsha (Past Karma)"}
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// FETCH CHART
+// ═══════════════════════════════════════════════════════════════════
+
+function fetchChart() {
+  var dateVal = document.getElementById("birthDate").value;
+  var timeVal = document.getElementById("birthTime").value;
+  var parts = dateVal.split("-");
+  var tparts = timeVal.split(":");
+
+  var payload = {
+    year: parseInt(parts[0]),
+    month: parseInt(parts[1]),
+    day: parseInt(parts[2]),
+    hour: parseInt(tparts[0]),
+    minute: parseInt(tparts[1]),
+    lat: parseFloat(document.getElementById("birthLat").value),
+    lon: parseFloat(document.getElementById("birthLon").value),
+    tz_offset: parseFloat(document.getElementById("birthTz").value),
+    place: document.getElementById("birthPlace").value
+  };
+
+  lastInputPayload = payload;
+  document.getElementById("loadingOverlay").classList.add("active");
+  document.getElementById("errorBanner").classList.remove("active");
+  document.getElementById("generateBtn").disabled = true;
+
+  fetch("/api/chart", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(payload)
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    document.getElementById("loadingOverlay").classList.remove("active");
+    document.getElementById("generateBtn").disabled = false;
+    if (data.error) {
+      document.getElementById("errorBanner").textContent = "Error: " + data.error;
+      document.getElementById("errorBanner").classList.add("active");
+      return;
+    }
+    chartData = data;
+    renderAll(data);
+    document.getElementById("chartContent").style.display = "flex";
+    document.getElementById("chartContent").style.flexDirection = "column";
+    document.getElementById("chartContent").style.gap = "1.25rem";
+    if (currentUser) document.getElementById("saveBtn").style.display = "block";
+  })
+  .catch(function(err) {
+    document.getElementById("loadingOverlay").classList.remove("active");
+    document.getElementById("generateBtn").disabled = false;
+    document.getElementById("errorBanner").textContent = "Error: " + err.message;
+    document.getElementById("errorBanner").classList.add("active");
+  });
+}
+
+function switchTab(tabName) {
+  document.querySelectorAll('.tab-btn').forEach(function(btn) { btn.classList.remove('active'); });
+  document.querySelectorAll('.tab-pane').forEach(function(pane) { pane.classList.remove('active'); });
+  var pane = document.getElementById('tab-' + tabName);
+  if (pane) pane.classList.add('active');
+  var btn = document.querySelector('.tab-btn[data-tab="' + tabName + '"]');
+  if (btn) btn.classList.add('active');
+}
+
+function renderAll(data) {
+  switchTab('summary');
+  renderBirthData(data);
+  renderLagna(data);
+  renderPanchang(data);
+  renderKarakas(data);
+  renderPlanets(data);
+  buildAllCharts(data);
+  renderAllCharts();
+  renderBhava(data);
+  renderDashaSection(data);
+  renderAshtak(data);
+  renderYogas(data);
+  renderDoshas(data);
+  fetchTransits(data);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// BIRTH DATA & LAGNA
+// ═══════════════════════════════════════════════════════════════════
+
+function renderBirthData(data) {
+  var b = data.birth;
+  var html = '';
+  var items = [
+    ["Date", b.date], ["Time", b.time + " " + b.tz_str], ["Place", b.place],
+    ["Latitude", b.lat + "\u00b0"], ["Longitude", b.lon + "\u00b0"],
+    ["Timezone", b.tz_str], ["Ayanamsa", "Lahiri (" + b.ayanamsa + ")"],
+    ["Julian Day", '<span class="mono">' + b.jd + '</span>']
+  ];
+  items.forEach(function(kv) {
+    html += '<div class="kv"><span class="k">' + kv[0] + '</span><span class="v">' + kv[1] + '</span></div>';
+  });
+  document.getElementById("birthDataGrid").innerHTML = html;
+}
+
+function renderLagna(data) {
+  var l = data.lagna;
+  var pills = [
+    ["Sign", l.sign_name],
+    ["Sign Number", l.sign],
+    ["Degree", l.degree],
+    ["Total Longitude", l.lon_fmt],
+    ["Nakshatra", l.nakshatra + " Pada " + l.pada],
+    ["Nakshatra Lord", l.nak_lord],
+    ["Sign Lord", l.sign_lord]
+  ];
+  var html = '';
+  pills.forEach(function(p) {
+    html += '<div class="pill"><span class="k">' + p[0] + '</span><span class="v">' + p[1] + '</span></div>';
+  });
+  document.getElementById("lagnaGrid").innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PANCHANG & KARAKAS
+// ═══════════════════════════════════════════════════════════════════
+
+function renderPanchang(data) {
+  var p = data.panchang;
+  var rows = [
+    ["Tithi", p.tithi.display, "Lunar day (" + p.tithi.paksha + " Paksha)"],
+    ["Vara", p.vara.name, "Lord: " + p.vara.lord],
+    ["Nakshatra", p.nakshatra.display, "Lord: " + p.nakshatra.lord],
+    ["Yoga", p.yoga.name + " (" + p.yoga.index + "/27)", "Sun + Moon combination"],
+    ["Karana", p.karana.name, p.karana.is_vishti ? '<span style="color:var(--red);font-weight:600;">Vishti (Bhadra) \u2014 inauspicious</span>' : "Half-tithi"]
+  ];
+  var html = '';
+  rows.forEach(function(r) {
+    html += '<tr><td class="bold">' + r[0] + '</td><td>' + r[1] + '</td><td class="dim">' + r[2] + '</td></tr>';
+  });
+  document.getElementById("panchangBody").innerHTML = html;
+}
+
+function renderKarakas(data) {
+  var html = '';
+  data.karakas.forEach(function(k) {
+    html += '<tr><td class="bold">' + k.karaka + '</td><td>' + k.karaka_abbr + '</td><td style="color:var(--accent);font-weight:600;">' + k.planet + '</td><td class="mono">' + k.degree + '</td><td class="dim">' + k.signifies + '</td></tr>';
+  });
+  document.getElementById("karakaBody").innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PLANETS TABLE
+// ═══════════════════════════════════════════════════════════════════
+
+function renderPlanets(data) {
+  var dignityLabels = {
+    "exalted": '<span style="color:#2ECC40;font-weight:600;">🌟 Exalted</span>',
+    "debilitated": '<span style="color:#E53935;font-weight:600;">💔 Debilitated</span>',
+    "moolatrikona": '<span style="color:#3366FF;font-weight:600;">💎 Moolatrikona</span>',
+    "own": '<span style="color:#FF6B00;font-weight:600;">Own</span>',
+    "mks": '<span style="color:#FF6B00;font-weight:600;">⚠️ MKS</span>',
+  };
+  var relationLabels = {
+    "friendly": '<span style="color:#2ECC40;">Friendly</span>',
+    "neutral": '<span style="color:#9a7b52;">Neutral</span>',
+    "enemy": '<span style="color:#E53935;">Enemy</span>',
+    "own": '<span style="color:#FF6B00;font-weight:600;">Own</span>',
+  };
+  var html = '';
+  data.planets.forEach(function(p) {
+    var isRK = (p.name === "Rahu" || p.name === "Ketu");
+    var retroCell = (p.retro && !isRK) ? '🔄' : isRK ? '🔄' : '<span class="dim">\u2014</span>';
+    var nameExtras = '';
+    if (p.retro && !isRK) nameExtras += ' 🔄';
+    if (p.combust) nameExtras += ' 🔥';
+    if (p.vargottama) nameExtras += ' 🔶';
+    var dignityCell = '';
+    if (p.dignity && dignityLabels[p.dignity]) {
+      dignityCell = dignityLabels[p.dignity];
+    } else if (p.house_relation && relationLabels[p.house_relation]) {
+      dignityCell = relationLabels[p.house_relation];
+    } else {
+      dignityCell = '<span class="dim">\u2014</span>';
+    }
+    html += '<tr><td class="bold">' + p.name + nameExtras + '</td><td class="mono">' + p.full_lon + '</td><td>' + p.sign_name + '</td><td class="mono">' + p.deg + '</td><td>' + p.nakshatra + '</td><td>' + p.pada + '</td><td>' + p.house + '</td><td>' + retroCell + '</td><td>' + dignityCell + '</td></tr>';
+  });
+  document.getElementById("planetsBody").innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DIAMOND CHART RENDERER
+// ═══════════════════════════════════════════════════════════════════
+
+var HPOLY = {
+  1:  "170,5 252.5,87.5 170,170 87.5,87.5",
+  2:  "5,5 170,5 87.5,87.5",
+  3:  "5,5 87.5,87.5 5,170",
+  4:  "87.5,87.5 170,170 87.5,252.5 5,170",
+  5:  "5,170 87.5,252.5 5,335",
+  6:  "5,335 87.5,252.5 170,335",
+  7:  "170,335 87.5,252.5 170,170 252.5,252.5",
+  8:  "170,335 252.5,252.5 335,335",
+  9:  "335,335 252.5,252.5 335,170",
+  10: "252.5,87.5 335,170 252.5,252.5 170,170",
+  11: "335,170 252.5,87.5 335,5",
+  12: "335,5 170,5 252.5,87.5"
+};
+
+var HC = {
+  1:  {sx:170, sy:26,  cx:170, cy:78},
+  2:  {sx:87,  sy:19,  cx:82,  cy:46},
+  3:  {sx:19,  sy:91,  cx:34,  cy:100},
+  4:  {sx:26,  sy:174, cx:82,  cy:170},
+  5:  {sx:19,  sy:253, cx:34,  cy:242},
+  6:  {sx:87,  sy:326, cx:82,  cy:298},
+  7:  {sx:170, sy:323, cx:170, cy:264},
+  8:  {sx:253, sy:326, cx:258, cy:298},
+  9:  {sx:321, sy:253, cx:306, cy:242},
+  10: {sx:314, sy:174, cx:258, cy:170},
+  11: {sx:321, sy:91,  cx:306, cy:100},
+  12: {sx:253, sy:19,  cx:258, cy:46}
+};
+
+// Map old dignity symbols to new emojis (for saved charts with legacy data)
+var OLD_TO_NEW_DIGNITY = {
+  "\u2191": "\uD83C\uDF1F",  // ↑ → 🌟 Exalted
+  "\u2193": "\uD83D\uDC94",  // ↓ → 💔 Debilitated
+  "\u25B3": "\uD83D\uDC8E",  // △ → 💎 Moolatrikona
+  "\u2297": "\u26A0\uFE0F"   // ⊗ → ⚠️ MKS
+};
+
+var PLANET_COLORS = {
+  "Su": "#D97706",  // Sun — amber/gold
+  "Mo": "#607D8B",  // Moon — blue-grey (white is invisible on parchment)
+  "Ma": "#C62828",  // Mars — red
+  "Me": "#2E7D32",  // Mercury — green
+  "Ju": "#F57F17",  // Jupiter — saffron/golden
+  "Ve": "#AD1457",  // Venus — deep pink
+  "Sa": "#37474F",  // Saturn — dark slate
+  "Ra": "#546E7A",  // Rahu — smoke grey
+  "Ke": "#6D4C41"   // Ketu — brown
+};
+
+var ARROW_COLORS = {
+  "\uD83C\uDF1F":"#2ECC40","\uD83D\uDC94":"#E53935","\uD83D\uDC8E":"#3366FF","\u26A0\uFE0F":"#FF6B00",
+  "\u2191":"#2ECC40","\u2193":"#E53935","\u25B3":"#3366FF","\u2297":"#FF6B00"
+};
+// emoji sets for SVG dignity indicators
+var DIGNITY_EMOJIS = new Set(["\uD83C\uDF1F","\uD83D\uDC94","\uD83D\uDC8E","\u26A0\uFE0F","\u2191","\u2193","\u25B3","\u2297"]);
+
+var ASPECT_RULES = {
+  Su:[7], Mo:[7], Ma:[4,7,8], Me:[7], Ju:[5,7,9],
+  Ve:[7], Sa:[3,7,10], Ra:[5,7,9], Ke:[7]
+};
+
+function ord(n) {
+  if (n===1) return "1st"; if (n===2) return "2nd"; if (n===3) return "3rd";
+  return n+"th";
+}
+
+var _currentChartRetro = [];
+var _currentChartCombust = [];
+var _currentChartVargottama = [];
+var _currentChartDegs = {};
+var _currentChartFs = 9;
+
+function buildTextLine(items, x, y, fs) {
+  var parts = [];
+  items.forEach(function(p, i) {
+    // All planet abbreviations are exactly 2 chars; rest is the dignity emoji
+    var chars = [...p];
+    var baseName = chars.slice(0, 2).join('');
+    var arrow = chars.slice(2).join('');
+    // Convert old symbols to new emojis
+    if (arrow && OLD_TO_NEW_DIGNITY[arrow]) arrow = OLD_TO_NEW_DIGNITY[arrow];
+    var html = '';
+    if (i > 0) html += ' ';
+    var degRaw = _currentChartDegs[baseName] || '';
+    var degStr = degRaw ? String(parseInt(degRaw, 10)) : '';
+    var degFs = Math.max(Math.round(fs * 0.55), 6);
+    var degHtml = degStr ? '<sup style="font-size:' + degFs + 'px;color:#7a6a5a;vertical-align:super;line-height:0;">' + degStr + '°</sup>' : '';
+    var planetColor = PLANET_COLORS[baseName] || '#2a1f14';
+    var nameStyle = 'color:' + planetColor + ';font-weight:800;font-family:Cinzel,serif;';
+    if (arrow && ARROW_COLORS[arrow]) {
+      html += '<span style="' + nameStyle + '">' + baseName + '</span>' + degHtml + '<span style="font-size:' + Math.round(fs * 0.85) + 'px;">' + arrow + '</span>';
+    } else {
+      html += '<span style="' + nameStyle + '">' + baseName + '</span>' + degHtml;
+    }
+    // Add retrograde indicator
+    if (_currentChartRetro.indexOf(baseName) >= 0) {
+      html += '<span style="font-size:' + Math.round(fs * 0.85) + 'px;">🔄</span>';
+    }
+    // Add combust indicator
+    if (_currentChartCombust.indexOf(baseName) >= 0) {
+      html += '<span style="font-size:' + Math.round(fs * 0.85) + 'px;">🔥</span>';
+    }
+    // Add vargottama indicator
+    if (_currentChartVargottama.indexOf(baseName) >= 0) {
+      html += '<span style="font-size:' + Math.round(fs * 0.85) + 'px;">🔶</span>';
+    }
+    parts.push(html);
+  });
+  var hasDegs = Object.keys(_currentChartDegs).length > 0;
+  var w = hasDegs ? 100 : 90;
+  var h = Math.round(fs + (hasDegs ? 12 : 8));
+  return '<foreignObject x="' + (x - w / 2) + '" y="' + (y - fs - (hasDegs ? 2 : 0)) + '" width="' + w + '" height="' + h + '" style="overflow:visible;">' +
+    '<div xmlns="http://www.w3.org/1999/xhtml" style="text-align:center;font-family:Inter,sans-serif;font-size:' + fs + 'px;line-height:1.2;white-space:nowrap;overflow:hidden;width:' + w + 'px;">' +
+    parts.join('') + '</div></foreignObject>';
+}
+
+function renderPlanetGroup(planets, pos, chartId, house) {
+  if (!planets || planets.length === 0) return "";
+  var count = planets.length;
+  var hasDegs = Object.keys(_currentChartDegs).length > 0;
+  var fs = _currentChartFs;
+  var lh = fs + (hasDegs ? 12 : 4);
+  var rows = [];
+  for (var i = 0; i < count; i++) rows.push(planets.slice(i, i + 1));
+  var totalH = rows.length * lh;
+  var startY = pos.cy - totalH / 2 + fs * 0.4;
+  var svg = '<g clip-path="url(#cp-' + chartId + '-' + house + ')">';
+  svg += '<g onmouseenter="showDrishti(event,\'' + chartId + '\',' + house + ')" onmouseleave="hideDrishti(\'' + chartId + '\')" style="cursor:pointer;">';
+  rows.forEach(function(row, ri) {
+    svg += buildTextLine(row, pos.cx, startY + ri * lh, fs);
+  });
+  svg += '</g></g>';
+  return svg;
+}
+
+function buildDiamond(c, idx) {
+  _currentChartRetro = c.retro || [];
+  _currentChartCombust = c.combust || [];
+  _currentChartVargottama = c.vargottama || [];
+  _currentChartDegs = c.planet_degs || {};
+  _currentChartFs = c._planetFs || 9;
+  var S = 340, half = 170, pad = 5;
+  var id = 'c' + idx;
+  var maxW = c._maxWidth || '380px';
+  var svg = '<svg viewBox="0 0 ' + S + ' ' + S + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:' + maxW + ';" id="' + id + '">';
+  svg += '<defs>';
+  for (var h = 1; h <= 12; h++) {
+    svg += '<clipPath id="cp-' + id + '-' + h + '"><polygon points="' + HPOLY[h] + '"/></clipPath>';
+  }
+  svg += '</defs>';
+  svg += '<rect x="' + pad + '" y="' + pad + '" width="' + (S - 2 * pad) + '" height="' + (S - 2 * pad) + '" fill="#fff8ee" stroke="#e0c08a" stroke-width="1.3" rx="4"/>';
+  svg += '<line x1="' + half + '" y1="' + pad + '" x2="' + (S - pad) + '" y2="' + half + '" stroke="#c4b0e8" stroke-width="1.1"/>';
+  svg += '<line x1="' + (S - pad) + '" y1="' + half + '" x2="' + half + '" y2="' + (S - pad) + '" stroke="#c4b0e8" stroke-width="1.1"/>';
+  svg += '<line x1="' + half + '" y1="' + (S - pad) + '" x2="' + pad + '" y2="' + half + '" stroke="#c4b0e8" stroke-width="1.1"/>';
+  svg += '<line x1="' + pad + '" y1="' + half + '" x2="' + half + '" y2="' + pad + '" stroke="#c4b0e8" stroke-width="1.1"/>';
+  svg += '<line x1="' + pad + '" y1="' + pad + '" x2="' + half + '" y2="' + half + '" stroke="#ddd4f0" stroke-width="0.7"/>';
+  svg += '<line x1="' + (S - pad) + '" y1="' + pad + '" x2="' + half + '" y2="' + half + '" stroke="#ddd4f0" stroke-width="0.7"/>';
+  svg += '<line x1="' + (S - pad) + '" y1="' + (S - pad) + '" x2="' + half + '" y2="' + half + '" stroke="#ddd4f0" stroke-width="0.7"/>';
+  svg += '<line x1="' + pad + '" y1="' + (S - pad) + '" x2="' + half + '" y2="' + half + '" stroke="#ddd4f0" stroke-width="0.7"/>';
+
+  for (var h = 1; h <= 12; h++) {
+    svg += '<polygon points="' + HPOLY[h] + '" fill="transparent" id="hl-' + id + '-' + h + '" style="transition:fill 0.15s;pointer-events:none;"/>';
+  }
+  for (var h = 1; h <= 12; h++) {
+    var p = HC[h];
+    svg += '<text x="' + p.cx + '" y="' + (p.cy + 22) + '" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" font-weight="700" fill="#FF6B00" display="none" id="albl-' + id + '-' + h + '" style="pointer-events:none;"></text>';
+  }
+
+  for (var h = 1; h <= 12; h++) {
+    var pos = HC[h];
+    var signNum = ((c.lagna - 1 + h - 1) % 12) + 1;
+    var isAsc = (h === 1);
+    var numColor = isAsc ? '#FF6B00' : '#9a7b52';
+    var fw = isAsc ? '700' : '500';
+    svg += '<text x="' + pos.sx + '" y="' + pos.sy + '" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="' + numColor + '" font-weight="' + fw + '">' + signNum + '</text>';
+    if (isAsc) {
+      svg += '<text x="' + pos.sx + '" y="' + (pos.sy - 11) + '" text-anchor="middle" font-family="Inter,sans-serif" font-size="7.5" fill="#FF6B00" font-weight="700" letter-spacing="0.5">ASC</text>';
+    }
+    if (c.al === h) {
+      var TRIANGLE_AL = {3:{x:18,y:22}, 5:{x:18,y:185}, 9:{x:322,y:185}, 11:{x:322,y:22}};
+      var alPos = TRIANGLE_AL[h];
+      if (alPos) {
+        svg += '<text x="' + alPos.x + '" y="' + alPos.y + '" text-anchor="middle" font-family="Inter,sans-serif" font-size="8.5" fill="#FF6B00" font-weight="700" font-style="italic">AL</text>';
+      } else {
+        var alX = pos.sx > 170 ? pos.sx - 22 : pos.sx + 22;
+        svg += '<text x="' + alX + '" y="' + pos.sy + '" text-anchor="middle" font-family="Inter,sans-serif" font-size="8.5" fill="#FF6B00" font-weight="700" font-style="italic">AL</text>';
+      }
+    }
+    svg += renderPlanetGroup(c.planets[h], pos, id, h);
+  }
+  svg += '</svg>';
+  return svg;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DRISHTI HOVER
+// ═══════════════════════════════════════════════════════════════════
+
+function showDrishti(evt, chartId, house) {
+  var idx = parseInt(chartId.slice(1));
+  var chart = ALL_CHARTS[idx];
+  var planets = chart.planets[house] || [];
+  var srcEl = document.getElementById('hl-' + chartId + '-' + house);
+  if (srcEl) srcEl.setAttribute('fill', 'rgba(59,130,246,0.18)');
+
+  var aspectMap = {};
+  planets.forEach(function(p) {
+    var base = [...p].slice(0, 2).join(''); // 2-char abbr only
+    if (base === 'AL') return;
+    var rules = ASPECT_RULES[base] || [7];
+    rules.forEach(function(n) {
+      var target = ((house - 1 + n - 1) % 12) + 1;
+      if (!aspectMap[target]) aspectMap[target] = [];
+      aspectMap[target].push({planet: base, n: n});
+    });
+  });
+
+  Object.keys(aspectMap).forEach(function(h) {
+    var hNum = parseInt(h);
+    var el = document.getElementById('hl-' + chartId + '-' + hNum);
+    if (el) el.setAttribute('fill', 'rgba(234,88,12,0.18)');
+    var lbl = document.getElementById('albl-' + chartId + '-' + hNum);
+    if (lbl) {
+      lbl.textContent = aspectMap[h].map(function(a) { return a.planet + ' ' + ord(a.n); }).join(', ');
+      lbl.setAttribute('display', 'block');
+    }
+  });
+
+  var tip = document.getElementById('drishtiTip');
+  var lines = [];
+  planets.forEach(function(p) {
+    var base = [...p].slice(0, 2).join(''); // 2-char abbr only
+    if (base === 'AL') return;
+    var rules = ASPECT_RULES[base] || [7];
+    var targets = rules.map(function(n) {
+      var target = ((house - 1 + n - 1) % 12) + 1;
+      return '<span class="asp-lbl">H' + target + '</span> (' + ord(n) + ')';
+    });
+    lines.push('<strong>' + base + '</strong> from <span class="src-lbl">H' + house + '</span> \u2192 ' + targets.join(', '));
+  });
+  if (lines.length > 0) {
+    tip.innerHTML = lines.join('<br>');
+    tip.style.display = 'block';
+    var svgEl = document.getElementById(chartId);
+    if (svgEl) {
+      var rect = svgEl.getBoundingClientRect();
+      tip.style.left = (rect.left + rect.width / 2 - 120) + 'px';
+      tip.style.top = (rect.top - 10 + window.scrollY) + 'px';
+      tip.style.position = 'absolute';
+      var tipW = tip.offsetWidth;
+      tip.style.left = Math.max(8, rect.left + rect.width / 2 - tipW / 2) + 'px';
+      tip.style.top = (rect.top + window.scrollY - tip.offsetHeight - 8) + 'px';
+    }
+  }
+}
+
+function hideDrishti(chartId) {
+  for (var h = 1; h <= 12; h++) {
+    var el = document.getElementById('hl-' + chartId + '-' + h);
+    if (el) el.setAttribute('fill', 'transparent');
+    var lbl = document.getElementById('albl-' + chartId + '-' + h);
+    if (lbl) lbl.setAttribute('display', 'none');
+  }
+  document.getElementById('drishtiTip').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RASHI DRISHTI CHART
+// ═══════════════════════════════════════════════════════════════════
+
+var SIGN_NAMES = ['','Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+
+function houseToSign(house, lagna) {
+  return ((lagna - 1 + house - 1) % 12) + 1;
+}
+function signToHouse(sign, lagna) {
+  return ((sign - lagna + 12) % 12) + 1;
+}
+
+function getRashiDrishti(sign) {
+  var type = ((sign - 1) % 3);
+  if (type === 0) {
+    var next = (sign % 12) + 1;
+    return [2,5,8,11].filter(function(s){ return s !== next; });
+  } else if (type === 1) {
+    var prev = ((sign - 2 + 12) % 12) + 1;
+    return [1,4,7,10].filter(function(s){ return s !== prev; });
+  } else {
+    return [3,6,9,12].filter(function(s){ return s !== sign; });
+  }
+}
+
+function renderPlanetGroupStatic(planets, pos, chartId, house) {
+  if (!planets || planets.length === 0) return "";
+  var count = planets.length;
+  var fs = count > 5 ? 9 : count > 3 ? 10.5 : 13;
+  var lh = fs + 3;
+  var rows = [];
+  for (var i = 0; i < count; i += 2) rows.push(planets.slice(i, i + 2));
+  var totalH = rows.length * lh;
+  var startY = pos.cy - totalH / 2 + fs * 0.4;
+  var svg = '<g clip-path="url(#cp-' + chartId + '-' + house + ')" style="pointer-events:none;">';
+  rows.forEach(function(row, ri) {
+    svg += buildTextLine(row, pos.cx, startY + ri * lh, fs);
+  });
+  svg += '</g>';
+  return svg;
+}
+
+function buildRashiDrishtiDiamond(c, idx) {
+  _currentChartRetro = c.retro || [];
+  _currentChartCombust = c.combust || [];
+  _currentChartVargottama = c.vargottama || [];
+  _currentChartDegs = {};
+  var S = 340, half = 170, pad = 5;
+  var id = 'c' + idx;
+  var svg = '<svg viewBox="0 0 ' + S + ' ' + S + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:380px;" id="' + id + '">';
+  svg += '<defs>';
+  for (var h = 1; h <= 12; h++) {
+    svg += '<clipPath id="cp-' + id + '-' + h + '"><polygon points="' + HPOLY[h] + '"/></clipPath>';
+  }
+  svg += '<marker id="arr-' + id + '" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">';
+  svg += '<polygon points="0 0, 6 2, 0 4" fill="rgba(180,60,40,0.5)"/></marker>';
+  svg += '<marker id="arr-hl-' + id + '" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">';
+  svg += '<polygon points="0 0, 7 2.5, 0 5" fill="#c0392b"/></marker>';
+  svg += '</defs>';
+  svg += '<rect x="' + pad + '" y="' + pad + '" width="' + (S-2*pad) + '" height="' + (S-2*pad) + '" fill="#fff8ee" stroke="#e0c08a" stroke-width="1.3" rx="4"/>';
+  svg += '<line x1="' + half + '" y1="' + pad + '" x2="' + (S-pad) + '" y2="' + half + '" stroke="#c4b0e8" stroke-width="1.1"/>';
+  svg += '<line x1="' + (S-pad) + '" y1="' + half + '" x2="' + half + '" y2="' + (S-pad) + '" stroke="#c4b0e8" stroke-width="1.1"/>';
+  svg += '<line x1="' + half + '" y1="' + (S-pad) + '" x2="' + pad + '" y2="' + half + '" stroke="#c4b0e8" stroke-width="1.1"/>';
+  svg += '<line x1="' + pad + '" y1="' + half + '" x2="' + half + '" y2="' + pad + '" stroke="#c4b0e8" stroke-width="1.1"/>';
+  svg += '<line x1="' + pad + '" y1="' + pad + '" x2="' + half + '" y2="' + half + '" stroke="#ddd4f0" stroke-width="0.7"/>';
+  svg += '<line x1="' + (S-pad) + '" y1="' + pad + '" x2="' + half + '" y2="' + half + '" stroke="#ddd4f0" stroke-width="0.7"/>';
+  svg += '<line x1="' + (S-pad) + '" y1="' + (S-pad) + '" x2="' + half + '" y2="' + half + '" stroke="#ddd4f0" stroke-width="0.7"/>';
+  svg += '<line x1="' + pad + '" y1="' + (S-pad) + '" x2="' + half + '" y2="' + half + '" stroke="#ddd4f0" stroke-width="0.7"/>';
+
+  var allLines = [];
+  for (var h = 1; h <= 12; h++) {
+    if (!c.planets[h] || c.planets[h].length === 0) continue;
+    var sign = houseToSign(h, c.lagna);
+    var targets = getRashiDrishti(sign);
+    targets.forEach(function(ts) {
+      allLines.push({from: h, to: signToHouse(ts, c.lagna)});
+    });
+  }
+
+  svg += '<g id="rdlines-' + id + '">';
+  allLines.forEach(function(ln) {
+    var src = HC[ln.from], tgt = HC[ln.to];
+    var dx = tgt.cx - src.cx, dy = tgt.cy - src.cy;
+    var len = Math.sqrt(dx*dx + dy*dy);
+    if (len < 1) return;
+    var sh = 18;
+    var sx = src.cx + dx/len * sh, sy = src.cy + dy/len * sh;
+    var ex = tgt.cx - dx/len * sh, ey = tgt.cy - dy/len * sh;
+    svg += '<line x1="' + sx.toFixed(1) + '" y1="' + sy.toFixed(1) + '" x2="' + ex.toFixed(1) + '" y2="' + ey.toFixed(1) + '" stroke="rgba(180,60,40,0.22)" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr-' + id + ')" data-from="' + ln.from + '" style="pointer-events:none;transition:all 0.15s;"/>';
+  });
+  svg += '</g>';
+
+  for (var h = 1; h <= 12; h++) {
+    svg += '<polygon points="' + HPOLY[h] + '" fill="transparent" id="hl-' + id + '-' + h + '" style="transition:fill 0.15s;pointer-events:all;cursor:pointer;" onmouseenter="showRashiDrishti(event,\'' + id + '\',' + h + ')" onmouseleave="hideRashiDrishti(\'' + id + '\')"/>';
+  }
+
+  for (var h = 1; h <= 12; h++) {
+    var pos = HC[h];
+    var signNum = ((c.lagna - 1 + h - 1) % 12) + 1;
+    var isAsc = (h === 1);
+    var numColor = isAsc ? '#FF6B00' : '#9a7b52';
+    var fw = isAsc ? '700' : '500';
+    svg += '<text x="' + pos.sx + '" y="' + pos.sy + '" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="' + numColor + '" font-weight="' + fw + '" style="pointer-events:none;">' + signNum + '</text>';
+    if (isAsc) {
+      svg += '<text x="' + pos.sx + '" y="' + (pos.sy - 11) + '" text-anchor="middle" font-family="Inter,sans-serif" font-size="7.5" fill="#FF6B00" font-weight="700" letter-spacing="0.5" style="pointer-events:none;">ASC</text>';
+    }
+    svg += renderPlanetGroupStatic(c.planets[h], pos, id, h);
+  }
+  svg += '</svg>';
+  return svg;
+}
+
+function showRashiDrishti(evt, chartId, house) {
+  var idx = parseInt(chartId.slice(1));
+  var chart = ALL_CHARTS[idx];
+  var sign = houseToSign(house, chart.lagna);
+  var targetSigns = getRashiDrishti(sign);
+  var targetHouses = targetSigns.map(function(ts) { return signToHouse(ts, chart.lagna); });
+  var signType = ((sign-1)%3) === 0 ? 'Chara' : ((sign-1)%3) === 1 ? 'Sthira' : 'Dwiswabhava';
+
+  document.getElementById('hl-' + chartId + '-' + house).setAttribute('fill', 'rgba(59,130,246,0.18)');
+  targetHouses.forEach(function(th) {
+    document.getElementById('hl-' + chartId + '-' + th).setAttribute('fill', 'rgba(192,57,43,0.15)');
+  });
+
+  var lineGroup = document.getElementById('rdlines-' + chartId);
+  if (lineGroup) {
+    var lines = lineGroup.querySelectorAll('line');
+    lines.forEach(function(line) {
+      var from = parseInt(line.getAttribute('data-from'));
+      if (from === house) {
+        line.setAttribute('stroke', 'rgba(192,57,43,0.85)');
+        line.setAttribute('stroke-width', '2.2');
+        line.setAttribute('stroke-dasharray', 'none');
+        line.setAttribute('marker-end', 'url(#arr-hl-' + chartId + ')');
+      } else {
+        line.setAttribute('stroke', 'rgba(180,60,40,0.06)');
+        line.setAttribute('stroke-width', '0.8');
+      }
+    });
+  }
+
+  var planets = chart.planets[house] || [];
+  var planetStr = planets.length > 0 ? ' &middot; ' + planets.map(function(p){return p.replace(/[\u2191\u2193\u2190\u2192]/g,'');}).join(', ') : '';
+  var targetStr = targetSigns.map(function(ts) {
+    var th = signToHouse(ts, chart.lagna);
+    var tp = chart.planets[th];
+    var tpStr = (tp && tp.length > 0) ? ' \u2192 ' + tp.map(function(p){return p.replace(/[\u2191\u2193\u2190\u2192]/g,'');}).join(',') : '';
+    return '<span class="asp-lbl">' + SIGN_NAMES[ts] + ' (H' + th + ')' + tpStr + '</span>';
+  }).join('<br>&nbsp;&nbsp;&nbsp;&nbsp;');
+
+  var tip = document.getElementById('drishtiTip');
+  tip.innerHTML = '<strong>' + SIGN_NAMES[sign] + '</strong> <span class="src-lbl">[' + signType + ']</span>' + planetStr + '<br>Rashi Drishti \u2192<br>&nbsp;&nbsp;&nbsp;&nbsp;' + targetStr;
+  tip.style.display = 'block';
+
+  var svgEl = document.getElementById(chartId);
+  if (svgEl) {
+    var rect = svgEl.getBoundingClientRect();
+    tip.style.position = 'absolute';
+    tip.style.left = Math.max(8, rect.left + rect.width / 2 - 140) + 'px';
+    tip.style.top = (rect.top + window.scrollY - 10) + 'px';
+    var tipW = tip.offsetWidth;
+    tip.style.left = Math.max(8, rect.left + rect.width / 2 - tipW / 2) + 'px';
+    tip.style.top = (rect.top + window.scrollY - tip.offsetHeight - 8) + 'px';
+  }
+}
+
+function hideRashiDrishti(chartId) {
+  for (var h = 1; h <= 12; h++) {
+    document.getElementById('hl-' + chartId + '-' + h).setAttribute('fill', 'transparent');
+  }
+  var lineGroup = document.getElementById('rdlines-' + chartId);
+  if (lineGroup) {
+    var lines = lineGroup.querySelectorAll('line');
+    lines.forEach(function(line) {
+      line.setAttribute('stroke', 'rgba(180,60,40,0.22)');
+      line.setAttribute('stroke-width', '1.2');
+      line.setAttribute('stroke-dasharray', '4,3');
+      line.setAttribute('marker-end', 'url(#arr-' + chartId + ')');
+    });
+  }
+  document.getElementById('drishtiTip').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// BUILD CHARTS FROM API DATA
+// ═══════════════════════════════════════════════════════════════════
+
+function buildAllCharts(data) {
+  ALL_CHARTS = [];
+  var chartOrder = ["D1", "D9", "D2", "D3", "D7", "D10", "D12", "D60"];
+
+  // D1 chart with AL
+  var d1 = data.charts.D1;
+  ALL_CHARTS.push({
+    title: CHART_TITLES.D1.title,
+    _maxWidth: '520px',
+    _planetFs: 9,
+    lagna: d1.lagna_sign,
+    al: data.arudha_lagna.house,
+    retro: d1.retro || [],
+    combust: data.combust_planets || [],
+    vargottama: data.vargottama_planets || [],
+    planet_degs: d1.planet_degs || {},
+    planets: convertHouses(d1.houses)
+  });
+
+  // D9 (placed next to D1 in grid)
+  var d9 = data.charts.D9;
+  ALL_CHARTS.push({
+    title: CHART_TITLES.D9.title,
+    _maxWidth: '520px',
+    _planetFs: 9,
+    lagna: d9.lagna_sign,
+    retro: d9.retro || [],
+    planets: convertHouses(d9.houses)
+  });
+
+  // D1 Rashi Drishti (under D1 in grid)
+  var d1rd = data.charts.D1;
+  var rdPlanets = {};
+  for (var h in d1rd.houses) {
+    rdPlanets[parseInt(h)] = d1rd.houses[h].map(function(p) {
+      return [...p].slice(0, 2).join(''); // strip dignity emoji, keep 2-char abbr
+    });
+  }
+  ALL_CHARTS.push({
+    title: CHART_TITLES.D1RD.title,
+    _planetFs: 9,
+    lagna: d1rd.lagna_sign,
+    rashiDrishti: true,
+    retro: d1rd.retro || [],
+    planets: rdPlanets
+  });
+
+  // Transit placeholder slot — filled later by renderTransitChart
+  // (index 3 reserved, Transit inserted here)
+
+  // Other divisional charts (skip D9, already added)
+  chartOrder.slice(1).forEach(function(key) {
+    if (key === 'D9') return;
+    var c = data.charts[key];
+    if (!c) return;
+    ALL_CHARTS.push({
+      title: CHART_TITLES[key].title,
+      _planetFs: 9,
+      lagna: c.lagna_sign,
+      retro: c.retro || [],
+      planets: convertHouses(c.houses)
+    });
+  });
+}
+
+function migratePlanetLabel(label) {
+  var chars = [...label];
+  if (chars.length <= 2) return label;
+  var base = chars.slice(0, 2).join('');
+  var rest = chars.slice(2).join('');
+  if (OLD_TO_NEW_DIGNITY[rest]) {
+    return base + OLD_TO_NEW_DIGNITY[rest];
+  }
+  return label;
+}
+
+function convertHouses(houses) {
+  var result = {};
+  for (var h in houses) {
+    result[parseInt(h)] = houses[h].map(migratePlanetLabel);
+  }
+  return result;
+}
+
+function renderAllCharts() {
+  document.getElementById("chartsGrid").innerHTML = ALL_CHARTS.map(function(c, i) {
+    var chartSvg = c.rashiDrishti ? buildRashiDrishtiDiamond(c, i) : buildDiamond(c, i);
+    return '<div class="chart-box"><h3>' + c.title + '</h3>' + chartSvg + '</div>';
+  }).join("");
+  renderSummaryCharts();
+}
+
+function renderSummaryCharts() {
+  var grid = document.getElementById("summaryChartsGrid");
+  if (!grid || ALL_CHARTS.length < 2) return;
+  var d1 = ALL_CHARTS[0];
+  var d9 = ALL_CHARTS[1];
+  // Override maxWidth for summary tab (larger display)
+  var origD1 = d1._maxWidth, origD9 = d9._maxWidth;
+  d1._maxWidth = '100%'; d9._maxWidth = '100%';
+  var html = '';
+  html += '<div class="chart-box">' + buildDiamond(d1, 100) + '</div>';
+  html += '<div class="chart-box">' + buildDiamond(d9, 101) + '</div>';
+  d1._maxWidth = origD1; d9._maxWidth = origD9;
+  grid.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// BHAVA
+// ═══════════════════════════════════════════════════════════════════
+
+function renderBhava(data) {
+  var html = '';
+  data.bhava.forEach(function(b) {
+    var pstr = b.planets.length > 0 ? b.planets.join(", ") : '<span class="dim">\u2014</span>';
+    html += '<tr><td class="bold">' + b.house + '</td><td>' + b.start + '</td><td>' + b.end + '</td><td>' + pstr + '</td></tr>';
+  });
+  document.getElementById("bhavaBody").innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DASHA
+// ═══════════════════════════════════════════════════════════════════
+
+function parseDate(s){var M={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};var parts=s.split("-");return new Date(+parts[2],M[parts[1]],+parts[0]);}
+function daysBetween(a,b){return(parseDate(b)-parseDate(a))/864e5;}
+function isCurrent(s,e){var n=new Date();return n>=parseDate(s)&&n<parseDate(e);}
+function fmtYears(s,e){var y=daysBetween(s,e)/365.25;return y>=1?y.toFixed(1)+"y":Math.round(y*12)+"mo";}
+
+function renderDashaSection(data) {
+  var d = data.dasha;
+  document.getElementById("dashaInfo").innerHTML = '<strong>Moon Nakshatra:</strong> ' + d.moon_nakshatra + ' (Pada ' + d.moon_pada + ') &middot; <strong>Dasha Lord:</strong> ' + d.dasha_lord;
+  dashaPath = [];
+  renderTimeline(d);
+  renderDasha(d);
+}
+
+function renderTimeline(d) {
+  var bar = document.getElementById("timelineBar");
+  bar.innerHTML = "";
+  d.maha.forEach(function(m) {
+    var seg = document.createElement("div");
+    seg.className = "t-seg" + (isCurrent(m.start, m.end) ? " current" : "");
+    seg.style.flex = m.years;
+    seg.style.background = COLORS[m.lord];
+    seg.title = m.lord + ": " + m.start + " \u2192 " + m.end;
+    seg.innerHTML = m.lord.slice(0,3) + '<span class="t-yr">' + m.years + 'y</span>';
+    seg.onclick = (function(lord) { return function() { dashaPath = [lord]; renderDasha(chartData.dasha); }; })(m.lord);
+    bar.appendChild(seg);
+  });
+}
+
+function renderBreadcrumb(d) {
+  var bc = document.getElementById("dashaBreadcrumb");
+  bc.innerHTML = "";
+  var mk = function(t, fn, a) {
+    var s = document.createElement("span");
+    s.className = "crumb" + (a ? " active" : "");
+    s.textContent = t;
+    if (!a) s.onclick = fn;
+    return s;
+  };
+  var sep = function() {
+    var s = document.createElement("span");
+    s.className = "sep";
+    s.textContent = "\u203a";
+    return s;
+  };
+
+  if (!dashaPath.length) {
+    bc.appendChild(mk("Maha Dasha", null, true));
+  } else if (dashaPath.length === 1) {
+    bc.appendChild(mk("Maha Dasha", function() { dashaPath = []; renderDasha(d); }, false));
+    bc.appendChild(sep());
+    bc.appendChild(mk(dashaPath[0] + " Antardasha", null, true));
+  } else {
+    bc.appendChild(mk("Maha Dasha", function() { dashaPath = []; renderDasha(d); }, false));
+    bc.appendChild(sep());
+    bc.appendChild(mk(dashaPath[0] + " AD", function() { dashaPath = [dashaPath[0]]; renderDasha(d); }, false));
+    bc.appendChild(sep());
+    bc.appendChild(mk(dashaPath[0] + "/" + dashaPath[1] + " PD", null, true));
+  }
+}
+
+function renderDashaRows(items, maxY, canDrill, d) {
+  var nav = document.getElementById("dashaNav");
+  nav.innerHTML = "";
+  var view = document.createElement("div");
+  view.className = "dasha-view";
+  items.forEach(function(item) {
+    var days = daysBetween(item.start, item.end);
+    var yrs = days / 365.25;
+    var pct = (yrs / maxY) * 100;
+    var cur = isCurrent(item.start, item.end);
+    var row = document.createElement("div");
+    row.className = "dasha-row" + (cur ? " is-current" : "");
+    row.innerHTML = '<span class="dasha-planet" style="color:' + COLORS[item.lord] + '">' + item.lord + '</span><span class="dasha-dates">' + item.start + '  \u2192  ' + item.end + '</span><div class="dasha-bar-wrap"><div class="dasha-bar-fill" style="width:' + pct + '%;background:' + COLORS[item.lord] + '"></div></div><span class="dasha-dur">' + fmtYears(item.start, item.end) + '</span><span class="dasha-arrow">' + (canDrill ? "\u203a" : "") + '</span>';
+    if (canDrill) {
+      row.style.cursor = "pointer";
+      row.onclick = (function(lord) { return function() { dashaPath.push(lord); renderDasha(d); }; })(item.lord);
+    }
+    view.appendChild(row);
+  });
+  nav.appendChild(view);
+}
+
+function renderDasha(d) {
+  renderBreadcrumb(d);
+  if (!dashaPath.length) {
+    renderDashaRows(d.maha, Math.max.apply(null, d.maha.map(function(m) { return m.years; })), true, d);
+  } else if (dashaPath.length === 1) {
+    var items = d.antar[dashaPath[0]];
+    if (!items) { dashaPath.pop(); renderDasha(d); return; }
+    var mx = Math.max.apply(null, items.map(function(i) { return daysBetween(i.start, i.end); }));
+    renderDashaRows(items, mx / 365.25, true, d);
+  } else {
+    var key = dashaPath[0] + "/" + dashaPath[1];
+    var items = d.pratyantar[key];
+    if (!items) {
+      document.getElementById("dashaNav").innerHTML = '<div class="dasha-view" style="padding:1rem;color:var(--text-3);font-size:0.82rem;">Pratyantardasha for <strong style="color:var(--text)">' + key + '</strong> not available.</div>';
+      return;
+    }
+    var mx = Math.max.apply(null, items.map(function(i) { return daysBetween(i.start, i.end); }));
+    renderDashaRows(items, mx / 365.25, false, d);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ASHTAKAVARGA
+// ═══════════════════════════════════════════════════════════════════
+
+function renderAshtak(data) {
+  var total = 0;
+  data.ashtakavarga.forEach(function(a) { total += a.points; });
+  document.getElementById("ashtakSub").textContent = "Simplified \u00b7 Total: " + total;
+  document.getElementById("ashtakChart").innerHTML = data.ashtakavarga.map(function(a) {
+    var pct = (a.points / 8) * 100;
+    var c = a.points <= 2 ? "#dc2626" : a.points >= 6 ? "#16a34a" : "#2563eb";
+    return '<div class="ashtak-row"><span class="ashtak-label">' + a.sign + '</span><div class="ashtak-bar-bg"><div class="ashtak-fill" style="width:' + pct + '%;background:' + c + ';">' + a.points + '</div></div></div>';
+  }).join("");
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// YOGAS
+// ═══════════════════════════════════════════════════════════════════
+
+function renderYogas(data) {
+  if (!data.yogas || data.yogas.length === 0) {
+    document.getElementById("yogaGrid").innerHTML = '<div style="color:var(--text-3);font-size:0.82rem;">No major yogas detected.</div>';
+    return;
+  }
+  document.getElementById("yogaGrid").innerHTML = data.yogas.map(function(y) {
+    return '<div class="yoga-item ' + y.type + '"><h4>' + y.name + '</h4><p>' + y.description + '</p></div>';
+  }).join("");
+}
+
+function renderDoshas(data) {
+  if (!data.doshas || data.doshas.length === 0) {
+    document.getElementById("doshaGrid").innerHTML = '<div style="color:var(--text-3);font-size:0.82rem;">No doshas detected.</div>';
+    return;
+  }
+  document.getElementById("doshaGrid").innerHTML = data.doshas.map(function(d) {
+    var cancel = '';
+    if (d.cancellations && d.cancellations.length > 0) {
+      cancel = '<div class="cancellation">Cancelled/Mitigated: ' + d.cancellations.join('; ') + '</div>';
+    }
+    return '<div class="dosha-item ' + d.type + '"><h4>' + d.name + '</h4><p>' + d.description + '</p>' + cancel + '</div>';
+  }).join("");
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CURRENT TRANSITS (GOCHARA)
+// ═══════════════════════════════════════════════════════════════════
+
+function fetchTransits(natalData) {
+  var now = new Date();
+  var payload = {
+    year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate(),
+    hour: now.getHours(), minute: now.getMinutes(),
+    lat: natalData.birth.lat, lon: natalData.birth.lon,
+    tz_offset: natalData.birth.tz,
+    place: natalData.birth.place
+  };
+
+  fetch("/api/chart", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(payload)
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(transitData) {
+    if (transitData.error) return;
+    renderTransitTable(transitData, natalData);
+    renderTransitChart(transitData, natalData);
+  })
+  .catch(function() {});
+}
+
+function renderTransitTable(transitData, natalData) {
+  var natalLagna = natalData.lagna.sign;
+  document.getElementById("transitSub").textContent = "Gochara \u2014 " + transitData.birth.date + " " + transitData.birth.time;
+
+  var html = '';
+  transitData.planets.forEach(function(p) {
+    // House from natal lagna (sign-based)
+    var transitSign = p.sign;
+    var natalHouse = ((transitSign - natalLagna + 12) % 12) + 1;
+    var retro = (p.retro && p.name !== "Rahu" && p.name !== "Ketu") ? '<span class="retro">R</span>' :
+                (p.name === "Rahu" || p.name === "Ketu") ? '<span class="retro">R</span>' : '<span class="dim">\u2014</span>';
+    html += '<tr><td class="bold">' + p.name + '</td><td>' + p.sign_name + '</td><td class="mono">' + p.deg + '</td><td>' + p.nakshatra + ' ' + p.pada + '</td><td>H' + natalHouse + '</td><td>' + retro + '</td></tr>';
+  });
+  document.getElementById("transitBody").innerHTML = html;
+}
+
+function renderTransitChart(transitData, natalData) {
+  var natalLagna = natalData.lagna.sign; // 1-based sign number
+
+  // Build transit chart houses relative to natal lagna
+  var transitHouses = {};
+  transitData.planets.forEach(function(p) {
+    var house = ((p.sign - natalLagna + 12) % 12) + 1;
+    if (!transitHouses[house]) transitHouses[house] = [];
+    var retro = (p.retro && p.name !== "Rahu" && p.name !== "Ketu") ? '(R)' : '';
+    transitHouses[house].push(p.abbr + retro);
+  });
+
+  // Also build natal planet positions in same house system for comparison
+  var natalHouses = {};
+  natalData.planets.forEach(function(p) {
+    var house = ((p.sign - natalLagna + 12) % 12) + 1;
+    if (!natalHouses[house]) natalHouses[house] = [];
+    natalHouses[house].push(p.abbr);
+  });
+
+  var transitChart = {
+    title: "Transit (Gochara)", tag: "Current positions over natal houses",
+    lagna: natalLagna,
+    planets: transitHouses
+  };
+
+  // Insert transit chart into the main charts grid at position 2 (after D1 and Rashi Drishti)
+  var idx = ALL_CHARTS.length;
+  var chartSvg = buildTransitDiamond(transitChart, natalHouses, idx);
+  var transitHtml = '<div class="chart-box"><h3>' + transitChart.title + '</h3><span class="chart-tag">' + transitChart.tag + '</span>' + chartSvg + '</div>';
+
+  var grid = document.getElementById("chartsGrid");
+  var children = grid.children;
+  if (children.length >= 3) {
+    // Insert after the 3rd chart (D1RD) so Transit sits next to D1RD in row 2
+    var temp = document.createElement("div");
+    temp.innerHTML = transitHtml;
+    var newEl = temp.firstChild;
+    if (children.length > 3) {
+      grid.insertBefore(newEl, children[3]);
+    } else {
+      grid.appendChild(newEl);
+    }
+  } else {
+    grid.insertAdjacentHTML("beforeend", transitHtml);
+  }
+}
+
+function buildTransitDiamond(c, natalHouses, idx) {
+  _currentChartRetro = [];
+  _currentChartCombust = [];
+  _currentChartVargottama = [];
+  var S = 340, half = 170, pad = 5;
+  var id = 'c' + idx;
+  var svg = '<svg viewBox="0 0 ' + S + ' ' + S + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:380px;" id="' + id + '">';
+
+  svg += '<defs>';
+  for (var h = 1; h <= 12; h++) {
+    svg += '<clipPath id="cp-' + id + '-' + h + '"><polygon points="' + HPOLY[h] + '"/></clipPath>';
+  }
+  svg += '</defs>';
+
+  // Background — slightly different tint for transit
+  svg += '<rect x="' + pad + '" y="' + pad + '" width="' + (S - 2 * pad) + '" height="' + (S - 2 * pad) + '" fill="#f0f5ff" stroke="#80b0e8" stroke-width="1.3" rx="4"/>';
+
+  // Diamond edges
+  svg += '<line x1="' + half + '" y1="' + pad + '" x2="' + (S - pad) + '" y2="' + half + '" stroke="#80b0e8" stroke-width="1.1"/>';
+  svg += '<line x1="' + (S - pad) + '" y1="' + half + '" x2="' + half + '" y2="' + (S - pad) + '" stroke="#80b0e8" stroke-width="1.1"/>';
+  svg += '<line x1="' + half + '" y1="' + (S - pad) + '" x2="' + pad + '" y2="' + half + '" stroke="#80b0e8" stroke-width="1.1"/>';
+  svg += '<line x1="' + pad + '" y1="' + half + '" x2="' + half + '" y2="' + pad + '" stroke="#80b0e8" stroke-width="1.1"/>';
+  // Corner diagonals
+  svg += '<line x1="' + pad + '" y1="' + pad + '" x2="' + half + '" y2="' + half + '" stroke="#c0d4f0" stroke-width="0.7"/>';
+  svg += '<line x1="' + (S - pad) + '" y1="' + pad + '" x2="' + half + '" y2="' + half + '" stroke="#c0d4f0" stroke-width="0.7"/>';
+  svg += '<line x1="' + (S - pad) + '" y1="' + (S - pad) + '" x2="' + half + '" y2="' + half + '" stroke="#c0d4f0" stroke-width="0.7"/>';
+  svg += '<line x1="' + pad + '" y1="' + (S - pad) + '" x2="' + half + '" y2="' + half + '" stroke="#c0d4f0" stroke-width="0.7"/>';
+
+  for (var h = 1; h <= 12; h++) {
+    var pos = HC[h];
+    var signNum = ((c.lagna - 1 + h - 1) % 12) + 1;
+    var isAsc = (h === 1);
+    var numColor = isAsc ? '#00BFA5' : '#9a7b52';
+    var fw = isAsc ? '700' : '500';
+
+    svg += '<text x="' + pos.sx + '" y="' + pos.sy + '" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="' + numColor + '" font-weight="' + fw + '">' + signNum + '</text>';
+    if (isAsc) {
+      svg += '<text x="' + pos.sx + '" y="' + (pos.sy - 11) + '" text-anchor="middle" font-family="Inter,sans-serif" font-size="7.5" fill="#00BFA5" font-weight="700" letter-spacing="0.5">ASC</text>';
+    }
+
+    // Natal planets (dim, smaller, at top of house)
+    var np = natalHouses[h];
+    if (np && np.length > 0) {
+      var nText = np.join(" ");
+      var ny = pos.cy - 10;
+      svg += '<text x="' + pos.cx + '" y="' + ny + '" text-anchor="middle" font-family="Inter,sans-serif" font-size="7.5" fill="#b8a8d0" font-weight="500">' + nText + '</text>';
+    }
+
+    // Transit planets (bold, colored, main position)
+    var tp = c.planets[h];
+    if (tp && tp.length > 0) {
+      var fs = tp.length > 4 ? 8.5 : 10.5;
+      var rows = [];
+      for (var i = 0; i < tp.length; i += 3) rows.push(tp.slice(i, i + 3));
+      var lh = fs + 3;
+      var totalH = rows.length * lh;
+      var startY = pos.cy - totalH / 2 + fs * 0.4 + 4;
+      svg += '<g clip-path="url(#cp-' + id + '-' + h + ')">';
+      rows.forEach(function(row, ri) {
+        var y = startY + ri * lh;
+        svg += '<text x="' + pos.cx + '" y="' + y + '" text-anchor="middle" font-family="Inter,sans-serif" font-size="' + fs + '" fill="#00BFA5" font-weight="700">' + row.join(" ") + '</text>';
+      });
+      svg += '</g>';
+    }
+  }
+
+  svg += '</svg>';
+  return svg;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PLACE AUTOCOMPLETE (OpenStreetMap Nominatim)
+// ═══════════════════════════════════════════════════════════════════
+
+var placeTimer = null;
+var placeInput = document.getElementById("birthPlace");
+var placeDropdown = document.getElementById("placeDropdown");
+
+placeInput.addEventListener("input", function() {
+  clearTimeout(placeTimer);
+  var q = placeInput.value.trim();
+  if (q.length < 2) {
+    placeDropdown.classList.remove("open");
+    return;
+  }
+  placeDropdown.innerHTML = '<div class="place-spinner">Searching...</div>';
+  placeDropdown.classList.add("open");
+
+  placeTimer = setTimeout(function() { searchPlace(q); }, 350);
+});
+
+placeInput.addEventListener("keydown", function(e) {
+  if (e.key === "Escape") placeDropdown.classList.remove("open");
+});
+
+// Close dropdown when clicking outside
+document.addEventListener("click", function(e) {
+  if (!e.target.closest(".place-wrap")) {
+    placeDropdown.classList.remove("open");
+  }
+});
+
+function searchPlace(query) {
+  var url = "https://nominatim.openstreetmap.org/search?format=json&limit=6&q=" + encodeURIComponent(query);
+  fetch(url, { headers: { "Accept-Language": "en" } })
+    .then(function(r) { return r.json(); })
+    .then(function(results) {
+      if (!results || results.length === 0) {
+        placeDropdown.innerHTML = '<div class="place-spinner">No results found</div>';
+        return;
+      }
+      var html = '';
+      results.forEach(function(r) {
+        var name = r.display_name;
+        // Shorten very long names
+        if (name.length > 60) name = name.substring(0, 57) + "...";
+        var lat = parseFloat(r.lat).toFixed(4);
+        var lon = parseFloat(r.lon).toFixed(4);
+        html += '<div class="place-option" onclick="selectPlace(\'' + escAttr(r.display_name) + '\',' + lat + ',' + lon + ')">';
+        html += '<span class="place-name">' + escHtml(name) + '</span>';
+        html += '<span class="place-coords">' + lat + ', ' + lon + '</span>';
+        html += '</div>';
+      });
+      placeDropdown.innerHTML = html;
+    })
+    .catch(function() {
+      placeDropdown.innerHTML = '<div class="place-spinner">Search failed</div>';
+    });
+}
+
+function selectPlace(name, lat, lon) {
+  // Use a shorter display name (city, country)
+  var parts = name.split(", ");
+  var short = parts.length >= 2 ? parts[0] + ", " + parts[parts.length - 1] : parts[0];
+  placeInput.value = short;
+  document.getElementById("birthLat").value = lat;
+  document.getElementById("birthLon").value = lon;
+  placeDropdown.classList.remove("open");
+
+  // Auto-detect timezone from coordinates + selected date
+  var dateVal = document.getElementById("birthDate").value;
+  var timeVal = document.getElementById("birthTime").value;
+  var dparts = dateVal.split("-");
+  var tparts = timeVal.split(":");
+  var tzPayload = {
+    lat: lat, lon: lon,
+    year: parseInt(dparts[0]), month: parseInt(dparts[1]), day: parseInt(dparts[2]),
+    hour: parseInt(tparts[0]), minute: parseInt(tparts[1])
+  };
+
+  fetch("/api/timezone", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(tzPayload)
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.offset !== undefined) {
+      document.getElementById("birthTz").value = data.offset;
+    }
+  })
+  .catch(function() { /* keep existing TZ on error */ });
+}
+
+function escHtml(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+function escAttr(s) { return s.replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
+
+// ═══════════════════════════════════════════════════════════════════
+// AUTH + SAVE/LOAD/DELETE CHARTS
+// ═══════════════════════════════════════════════════════════════════
+
+var currentUser = null;
+var lastInputPayload = null;
+var aiRemainingCount = 10;
+var _editingChartId = null;
+var _editingChartName = '';
+
+function checkAuth() {
+  fetch("/api/me")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      currentUser = data.user;
+      if (data.ai_remaining !== undefined) {
+        aiRemainingCount = data.ai_remaining;
+        aiLimitReached = aiRemainingCount <= 0;
+      }
+      updateAuthUI();
+    })
+    .catch(function() { currentUser = null; updateAuthUI(); });
+}
+
+function updateAuthUI() {
+  var auth = document.getElementById("headerAuth");
+  if (currentUser) {
+    auth.innerHTML =
+      '<div class="user-info">' +
+        (currentUser.picture ? '<img class="user-avatar" src="' + escHtml(currentUser.picture) + '" referrerpolicy="no-referrer">' : '') +
+        '<span class="user-name">' + escHtml(currentUser.name || currentUser.email) + '</span>' +
+      '</div>' +
+      '<a class="header-link" href="#" onclick="openMyCharts();return false;">My Charts</a>' +
+      '<a class="header-link" href="#" onclick="openAIHistory();return false;">Chat History</a>' +
+      '<a class="header-link" href="/auth/logout">Sign Out</a>';
+    document.getElementById("saveBtn").style.display = chartData ? "block" : "none";
+  } else {
+    auth.innerHTML = '<a href="/auth/google" class="google-btn">Sign in with Google</a>';
+    document.getElementById("saveBtn").style.display = "none";
+  }
+}
+
+function openSaveModal() {
+  if (!chartData) return;
+  document.getElementById("saveChartName").value = "";
+  document.getElementById("saveModalOverlay").classList.add("open");
+  setTimeout(function() { document.getElementById("saveChartName").focus(); }, 100);
+}
+
+function closeSaveModal() {
+  document.getElementById("saveModalOverlay").classList.remove("open");
+}
+
+function saveCurrentChart() {
+  var name = document.getElementById("saveChartName").value.trim();
+  if (!name) { alert("Please enter a name for the chart."); return; }
+  if (!chartData || !lastInputPayload) { alert("No chart to save. Generate a chart first."); return; }
+
+  fetch("/api/charts/save", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ name: name, input_data: lastInputPayload, chart_data: chartData })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.error) { alert(data.error); return; }
+    closeSaveModal();
+    alert("Chart saved!");
+  })
+  .catch(function(err) { alert("Failed to save: " + err.message); });
+}
+
+function editSavedChart(id, name) {
+  fetch("/api/charts/" + id)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) { alert(data.error); return; }
+      var inp = data.input_data;
+      if (inp.year && inp.month && inp.day)
+        document.getElementById("birthDate").value = inp.year + "-" + String(inp.month).padStart(2,"0") + "-" + String(inp.day).padStart(2,"0");
+      if (inp.hour !== undefined && inp.minute !== undefined)
+        document.getElementById("birthTime").value = String(inp.hour).padStart(2,"0") + ":" + String(inp.minute).padStart(2,"0");
+      if (inp.place) document.getElementById("birthPlace").value = inp.place;
+      if (inp.lat !== undefined) document.getElementById("birthLat").value = inp.lat;
+      if (inp.lon !== undefined) document.getElementById("birthLon").value = inp.lon;
+      if (inp.tz_offset !== undefined) document.getElementById("birthTz").value = inp.tz_offset;
+      _editingChartId = id;
+      _editingChartName = name;
+      document.getElementById("editBannerName").textContent = name;
+      document.getElementById("editBanner").classList.add("active");
+      closeMyCharts();
+      var inputCard = document.querySelector('.card.accent-purple');
+      if (inputCard) inputCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    })
+    .catch(function(err) { alert("Failed to load chart: " + err.message); });
+}
+
+function cancelEdit() {
+  _editingChartId = null;
+  _editingChartName = '';
+  document.getElementById("editBanner").classList.remove("active");
+}
+
+function updateEditedChart() {
+  if (!chartData || !lastInputPayload) {
+    alert("Calculate the chart first, then click Update Chart.");
+    return;
+  }
+  fetch("/api/charts/" + _editingChartId, {
+    method: "PUT",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ input_data: lastInputPayload, chart_data: chartData })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.error) { alert(data.error); return; }
+    cancelEdit();
+    var b = document.createElement("div");
+    b.textContent = "✓ Chart updated";
+    b.style.cssText = "position:fixed;bottom:1.5rem;right:1.5rem;background:#22c55e;color:#fff;padding:0.5rem 1rem;border-radius:8px;font-size:0.82rem;font-weight:600;z-index:999;";
+    document.body.appendChild(b);
+    setTimeout(function(){ document.body.removeChild(b); }, 2500);
+  })
+  .catch(function(err) { alert("Failed to update: " + err.message); });
+}
+
+function openMyCharts() {
+  document.getElementById("chartsOverlay").classList.add("open");
+  document.getElementById("chartsPanel").classList.add("open");
+  loadMyCharts();
+}
+
+function closeMyCharts() {
+  document.getElementById("chartsOverlay").classList.remove("open");
+  document.getElementById("chartsPanel").classList.remove("open");
+}
+
+function loadMyCharts() {
+  document.getElementById("panelBody").innerHTML = '<div class="panel-empty">Loading...</div>';
+  fetch("/api/charts")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) { document.getElementById("panelBody").innerHTML = '<div class="panel-empty">' + escHtml(data.error) + '</div>'; return; }
+      document.getElementById("panelCount").textContent = data.count + "/" + data.limit + " charts saved";
+      if (data.charts.length === 0) {
+        document.getElementById("panelBody").innerHTML = '<div class="panel-empty">No saved charts yet. Generate a chart and click "Save Chart" to save it.</div>';
+        return;
+      }
+      var html = '';
+      data.charts.forEach(function(c) {
+        html += '<div class="saved-chart-item">' +
+          '<div class="saved-chart-name">' + escHtml(c.name) + '</div>' +
+          '<div class="saved-chart-meta">' + escHtml(c.place || "Unknown place") + ' &middot; ' + escHtml(c.date || "") + '</div>' +
+          '<div class="saved-chart-actions">' +
+            '<button class="btn-load" onclick="loadSavedChart(' + c.id + ')">Load</button>' +
+            '<button class="btn-edit" onclick="editSavedChart(' + c.id + ',\'' + escAttr(c.name) + '\')">Edit</button>' +
+            '<button class="btn-delete" onclick="deleteSavedChart(' + c.id + ',\'' + escAttr(c.name) + '\')">Delete</button>' +
+          '</div></div>';
+      });
+      document.getElementById("panelBody").innerHTML = html;
+    })
+    .catch(function() { document.getElementById("panelBody").innerHTML = '<div class="panel-empty">Failed to load charts.</div>'; });
+}
+
+function openAIHistory() {
+  document.getElementById("historyOverlay").classList.add("open");
+  document.getElementById("historyPanel").classList.add("open");
+  loadAIHistory();
+}
+
+function closeAIHistory() {
+  document.getElementById("historyOverlay").classList.remove("open");
+  document.getElementById("historyPanel").classList.remove("open");
+}
+
+function loadAIHistory() {
+  document.getElementById("historyBody").innerHTML = '<div class="panel-empty">Loading...</div>';
+  fetch("/api/ai-history")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) { document.getElementById("historyBody").innerHTML = '<div class="panel-empty">' + escHtml(data.error) + '</div>'; return; }
+      var items = data.history;
+      document.getElementById("historyCount").textContent = items.length + " readings (last 30 days)";
+      if (items.length === 0) {
+        document.getElementById("historyBody").innerHTML = '<div class="panel-empty">No AI readings yet. Generate a chart and ask a question to get started.</div>';
+        return;
+      }
+      var html = '';
+      var lastGroup = '';
+      var today = new Date(); today.setHours(0,0,0,0);
+      var yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+      items.forEach(function(item) {
+        var d = new Date(item.created_at);
+        var dDay = new Date(d); dDay.setHours(0,0,0,0);
+        var groupLabel;
+        if (dDay.getTime() === today.getTime()) groupLabel = 'Today';
+        else if (dDay.getTime() === yesterday.getTime()) groupLabel = 'Yesterday';
+        else groupLabel = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        if (groupLabel !== lastGroup) {
+          html += '<div class="history-date-group">' + groupLabel + '</div>';
+          lastGroup = groupLabel;
+        }
+        var timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        html += '<div class="history-item" onclick="toggleHistoryItem(this)">' +
+          '<div class="history-item-question">' + escHtml(item.question) + '</div>' +
+          '<div class="history-item-meta">' + escHtml(item.category) + ' &middot; ' + timeStr + '</div>' +
+          '<div class="history-item-reading">' + marked.parse(item.reading || '') + '</div>' +
+        '</div>';
+      });
+      document.getElementById("historyBody").innerHTML = html;
+    })
+    .catch(function() { document.getElementById("historyBody").innerHTML = '<div class="panel-empty">Failed to load history.</div>'; });
+}
+
+function toggleHistoryItem(el) {
+  el.classList.toggle("expanded");
+}
+
+function loadSavedChart(id) {
+  fetch("/api/charts/" + id)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) { alert(data.error); return; }
+      var inp = data.input_data;
+      // Fill form
+      if (inp.year && inp.month && inp.day) {
+        document.getElementById("birthDate").value = inp.year + "-" + String(inp.month).padStart(2,"0") + "-" + String(inp.day).padStart(2,"0");
+      }
+      if (inp.hour !== undefined && inp.minute !== undefined) {
+        document.getElementById("birthTime").value = String(inp.hour).padStart(2,"0") + ":" + String(inp.minute).padStart(2,"0");
+      }
+      if (inp.place) document.getElementById("birthPlace").value = inp.place;
+      if (inp.lat !== undefined) document.getElementById("birthLat").value = inp.lat;
+      if (inp.lon !== undefined) document.getElementById("birthLon").value = inp.lon;
+      if (inp.tz_offset !== undefined) document.getElementById("birthTz").value = inp.tz_offset;
+
+      // Render chart
+      chartData = data.chart_data;
+      lastInputPayload = inp;
+      renderAll(chartData);
+      document.getElementById("chartContent").style.display = "flex";
+      document.getElementById("chartContent").style.flexDirection = "column";
+      document.getElementById("chartContent").style.gap = "1.25rem";
+      closeMyCharts();
+    })
+    .catch(function(err) { alert("Failed to load chart: " + err.message); });
+}
+
+function deleteSavedChart(id, name) {
+  if (!confirm('Delete "' + name + '"?')) return;
+  fetch("/api/charts/" + id, { method: "DELETE" })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) { alert(data.error); return; }
+      loadMyCharts();
+    })
+    .catch(function(err) { alert("Failed to delete: " + err.message); });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// BTR (BIRTH TIME RECTIFICATION)
+// ═══════════════════════════════════════════════════════════════════
+
+var btrData = null;
+var btrQuestions = [];
+var btrConversation = [];
+
+function fetchBTR() {
+  var dateVal = document.getElementById("birthDate").value;
+  var timeVal = document.getElementById("birthTime").value;
+  var parts = dateVal.split("-");
+  var tparts = timeVal.split(":");
+
+  var payload = {
+    year: parseInt(parts[0]),
+    month: parseInt(parts[1]),
+    day: parseInt(parts[2]),
+    hour: parseInt(tparts[0]),
+    minute: parseInt(tparts[1]),
+    lat: parseFloat(document.getElementById("birthLat").value),
+    lon: parseFloat(document.getElementById("birthLon").value),
+    tz_offset: parseFloat(document.getElementById("birthTz").value)
+  };
+
+  var loading = document.getElementById("btrBoundaryLoading");
+  loading.classList.add("active");
+  document.getElementById("btrBoundaryBody").innerHTML = "";
+
+  fetch("/api/btr", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(payload)
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    loading.classList.remove("active");
+    if (data.error) {
+      document.getElementById("btrBoundaryBody").innerHTML = '<tr><td colspan="5" style="color:var(--red);">Error: ' + data.error + '</td></tr>';
+      return;
+    }
+    btrData = data;
+    renderBTRBoundaries(data);
+  })
+  .catch(function(err) {
+    loading.classList.remove("active");
+    document.getElementById("btrBoundaryBody").innerHTML = '<tr><td colspan="5" style="color:var(--red);">Error: ' + err.message + '</td></tr>';
+  });
+}
+
+function renderBTRBoundaries(data) {
+  var tbody = document.getElementById("btrBoundaryBody");
+  var html = "";
+
+  data.boundaries.forEach(function(b) {
+    var minBefore = b.mins_before !== null ? b.mins_before.toFixed(1) : ">120";
+    var minAfter = b.mins_after !== null ? b.mins_after.toFixed(1) : ">120";
+    var nearest = Math.min(
+      b.mins_before !== null ? b.mins_before : 999,
+      b.mins_after !== null ? b.mins_after : 999
+    );
+
+    var badgeClass, badgeText;
+    if (nearest < 5) {
+      badgeClass = "btr-badge-critical";
+      badgeText = "Critical";
+    } else if (nearest <= 15) {
+      badgeClass = "btr-badge-sensitive";
+      badgeText = "Sensitive";
+    } else {
+      badgeClass = "btr-badge-stable";
+      badgeText = "Stable";
+    }
+
+    var prevLabel = b.prev_sign ? b.prev_sign + " (" + minBefore + " min)" : "—";
+    var nextLabel = b.next_sign ? b.next_sign + " (" + minAfter + " min)" : "—";
+
+    html += '<tr>';
+    html += '<td class="bold">' + b.chart + '</td>';
+    html += '<td style="color:var(--accent);font-weight:600;">' + b.current_sign + '</td>';
+    html += '<td>' + prevLabel + '</td>';
+    html += '<td>' + nextLabel + '</td>';
+    html += '<td><span class="btr-badge ' + badgeClass + '">' + badgeText + '</span></td>';
+    html += '</tr>';
+  });
+
+  tbody.innerHTML = html;
+
+  // Render D1 timeline
+  renderD1Timeline(data.boundaries);
+}
+
+function renderD1Timeline(boundaries) {
+  var container = document.getElementById("btrD1Timeline");
+  var d1 = boundaries.find(function(b) { return b.chart === "D1"; });
+  if (!d1 || d1.mins_before === null || d1.mins_after === null) {
+    container.innerHTML = "";
+    return;
+  }
+
+  var totalWindow = d1.mins_before + d1.mins_after;
+  var markerPct = (d1.mins_before / totalWindow) * 100;
+
+  container.innerHTML =
+    '<div style="font-size:0.75rem;color:var(--text-3);margin-bottom:0.25rem;">D1 Lagna Window — ' + d1.current_sign + '</div>' +
+    '<div class="btr-timeline" style="position:relative;">' +
+      '<div class="btr-timeline-fill" style="left:0;width:100%;"></div>' +
+      '<div class="btr-timeline-marker" style="left:' + markerPct + '%;"></div>' +
+      '<div class="btr-timeline-label" style="left:4px;">' + d1.prev_sign + '</div>' +
+      '<div class="btr-timeline-label" style="right:4px;">' + d1.next_sign + '</div>' +
+    '</div>' +
+    '<div style="display:flex;justify-content:space-between;font-size:0.65rem;color:var(--text-3);">' +
+      '<span>-' + d1.mins_before.toFixed(1) + ' min</span>' +
+      '<span style="color:var(--accent);font-weight:600;">Birth Time</span>' +
+      '<span>+' + d1.mins_after.toFixed(1) + ' min</span>' +
+    '</div>';
+}
+
+function btrGetAge() {
+  var dateVal = document.getElementById("birthDate").value;
+  if (!dateVal) return null;
+  var parts = dateVal.split("-");
+  var today = new Date();
+  var age = today.getFullYear() - parseInt(parts[0]);
+  var m = today.getMonth() + 1 - parseInt(parts[1]);
+  if (m < 0 || (m === 0 && today.getDate() < parseInt(parts[2]))) age--;
+  return age;
+}
+
+function generateBTRQuestions() {
+  if (!chartData || !btrData) return;
+
+  var btn = document.getElementById("btrGenQuestionsBtn");
+  var loading = document.getElementById("btrAILoading");
+  var errorEl = document.getElementById("btrAIError");
+  var stepEl = document.getElementById("btrAIStep");
+
+  btn.disabled = true;
+  errorEl.classList.remove("active");
+  loading.classList.add("active");
+  stepEl.textContent = "Generating verification questions...";
+
+  var additionalInfo = (document.getElementById("btrAdditionalInfo").value || "").trim();
+
+  fetch("/api/btr/ask", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      mode: "questions",
+      chart_data: chartData,
+      btr_data: btrData,
+      conversation: btrConversation,
+      age: btrGetAge(),
+      additional_info: additionalInfo
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    loading.classList.remove("active");
+    btn.disabled = false;
+    if (data.error) {
+      errorEl.textContent = data.error;
+      errorEl.classList.add("active");
+      return;
+    }
+    btrQuestions = btrQuestions.concat(data.questions || []);
+    btrConversation.push({role: "questions", data: data.questions || []});
+    renderBTRQuestions(btrQuestions);
+    document.getElementById("btrAnalyzeBtn").style.display = "inline-block";
+    btn.textContent = "More Questions";
+  })
+  .catch(function(err) {
+    loading.classList.remove("active");
+    btn.disabled = false;
+    errorEl.textContent = "Error: " + err.message;
+    errorEl.classList.add("active");
+  });
+}
+
+function renderBTRQuestions(questions) {
+  var container = document.getElementById("btrQuestionsContainer");
+  var html = "";
+
+  questions.forEach(function(q, idx) {
+    html += '<div class="btr-question-card" data-qidx="' + idx + '">';
+    html += '<div class="btr-q-meta">' + (q.chart || "") + ' — ' + (q.reasoning || "") + '</div>';
+    html += '<div class="btr-q-text">' + (idx + 1) + '. ' + q.question + '</div>';
+    html += '<div class="btr-q-options">';
+
+    if (q.type === "multiple_choice" && q.options) {
+      q.options.forEach(function(opt, oi) {
+        var checked = q.answer === opt ? ' checked' : '';
+        html += '<label><input type="radio" name="btrq_' + idx + '" value="' + opt.replace(/"/g, '&quot;') + '"' + checked + ' onchange="btrAnswerChanged(' + idx + ', this.value)"><span>' + opt + '</span></label>';
+      });
+    } else {
+      var yesChecked = q.answer === "Yes" ? ' checked' : '';
+      var noChecked = q.answer === "No" ? ' checked' : '';
+      var unsureChecked = q.answer === "Not sure" ? ' checked' : '';
+      html += '<label><input type="radio" name="btrq_' + idx + '" value="Yes"' + yesChecked + ' onchange="btrAnswerChanged(' + idx + ', \'Yes\')"><span>Yes</span></label>';
+      html += '<label><input type="radio" name="btrq_' + idx + '" value="No"' + noChecked + ' onchange="btrAnswerChanged(' + idx + ', \'No\')"><span>No</span></label>';
+      html += '<label><input type="radio" name="btrq_' + idx + '" value="Not sure"' + unsureChecked + ' onchange="btrAnswerChanged(' + idx + ', \'Not sure\')"><span>Not sure</span></label>';
+    }
+
+    html += '</div></div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function btrAnswerChanged(idx, value) {
+  if (btrQuestions[idx]) {
+    btrQuestions[idx].answer = value;
+  }
+}
+
+function submitBTRAnswers() {
+  if (!chartData || !btrData || btrQuestions.length === 0) return;
+
+  // Collect answered questions
+  var answered = btrQuestions.filter(function(q) { return q.answer; });
+  if (answered.length === 0) {
+    var errorEl = document.getElementById("btrAIError");
+    errorEl.textContent = "Please answer at least one question before analyzing.";
+    errorEl.classList.add("active");
+    return;
+  }
+
+  var analyzeBtn = document.getElementById("btrAnalyzeBtn");
+  var loading = document.getElementById("btrAILoading");
+  var errorEl = document.getElementById("btrAIError");
+  var stepEl = document.getElementById("btrAIStep");
+
+  analyzeBtn.disabled = true;
+  document.getElementById("btrGenQuestionsBtn").disabled = true;
+  errorEl.classList.remove("active");
+  loading.classList.add("active");
+  stepEl.textContent = "Analyzing answers and computing correction...";
+
+  var qaPairs = btrQuestions.map(function(q) {
+    return { question: q.question, answer: q.answer || "Not answered", chart: q.chart };
+  });
+
+  btrConversation.push({role: "answers", data: qaPairs});
+
+  var additionalInfo = (document.getElementById("btrAdditionalInfo").value || "").trim();
+
+  fetch("/api/btr/ask", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      mode: "analyze",
+      chart_data: chartData,
+      btr_data: btrData,
+      qa_pairs: qaPairs,
+      conversation: btrConversation,
+      age: btrGetAge(),
+      additional_info: additionalInfo
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    loading.classList.remove("active");
+    analyzeBtn.disabled = false;
+    document.getElementById("btrGenQuestionsBtn").disabled = false;
+    if (data.error) {
+      errorEl.textContent = data.error;
+      errorEl.classList.add("active");
+      return;
+    }
+    btrConversation.push({role: "analysis", data: data});
+    renderBTRAnalysis(data);
+  })
+  .catch(function(err) {
+    loading.classList.remove("active");
+    analyzeBtn.disabled = false;
+    document.getElementById("btrGenQuestionsBtn").disabled = false;
+    errorEl.textContent = "Error: " + err.message;
+    errorEl.classList.add("active");
+  });
+}
+
+function renderBTRAnalysis(result) {
+  var panel = document.getElementById("btrResultPanel");
+  var analysis = result.analysis || result;
+
+  var suggestion = analysis.suggested_adjustment || "No adjustment suggested";
+  var explanation = analysis.explanation || "";
+  var confidence = (analysis.confidence || "medium").toLowerCase();
+  var changes = analysis.chart_changes || [];
+
+  var html = '<div class="btr-result-panel">';
+  html += '<h4>Rectification Suggestion</h4>';
+  html += '<div class="btr-suggestion">' + suggestion + '</div>';
+
+  if (changes.length > 0) {
+    html += '<div style="margin-bottom:0.5rem;">';
+    changes.forEach(function(c) {
+      html += '<div style="font-size:0.8rem;color:var(--text-2);margin-bottom:0.2rem;">' + c + '</div>';
+    });
+    html += '</div>';
+  }
+
+  html += '<div class="btr-explanation">' + explanation + '</div>';
+
+  var confClass = 'btr-confidence-' + confidence;
+  html += '<div class="btr-confidence ' + confClass + '">';
+  html += '<span class="btr-confidence-dot"></span>';
+  html += 'Confidence: ' + confidence.charAt(0).toUpperCase() + confidence.slice(1);
+  html += '</div>';
+
+  // Parse offset minutes from suggestion for Apply button
+  var offsetMatch = suggestion.match(/([+-]?\d+\.?\d*)\s*min/i);
+  if (offsetMatch) {
+    var offsetMins = parseFloat(offsetMatch[1]);
+    // Check if "earlier" → negative offset
+    if (suggestion.toLowerCase().indexOf("earlier") >= 0 && offsetMins > 0) {
+      offsetMins = -offsetMins;
+    }
+    html += '<div style="margin-top:0.75rem;">';
+    html += '<button class="btr-btn" onclick="applyBTRCorrection(' + offsetMins + ')">Apply Correction</button>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  panel.innerHTML = html;
+}
+
+function applyBTRCorrection(offsetMins) {
+  var timeInput = document.getElementById("birthTime");
+  var tparts = timeInput.value.split(":");
+  var hour = parseInt(tparts[0]);
+  var minute = parseInt(tparts[1]);
+
+  var totalMins = hour * 60 + minute + offsetMins;
+  // Clamp to valid range
+  if (totalMins < 0) totalMins += 1440;
+  if (totalMins >= 1440) totalMins -= 1440;
+
+  var newHour = Math.floor(totalMins / 60);
+  var newMin = Math.round(totalMins % 60);
+  timeInput.value = String(newHour).padStart(2, '0') + ':' + String(newMin).padStart(2, '0');
+
+  // Reset BTR state
+  btrData = null;
+  btrQuestions = [];
+  btrConversation = [];
+  document.getElementById("btrQuestionsContainer").innerHTML = "";
+  document.getElementById("btrResultPanel").innerHTML = "";
+  document.getElementById("btrAnalyzeBtn").style.display = "none";
+  document.getElementById("btrGenQuestionsBtn").textContent = "Generate Questions";
+
+  // Re-generate chart and BTR
+  fetchChart();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// AI JYOTISH READING
+// ═══════════════════════════════════════════════════════════════════
+
+var aiConversation = [];  // [{role:"user",text:""},{role:"assistant",text:"",category:""}]
+var aiLimitReached = false;
+
+function checkAIAvailability() {
+  var section = document.getElementById("aiSection");
+  if (currentUser && chartData) {
+    section.classList.add("visible");
+  } else {
+    section.classList.remove("visible");
+  }
+}
+
+var _origRenderAll = renderAll;
+renderAll = function(data) {
+  _origRenderAll(data);
+  checkAIAvailability();
+  // Reset AI conversation when a new chart is loaded
+  aiConversation = [];
+  document.getElementById("aiChatThread").innerHTML = "";
+  document.getElementById("aiError").classList.remove("active");
+  document.getElementById("aiLoading").classList.remove("active");
+  if (aiLimitReached) {
+    document.getElementById("aiAskBtn").disabled = true;
+    document.getElementById("aiQuestion").disabled = true;
+    document.getElementById("aiHelper").textContent = "Daily limit reached (0 of 10 remaining)";
+  } else {
+    document.getElementById("aiAskBtn").disabled = false;
+    document.getElementById("aiQuestion").disabled = false;
+    document.getElementById("aiHelper").textContent = aiRemainingCount + " of 10 questions remaining today";
+  }
+  // Reset BTR state and auto-fetch boundaries
+  btrData = null;
+  btrQuestions = [];
+  btrConversation = [];
+  document.getElementById("btrQuestionsContainer").innerHTML = "";
+  document.getElementById("btrResultPanel").innerHTML = "";
+  document.getElementById("btrAIError").classList.remove("active");
+  document.getElementById("btrAnalyzeBtn").style.display = "none";
+  document.getElementById("btrGenQuestionsBtn").textContent = "Generate Questions";
+  fetchBTR();
+};
+
+var _origUpdateAuthUI = updateAuthUI;
+updateAuthUI = function() {
+  _origUpdateAuthUI();
+  checkAIAvailability();
+};
+
+var AI_STEPS = [
+  "Analyzing chart...",
+  "Identifying astrological factors...",
+  "Generating personalized reading..."
+];
+
+function appendChatMsg(role, text, category) {
+  var thread = document.getElementById("aiChatThread");
+  var div = document.createElement("div");
+  div.className = "ai-msg " + role;
+  if (role === "assistant" && category) {
+    var tag = document.createElement("span");
+    tag.className = "ai-category-tag";
+    tag.textContent = category;
+    div.appendChild(tag);
+    div.appendChild(document.createElement("br"));
+  }
+  if (role === "assistant") {
+    var content = document.createElement("div");
+    content.className = "ai-msg-content";
+    content.innerHTML = marked.parse(text);
+    div.appendChild(content);
+  } else {
+    div.appendChild(document.createTextNode(text));
+  }
+  thread.appendChild(div);
+  thread.scrollTop = thread.scrollHeight;
+}
+
+function askAI() {
+  var input = document.getElementById("aiQuestion");
+  var question = input.value.trim();
+  if (!question) { return; }
+  if (!chartData) { return; }
+  if (aiLimitReached) { return; }
+
+  var btn = document.getElementById("aiAskBtn");
+  var loading = document.getElementById("aiLoading");
+  var errorEl = document.getElementById("aiError");
+
+  // Add user message to thread
+  appendChatMsg("user", question);
+  aiConversation.push({role: "user", text: question});
+  input.value = "";
+
+  btn.disabled = true;
+  input.disabled = true;
+  errorEl.classList.remove("active");
+  loading.classList.add("active");
+
+  var stepIdx = 0;
+  document.getElementById("aiStep").textContent = AI_STEPS[0];
+  var stepTimer = setInterval(function() {
+    stepIdx++;
+    if (stepIdx < AI_STEPS.length) {
+      document.getElementById("aiStep").textContent = AI_STEPS[stepIdx];
+    }
+  }, 4000);
+
+  fetch("/api/ask", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      question: question,
+      chart_data: chartData,
+      conversation: aiConversation.slice(0, -1)  // prior turns (exclude current question)
+    })
+  })
+  .then(function(r) { return r.json().then(function(d) { return {status: r.status, data: d}; }); })
+  .then(function(resp) {
+    clearInterval(stepTimer);
+    loading.classList.remove("active");
+
+    if (resp.data.error) {
+      errorEl.textContent = resp.data.error;
+      errorEl.classList.add("active");
+      aiConversation.pop();  // remove the failed user message
+      if (resp.status === 429 && resp.data.error.indexOf("Daily limit") >= 0) {
+        aiLimitReached = true;
+        document.getElementById("aiHelper").textContent = "Daily limit reached";
+      } else {
+        btn.disabled = false;
+        input.disabled = false;
+      }
+      return;
+    }
+
+    // Success — add assistant reply
+    var reading = resp.data.reading;
+    var category = resp.data.category;
+    appendChatMsg("assistant", reading, category);
+    aiConversation.push({role: "assistant", text: reading});
+
+    if (resp.data.remaining !== undefined) {
+      aiRemainingCount = resp.data.remaining;
+      aiLimitReached = aiRemainingCount <= 0;
+      document.getElementById("aiHelper").textContent = aiRemainingCount + " of 10 questions remaining today";
+    }
+
+    btn.disabled = false;
+    input.disabled = false;
+    input.focus();
+  })
+  .catch(function(err) {
+    clearInterval(stepTimer);
+    loading.classList.remove("active");
+    errorEl.textContent = "Network error: " + err.message;
+    errorEl.classList.add("active");
+    aiConversation.pop();
+    btn.disabled = false;
+    input.disabled = false;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT — auto-fetch default chart + check auth
+// ═══════════════════════════════════════════════════════════════════
+checkAuth();
+</script>
+</body>
+</html>

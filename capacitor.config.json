@@ -1,0 +1,17 @@
+{
+  "appId": "com.grahalogic.astrojyoti",
+  "appName": "Astrojyoti",
+  "webDir": "www",
+  "server": {
+    "url": "https://jyotish-app-333157384151.us-central1.run.app",
+    "cleartext": false,
+    "allowNavigation": [
+      "jyotish-app-333157384151.us-central1.run.app",
+      "accounts.google.com"
+    ]
+  },
+  "ios": {
+    "contentInset": "always",
+    "backgroundColor": "#fdf6ec"
+  }
+}
