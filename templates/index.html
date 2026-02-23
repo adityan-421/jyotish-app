@@ -576,6 +576,44 @@ footer strong { color: #FF6B00; }
 .btr-loading .btr-step { font-size: 0.78rem; color: var(--text-3); }
 .btr-error { display: none; padding: 0.6rem 0.85rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; color: var(--red); font-size: 0.8rem; margin-top: 0.5rem; }
 .btr-error.active { display: block; }
+.btr-chat-thread { margin-top: 1rem; }
+.btr-chat-bubble {
+  padding: 0.75rem 1rem; border-radius: 12px; margin-bottom: 0.6rem;
+  font-size: 0.82rem; line-height: 1.6; max-width: 95%;
+}
+.btr-chat-bubble-user {
+  background: var(--accent-bg, rgba(255,107,0,0.08)); border: 1px solid var(--accent);
+  margin-left: auto; color: var(--text);
+}
+.btr-chat-bubble-ai {
+  background: var(--surface-2); border: 1px solid var(--border-light);
+  color: var(--text-2);
+}
+.btr-chat-bubble-label {
+  font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  margin-bottom: 0.3rem; color: var(--text-3);
+}
+.btr-chat-input-row {
+  display: flex; gap: 0.5rem; margin-top: 0.75rem; align-items: flex-end;
+}
+.btr-chat-input {
+  flex: 1; padding: 0.55rem 0.75rem; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); color: var(--text); font-family: inherit; font-size: 0.82rem;
+  resize: vertical; min-height: 2.4rem; max-height: 8rem; line-height: 1.5;
+}
+.btr-chat-input:focus { border-color: var(--accent); outline: none; }
+.btr-chat-send {
+  padding: 0.55rem 1rem; background: var(--accent); color: #fff; border: none;
+  border-radius: 10px; font-family: inherit; font-size: 0.82rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap; transition: background 0.15s;
+}
+.btr-chat-send:hover { background: var(--accent-2); }
+.btr-chat-send:disabled { opacity: 0.5; cursor: not-allowed; }
+.btr-followup-section { display: none; margin-top: 1rem; border-top: 1px solid var(--border-light); padding-top: 0.85rem; }
+.btr-followup-section.active { display: block; }
+.btr-followup-hint {
+  font-size: 0.75rem; color: var(--text-3); margin-bottom: 0.5rem; line-height: 1.5;
+}
 
 /* AI Reading */
 .ai-section { display: none; }
@@ -1112,6 +1150,14 @@ footer strong { color: #FF6B00; }
     <div class="btr-actions" id="btrActions">
       <button class="btr-btn" id="btrGenQuestionsBtn" onclick="generateBTRQuestions()">Generate Questions</button>
       <button class="btr-btn-secondary" id="btrAnalyzeBtn" onclick="submitBTRAnswers()" style="display:none;">Analyze Answers</button>
+    </div>
+    <div class="btr-followup-section" id="btrFollowupSection">
+      <div class="btr-followup-hint">Not converging? Provide corrections, additional life events, or details to help narrow down the birth time.</div>
+      <div class="btr-chat-thread" id="btrChatThread"></div>
+      <div class="btr-chat-input-row">
+        <textarea id="btrChatInput" class="btr-chat-input" rows="1" placeholder="e.g. 'Actually I have 2 siblings, not 1' or 'I got married in 2015 and divorced in 2020'" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendBTRFollowup();}"></textarea>
+        <button class="btr-chat-send" id="btrChatSendBtn" onclick="sendBTRFollowup()">Send</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2966,6 +3012,162 @@ function renderBTRAnalysis(result) {
 
   html += '</div>';
   panel.innerHTML = html;
+
+  // Show the followup chat section
+  document.getElementById("btrFollowupSection").classList.add("active");
+}
+
+function sendBTRFollowup() {
+  var input = document.getElementById("btrChatInput");
+  var message = (input.value || "").trim();
+  if (!message || !chartData || !btrData) return;
+
+  var sendBtn = document.getElementById("btrChatSendBtn");
+  var thread = document.getElementById("btrChatThread");
+
+  // Add user bubble to chat
+  var userBubble = '<div class="btr-chat-bubble btr-chat-bubble-user">';
+  userBubble += '<div class="btr-chat-bubble-label">You</div>';
+  userBubble += message.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  userBubble += '</div>';
+  thread.innerHTML += userBubble;
+
+  // Track in conversation
+  btrConversation.push({role: "user_followup", data: message});
+
+  input.value = "";
+  sendBtn.disabled = true;
+
+  // Show loading
+  var loadingId = "btrChatLoading_" + Date.now();
+  thread.innerHTML += '<div id="' + loadingId + '" class="btr-loading active" style="margin:0.5rem 0;"><div class="btr-spinner"></div><span class="btr-step">Analyzing your input...</span></div>';
+  thread.scrollTop = thread.scrollHeight;
+
+  var additionalInfo = (document.getElementById("btrAdditionalInfo").value || "").trim();
+
+  fetch("/api/btr/ask", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      mode: "followup",
+      chart_data: chartData,
+      btr_data: btrData,
+      conversation: btrConversation,
+      user_message: message,
+      age: btrGetAge(),
+      additional_info: additionalInfo
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    var loader = document.getElementById(loadingId);
+    if (loader) loader.remove();
+    sendBtn.disabled = false;
+
+    if (data.error) {
+      thread.innerHTML += '<div class="btr-chat-bubble btr-chat-bubble-ai"><div class="btr-chat-bubble-label">Error</div>' + data.error + '</div>';
+      return;
+    }
+
+    var fu = data.followup || {};
+    btrConversation.push({role: "followup_response", data: fu});
+    renderBTRFollowupResponse(fu);
+  })
+  .catch(function(err) {
+    var loader = document.getElementById(loadingId);
+    if (loader) loader.remove();
+    sendBtn.disabled = false;
+    thread.innerHTML += '<div class="btr-chat-bubble btr-chat-bubble-ai"><div class="btr-chat-bubble-label">Error</div>' + err.message + '</div>';
+  });
+}
+
+function renderBTRFollowupResponse(fu) {
+  var thread = document.getElementById("btrChatThread");
+
+  var responseText = fu.response_text || "";
+  var suggestion = fu.suggested_adjustment || "";
+  var explanation = fu.explanation || "";
+  var confidence = (fu.confidence || "medium").toLowerCase();
+  var changes = fu.chart_changes || [];
+  var followupQs = fu.followup_questions || [];
+
+  // Build AI response bubble
+  var html = '<div class="btr-chat-bubble btr-chat-bubble-ai">';
+  html += '<div class="btr-chat-bubble-label">AI Rectification</div>';
+
+  if (responseText) {
+    html += '<div style="margin-bottom:0.5rem;">' + responseText + '</div>';
+  }
+
+  if (suggestion) {
+    html += '<div style="font-weight:700;color:var(--accent);margin-bottom:0.4rem;">' + suggestion + '</div>';
+  }
+
+  if (changes.length > 0) {
+    changes.forEach(function(c) {
+      html += '<div style="font-size:0.78rem;color:var(--text-3);margin-bottom:0.15rem;">' + c + '</div>';
+    });
+  }
+
+  if (explanation) {
+    html += '<div style="margin-top:0.4rem;font-size:0.8rem;color:var(--text-2);line-height:1.6;white-space:pre-wrap;">' + explanation + '</div>';
+  }
+
+  var confClass = 'btr-confidence-' + confidence;
+  html += '<div class="btr-confidence ' + confClass + '" style="margin-top:0.4rem;">';
+  html += '<span class="btr-confidence-dot"></span>';
+  html += 'Confidence: ' + confidence.charAt(0).toUpperCase() + confidence.slice(1);
+  html += '</div>';
+
+  // Apply correction button if offset found
+  var offsetMatch = suggestion.match(/([+-]?\d+\.?\d*)\s*min/i);
+  if (offsetMatch) {
+    var offsetMins = parseFloat(offsetMatch[1]);
+    if (suggestion.toLowerCase().indexOf("earlier") >= 0 && offsetMins > 0) {
+      offsetMins = -offsetMins;
+    }
+    html += '<div style="margin-top:0.5rem;">';
+    html += '<button class="btr-btn" onclick="applyBTRCorrection(' + offsetMins + ')">Apply Correction</button>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  thread.innerHTML += html;
+
+  // Render follow-up questions if any
+  if (followupQs.length > 0) {
+    var startIdx = btrQuestions.length;
+    followupQs.forEach(function(q) { btrQuestions.push(q); });
+    btrConversation.push({role: "questions", data: followupQs});
+
+    var qHtml = '<div style="margin-top:0.5rem;">';
+    followupQs.forEach(function(q, i) {
+      var idx = startIdx + i;
+      qHtml += '<div class="btr-question-card" data-qidx="' + idx + '">';
+      qHtml += '<div class="btr-q-meta">' + (q.chart || "") + ' — ' + (q.reasoning || "") + '</div>';
+      qHtml += '<div class="btr-q-text">' + (idx + 1) + '. ' + q.question + '</div>';
+      qHtml += '<div class="btr-q-options">';
+
+      if (q.type === "multiple_choice" && q.options) {
+        q.options.forEach(function(opt) {
+          qHtml += '<label><input type="radio" name="btrq_' + idx + '" value="' + opt.replace(/"/g, '&quot;') + '" onchange="btrAnswerChanged(' + idx + ', this.value)"><span>' + opt + '</span></label>';
+        });
+      } else {
+        qHtml += '<label><input type="radio" name="btrq_' + idx + '" value="Yes" onchange="btrAnswerChanged(' + idx + ', \'Yes\')"><span>Yes</span></label>';
+        qHtml += '<label><input type="radio" name="btrq_' + idx + '" value="No" onchange="btrAnswerChanged(' + idx + ', \'No\')"><span>No</span></label>';
+        qHtml += '<label><input type="radio" name="btrq_' + idx + '" value="Not sure" onchange="btrAnswerChanged(' + idx + ', \'Not sure\')"><span>Not sure</span></label>';
+      }
+
+      qHtml += '</div></div>';
+    });
+    qHtml += '</div>';
+    thread.innerHTML += qHtml;
+
+    // Show analyze button in case user answers these
+    document.getElementById("btrAnalyzeBtn").style.display = "inline-block";
+  }
+
+  thread.scrollTop = thread.scrollHeight;
 }
 
 function applyBTRCorrection(offsetMins) {
@@ -2991,6 +3193,9 @@ function applyBTRCorrection(offsetMins) {
   document.getElementById("btrResultPanel").innerHTML = "";
   document.getElementById("btrAnalyzeBtn").style.display = "none";
   document.getElementById("btrGenQuestionsBtn").textContent = "Generate Questions";
+  document.getElementById("btrChatThread").innerHTML = "";
+  document.getElementById("btrChatInput").value = "";
+  document.getElementById("btrFollowupSection").classList.remove("active");
 
   // Re-generate chart and BTR
   fetchChart();
@@ -3039,6 +3244,9 @@ renderAll = function(data) {
   document.getElementById("btrAIError").classList.remove("active");
   document.getElementById("btrAnalyzeBtn").style.display = "none";
   document.getElementById("btrGenQuestionsBtn").textContent = "Generate Questions";
+  document.getElementById("btrChatThread").innerHTML = "";
+  document.getElementById("btrChatInput").value = "";
+  document.getElementById("btrFollowupSection").classList.remove("active");
   fetchBTR();
 };
 

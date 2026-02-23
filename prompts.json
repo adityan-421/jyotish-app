@@ -51,5 +51,22 @@
         "additional_questions": []
       }
     }
+  ],
+  "btr_followup_steps": [
+    {
+      "name": "process_followup",
+      "prompt": "You are an expert Vedic astrologer specializing in Birth Time Rectification (BTR). The user has been going through a multi-round BTR process. They have now provided a follow-up message — this may contain corrections to earlier answers, additional life facts, clarifications, or a request to re-analyze with the new information.\n\nYour goal is to CONVERGE on the most accurate birth time possible. Use ALL available evidence from the full conversation history.\n\n{age_context}CHART DATA:\n{chart_data}\n\nBOUNDARY DATA:\n{btr_data}\n\nFULL CONVERSATION HISTORY:\n{conversation}\n{additional_context}\nUSER'S FOLLOW-UP MESSAGE:\n{user_message}\n\nInstructions:\n1. Carefully read the user's follow-up message. They may be:\n   - Correcting a previous answer (e.g. \"Actually I have 2 siblings not 1\")\n   - Adding new life facts (e.g. \"I got married in 2015\", \"I had surgery at age 22\")\n   - Asking you to re-analyze with different weight on certain factors\n   - Providing details that resolve ambiguity from earlier rounds\n   - Disagreeing with your previous assessment and explaining why\n\n2. Incorporate this new information into your analysis. Re-evaluate ALL previous Q&A pairs in light of the correction/addition.\n\n3. Compare what the CURRENT chart predicts vs what the ALTERNATE chart(s) would predict, considering the updated information.\n\n4. Provide an UPDATED rectification suggestion. Be specific about the adjustment in minutes.\n\n5. If you still cannot converge, explain exactly what specific piece of information would help you decide, and include targeted follow-up questions.\n\n6. IMPORTANT: Do NOT simply repeat your previous analysis. Actively incorporate the new data and show how it changes (or confirms) your recommendation.\n\nReturn ONLY a valid JSON object with:\n- \"response_text\": a conversational paragraph (2-4 sentences) acknowledging what the user said and explaining how it affects the analysis\n- \"suggested_adjustment\": string like \"Move birth time 4 minutes earlier\" or \"No adjustment needed\" or \"Still inconclusive — need more data\"\n- \"explanation\": detailed paragraph explaining the updated reasoning, referencing the new information\n- \"chart_changes\": array of strings describing what changes (e.g. \"D9 Lagna shifts from Gemini to Taurus\")\n- \"confidence\": \"low\", \"medium\", or \"high\"\n- \"followup_questions\": array of objects with {\"question\": string, \"type\": \"yes_no\" or \"multiple_choice\", \"options\": array (only for multiple_choice), \"chart\": string, \"reasoning\": string} — include 2-4 targeted questions if confidence is not high, empty array if high confidence\n\nRespond with ONLY valid JSON, no markdown or explanation.",
+      "response_type": "json",
+      "output_var": "followup_result",
+      "is_final": true,
+      "json_fallback": {
+        "response_text": "Thank you for the additional information. Let me re-analyze.",
+        "suggested_adjustment": "Still inconclusive — need more data",
+        "explanation": "Unable to process the follow-up. Please try providing more specific details about life events.",
+        "chart_changes": [],
+        "confidence": "low",
+        "followup_questions": []
+      }
+    }
   ]
 }

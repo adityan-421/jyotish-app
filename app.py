@@ -377,8 +377,8 @@ def api_btr_ask():
         return jsonify({"error": "No JSON body provided"}), 400
 
     mode = data.get("mode")
-    if mode not in ("questions", "analyze"):
-        return jsonify({"error": "Invalid mode. Must be 'questions' or 'analyze'."}), 400
+    if mode not in ("questions", "analyze", "followup"):
+        return jsonify({"error": "Invalid mode. Must be 'questions', 'analyze', or 'followup'."}), 400
 
     chart_data = data.get("chart_data")
     btr_data = data.get("btr_data")
@@ -443,7 +443,7 @@ def api_btr_ask():
                 questions = result if isinstance(result, list) else []
             return jsonify({"questions": questions})
 
-        else:  # analyze
+        elif mode == "analyze":
             qa_pairs = data.get("qa_pairs") or []
             if not qa_pairs:
                 return jsonify({"error": "qa_pairs required for analyze mode"}), 400
@@ -473,6 +473,37 @@ def api_btr_ask():
             else:
                 analysis = result if isinstance(result, dict) else {}
             return jsonify({"analysis": analysis})
+
+        else:  # followup
+            user_message = (data.get("user_message") or "").strip()
+            if not user_message:
+                return jsonify({"error": "user_message required for followup mode"}), 400
+            variables["user_message"] = user_message
+
+            steps = prompts_config.get("btr_followup_steps", [])
+            if not steps:
+                return jsonify({"error": "BTR followup prompts not configured"}), 500
+            result = _run_prompt_chain(model, steps, variables)
+            if isinstance(result, str):
+                try:
+                    cleaned = result
+                    if cleaned.startswith("```"):
+                        cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
+                        if cleaned.endswith("```"):
+                            cleaned = cleaned[:-3].strip()
+                    followup_result = json.loads(cleaned)
+                except json.JSONDecodeError:
+                    followup_result = {
+                        "response_text": result,
+                        "suggested_adjustment": "Still inconclusive — need more data",
+                        "explanation": result,
+                        "chart_changes": [],
+                        "confidence": "low",
+                        "followup_questions": [],
+                    }
+            else:
+                followup_result = result if isinstance(result, dict) else {}
+            return jsonify({"followup": followup_result})
 
     except Exception as e:
         error_type = type(e).__name__
