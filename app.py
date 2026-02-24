@@ -11,7 +11,7 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_cors import CORS
 from authlib.integrations.flask_client import OAuth
-from jyotish_engine import compute_chart, compute_btr
+from jyotish_engine import compute_chart, compute_btr, calculate_sadesati
 from zoneinfo import ZoneInfo
 from datetime import datetime
 from database import (
@@ -282,6 +282,14 @@ def api_get_chart(chart_id):
     chart = get_chart(chart_id, user_id)
     if not chart:
         return jsonify({"error": "Chart not found"}), 404
+    # Backfill Sade Sati for charts saved before the feature was added
+    cd = chart.get("chart_data")
+    if cd and not cd.get("sadesati"):
+        try:
+            moon = next(p for p in cd["planets"] if p["name"] == "Moon")
+            cd["sadesati"] = calculate_sadesati(moon["lon"], cd["birth"]["jd"])
+        except Exception:
+            logger.warning("Could not backfill sadesati for chart %s", chart_id)
     return jsonify(chart)
 
 
