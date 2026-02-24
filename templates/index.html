@@ -1281,7 +1281,7 @@ footer strong { color: #FF6B00; }
   </div>
 </div>
 
-<div class="card accent-amber" id="sadesatiCard" style="display:none;">
+<div class="card accent-amber" id="sadesatiCard">
   <div class="card-header">
     <h2>Sade Sati & Dhaiya</h2>
     <span class="sub">Saturn's transit over natal Moon</span>
@@ -2271,7 +2271,7 @@ function renderDashaSection(data) {
   dashaPath = [];
   renderTimeline(d);
   renderDasha(d);
-  renderSadesati(data);
+  try { renderSadesati(data); } catch(e) { console.error("renderSadesati error:", e); }
 }
 
 function renderTimeline(d) {
@@ -2451,9 +2451,10 @@ function formatDateShort(d) {
 
 function renderSadesati(data) {
   var card = document.getElementById("sadesatiCard");
+  if (!card) { console.error("sadesatiCard not found"); return; }
   var ss = data.sadesati;
   if (!ss) { card.style.display = "none"; return; }
-  card.style.display = "";
+  card.style.display = "block";
 
   // Status badge
   var statusEl = document.getElementById("sadesatiStatus");
