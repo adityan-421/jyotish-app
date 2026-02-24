@@ -1,6 +1,6 @@
 {
   "appId": "com.grahalogic.astrojyoti",
-  "appName": "Astrojyoti",
+  "appName": "Punarvasu AI",
   "webDir": "www",
   "server": {
     "url": "https://jyotish-app-333157384151.us-central1.run.app",

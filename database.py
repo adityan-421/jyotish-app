@@ -26,7 +26,7 @@ def _get_pool():
     global _pool
     if _pool is None:
         _pool = psycopg2.pool.ThreadedConnectionPool(
-            minconn=1,
+            minconn=0,
             maxconn=5,
             host=DB_HOST,
             port=DB_PORT,
@@ -97,6 +97,7 @@ def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
+            cur.execute("ALTER TABLE saved_charts ADD COLUMN IF NOT EXISTS reading TEXT DEFAULT NULL")
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS ai_questions (
                     id SERIAL PRIMARY KEY,
@@ -156,7 +157,7 @@ def update_chart(chart_id, user_id, input_data, chart_data):
     with get_db() as conn:
         cur = conn.cursor()
         cur.execute(
-            "UPDATE saved_charts SET input_data=%s, chart_data=%s WHERE id=%s AND user_id=%s",
+            "UPDATE saved_charts SET input_data=%s, chart_data=%s, reading=NULL WHERE id=%s AND user_id=%s",
             (json.dumps(input_data), json.dumps(chart_data), chart_id, user_id),
         )
         updated = cur.rowcount
@@ -199,11 +200,14 @@ def get_chart(chart_id, user_id):
         cur.close()
     if not row:
         return None
+    reading_raw = row.get("reading")
+    reading = json.loads(reading_raw) if reading_raw else None
     return {
         "id": row["id"],
         "name": row["name"],
         "input_data": json.loads(row["input_data"]),
         "chart_data": json.loads(row["chart_data"]),
+        "reading": reading,
         "created_at": row["created_at"].isoformat() if row["created_at"] else None,
     }
 
@@ -216,6 +220,17 @@ def delete_chart(chart_id, user_id):
         conn.commit()
         cur.close()
         return deleted > 0
+
+
+def update_chart_reading(chart_id, user_id, reading):
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE saved_charts SET reading=%s WHERE id=%s AND user_id=%s",
+            (json.dumps(reading), chart_id, user_id),
+        )
+        conn.commit()
+        cur.close()
 
 
 def get_question_count_today(user_id):

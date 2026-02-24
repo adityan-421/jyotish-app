@@ -1,7 +1,7 @@
 {
   "name": "astrojyoti",
   "version": "1.0.0",
-  "description": "Astrojyoti - Vedic Astrology App",
+  "description": "Punarvasu AI - Vedic Astrology App",
   "dependencies": {
     "@capacitor/core": "^6.0.0",
     "@capacitor/ios": "^6.0.0"

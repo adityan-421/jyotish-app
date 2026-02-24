@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 from datetime import datetime
 from database import (
     init_db, reset_pool, upsert_user, save_chart, get_charts, get_chart, delete_chart,
-    update_chart, count_charts, get_question_count_today, save_ai_question, get_ai_history,
+    update_chart, update_chart_reading, count_charts, get_question_count_today, save_ai_question, get_ai_history,
 )
 
 from pathlib import Path
@@ -50,12 +50,29 @@ def build_conv_context(conversation):
     return ctx
 
 
+def _safe_substitute(template, variables):
+    """Replace {key} placeholders with values from variables dict.
+
+    Only replaces {word} tokens that exist in variables — leaves all other
+    braces (JSON examples, nested objects, etc.) untouched.  This avoids the
+    ValueError that str.format_map raises on literal JSON in prompt templates.
+    """
+    import re
+    def _replacer(match):
+        key = match.group(1)
+        if key in variables:
+            val = variables[key]
+            return val if isinstance(val, str) else str(val)
+        return match.group(0)
+    return re.sub(r'\{(\w+)\}', _replacer, template)
+
+
 def _run_prompt_chain(model, steps, variables):
     """Execute a sequence of prompt steps, returning the final output."""
     final_output = None
     for step in steps:
         # Format the prompt template with current variables
-        prompt_text = step["prompt"].format_map(_SafeFormatDict(variables))
+        prompt_text = _safe_substitute(step["prompt"], variables)
 
         response = model.generate_content(prompt_text)
         result_text = response.text.strip()
@@ -215,7 +232,10 @@ def auth_logout():
 def api_me():
     user = session.get("user")
     if user:
-        remaining = 10 - get_question_count_today(user["id"])
+        try:
+            remaining = 25 - get_question_count_today(user["id"])
+        except Exception:
+            remaining = 25  # Assume full quota if DB is unreachable
         return jsonify({"user": user, "ai_remaining": max(remaining, 0)})
     return jsonify({"user": None})
 
@@ -687,12 +707,15 @@ def api_ask():
     user = session["user"]
     user_id = user["id"]
 
-    # Rate limit: 10 questions per day
-    if get_question_count_today(user_id) >= 10:
-        return jsonify({"error": "Daily limit reached. You can ask 10 questions per day."}), 429
+    # Rate limit: 25 questions per day
+    if get_question_count_today(user_id) >= 25:
+        return jsonify({"error": "Daily limit reached. You can ask 25 questions per day."}), 429
 
     # Ensure user exists in DB
     upsert_user(user_id, user.get("email", ""), user.get("name", ""), user.get("picture", ""))
+
+    initial_reading = data.get("initial_reading", False)
+    chart_id = data.get("chart_id")  # optional: cache reading back to saved chart
 
     try:
         import vertexai
@@ -705,23 +728,68 @@ def api_ask():
         prompts_config = load_prompts()
         model = GenerativeModel(prompts_config.get("model", "gemini-2.5-flash"))
 
-        # Seed template variables
-        variables = {
-            "question": question,
-            "categories": ", ".join(LIFE_CATEGORIES),
-            "today": datetime.now().strftime("%d-%b-%Y"),
-            "conversation": build_conv_context(conversation),
-            "raw_chart_data": chart_data,
-        }
+        if initial_reading and "initial_reading_steps" in prompts_config:
+            # Comprehensive reading — send full chart data
+            full_chart = dict(chart_data)
+            if "dasha" in full_chart and "maha" in full_chart.get("dasha", {}):
+                full_chart["dasha"] = dict(full_chart["dasha"])
+                full_chart["dasha"]["maha"] = _relevant_maha_periods(full_chart["dasha"]["maha"])
+            full_chart["current_date"] = datetime.now().strftime("%d-%b-%Y")
 
-        reading = _run_prompt_chain(model, prompts_config["steps"], variables)
+            variables = {
+                "today": datetime.now().strftime("%d-%b-%Y"),
+                "chart_data": json.dumps(full_chart, indent=2),
+            }
+            result = _run_prompt_chain(model, prompts_config["initial_reading_steps"], variables)
+            category = "comprehensive"
 
-        category = variables.get("category", "other")
+            # result is the JSON string from the prompt chain
+            if isinstance(result, str):
+                try:
+                    cleaned = result.strip()
+                    if cleaned.startswith("```"):
+                        cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
+                        if cleaned.endswith("```"):
+                            cleaned = cleaned[:-3].strip()
+                    reading_data = json.loads(cleaned)
+                except json.JSONDecodeError:
+                    reading_data = prompts_config["initial_reading_steps"][0].get("json_fallback", {})
+            else:
+                reading_data = result if isinstance(result, dict) else {"categories": []}
+
+            # Save a summary to DB
+            save_ai_question(user_id, question, category,
+                             json.dumps(reading_data) if isinstance(reading_data, dict) else str(reading_data))
+
+            # Cache reading on the saved chart so it loads instantly next time
+            if chart_id:
+                try:
+                    update_chart_reading(chart_id, user_id, reading_data)
+                except Exception as e:
+                    logger.warning("Failed to cache reading for chart %s: %s", chart_id, e)
+
+            remaining = 25 - get_question_count_today(user_id)
+            return jsonify({
+                "category": category,
+                "reading_data": reading_data,
+                "remaining": remaining,
+            })
+        else:
+            # Normal question flow
+            variables = {
+                "question": question,
+                "categories": ", ".join(LIFE_CATEGORIES),
+                "today": datetime.now().strftime("%d-%b-%Y"),
+                "conversation": build_conv_context(conversation),
+                "raw_chart_data": chart_data,
+            }
+            reading = _run_prompt_chain(model, prompts_config["steps"], variables)
+            category = variables.get("category", "other")
 
         # Save to DB
         save_ai_question(user_id, question, category, reading)
 
-        remaining = 10 - get_question_count_today(user_id)
+        remaining = 25 - get_question_count_today(user_id)
         return jsonify({"category": category, "reading": reading, "remaining": remaining})
 
     except Exception as e:
@@ -740,8 +808,13 @@ except Exception:
 
 @app.before_request
 def _ensure_db():
-    """Lazily retry DB init if it failed at startup."""
-    init_db()
+    """Lazily retry DB init if it failed at startup — skip for non-DB routes."""
+    if request.endpoint in ("index",):
+        return
+    try:
+        init_db()
+    except Exception:
+        pass
 
 
 @app.after_request

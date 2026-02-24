@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Astrojyoti AI</title>
+<title>Punarvasu AI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@800&family=Inter:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -60,13 +60,19 @@ header {
   display: flex; justify-content: space-between; align-items: center;
 }
 
-.brand { display: flex; align-items: baseline; gap: 0.75rem; }
+.brand { display: flex; align-items: center; gap: 0.75rem; }
+.brand-logo {
+  width: 38px; height: 38px; flex-shrink: 0;
+  filter: drop-shadow(0 0 6px rgba(255,213,79,0.4));
+}
+.brand-text { display: flex; flex-direction: column; gap: 0.05rem; }
 .brand h1 {
   font-family: 'DM Serif Display', serif; font-size: 1.35rem; font-weight: 400;
   color: #ffd54f;
   -webkit-text-fill-color: #ffd54f;
+  line-height: 1.2;
 }
-.brand span { font-size: 0.72rem; color: rgba(255,213,79,0.6); }
+.brand span { font-size: 0.72rem; color: rgba(255,213,79,0.6); line-height: 1.2; }
 
 .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem 2rem; display: flex; flex-direction: column; gap: 1.25rem; }
 
@@ -163,6 +169,7 @@ header {
   min-width: 0; /* Allow value to wrap */
 }
 
+.lagna-rashi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
 .pill-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .pill {
   background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
@@ -272,6 +279,75 @@ tbody tr:hover { background: var(--surface-2); }
 .dasha-bar-fill { height: 100%; border-radius: 3px; }
 .dasha-dur { font-size: 0.72rem; color: var(--text-3); width: 50px; text-align: right; flex-shrink: 0; }
 .dasha-arrow { color: var(--text-3); font-size: 0.72rem; width: 14px; text-align: center; flex-shrink: 0; }
+
+/* Sade Sati & Dhaiya */
+.ss-status {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.3rem 0.75rem; border-radius: 20px; font-size: 0.78rem; font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+.ss-status.active-sadesati { background: rgba(255,179,0,0.15); color: #E6A000; }
+.ss-status.active-dhaiya { background: rgba(0,188,212,0.15); color: #00838F; }
+.ss-status.inactive { background: rgba(46,204,64,0.12); color: #2ECC40; }
+.ss-status .dot { width: 8px; height: 8px; border-radius: 50%; }
+.ss-status.active-sadesati .dot { background: #FFB300; }
+.ss-status.active-dhaiya .dot { background: #00BCD4; }
+.ss-status.inactive .dot { background: #2ECC40; }
+
+.ss-timeline {
+  display: flex; height: 28px; border-radius: 6px; overflow: hidden;
+  margin-bottom: 0.5rem; background: var(--surface-3); position: relative;
+}
+.ss-tl-seg {
+  height: 100%; display: flex; align-items: center; justify-content: center;
+  font-size: 0.52rem; font-weight: 600; color: #fff; overflow: hidden;
+  white-space: nowrap; min-width: 2px; transition: filter 0.15s;
+}
+.ss-tl-seg:hover { filter: brightness(1.15); }
+.ss-tl-seg.gap { background: transparent; }
+.ss-tl-seg.current-period { box-shadow: inset 0 -3px 0 rgba(255,255,255,0.7); }
+.ss-tl-years {
+  display: flex; justify-content: space-between; font-size: 0.6rem;
+  color: var(--text-3); margin-bottom: 0.75rem; padding: 0 2px;
+}
+
+.ss-legend {
+  display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;
+  font-size: 0.72rem; color: var(--text-2);
+}
+.ss-legend-item { display: flex; align-items: center; gap: 0.3rem; }
+.ss-legend-swatch {
+  width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0;
+}
+
+.ss-cycle {
+  border: 1px solid var(--border); border-radius: 10px;
+  margin-bottom: 0.6rem; overflow: hidden;
+}
+.ss-cycle-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.5rem 0.75rem; background: var(--surface-2);
+  font-size: 0.78rem; font-weight: 600; color: var(--text);
+  cursor: pointer;
+}
+.ss-cycle-header .ss-dur { font-weight: 400; color: var(--text-3); font-size: 0.72rem; }
+.ss-cycle-body { padding: 0.4rem 0.75rem; }
+.ss-phase-row {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.35rem 0; font-size: 0.78rem;
+  border-bottom: 1px solid var(--border-light);
+}
+.ss-phase-row:last-child { border-bottom: none; }
+.ss-phase-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.ss-phase-label { font-weight: 600; width: 55px; flex-shrink: 0; }
+.ss-phase-sign { color: var(--text-2); width: 90px; flex-shrink: 0; }
+.ss-phase-dates { color: var(--text-3); font-size: 0.72rem; font-variant-numeric: tabular-nums; }
+
+.ss-section-title {
+  font-size: 0.82rem; font-weight: 600; color: var(--text-2);
+  margin: 1rem 0 0.5rem; padding-top: 0.75rem;
+  border-top: 1px solid var(--border-light);
+}
 
 /* Ashtakavarga */
 .ashtak-row { display: flex; align-items: center; margin-bottom: 0.3rem; }
@@ -620,14 +696,14 @@ footer strong { color: #FF6B00; }
 .ai-section.visible { display: block; }
 .ai-chat-thread {
   display: flex; flex-direction: column; gap: 0.75rem;
-  max-height: 500px; overflow-y: auto; margin-bottom: 1rem;
+  max-height: 70vh; overflow-y: auto; margin-bottom: 1rem;
   scroll-behavior: smooth;
 }
 .ai-chat-thread:empty { display: none; }
 .ai-chat-thread:empty + .ai-loading:not(.active) + .ai-error:not(.active) + .ai-input-row { margin-top: 0; }
 .ai-msg {
   padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.85rem; line-height: 1.7;
-  max-width: 92%; animation: fadeSlide 0.2s ease;
+  max-width: 100%; animation: fadeSlide 0.2s ease;
 }
 .ai-msg.user {
   align-self: flex-end; background: var(--accent-bg); color: var(--text);
@@ -642,6 +718,54 @@ footer strong { color: #FF6B00; }
 .ai-msg-content ul, .ai-msg-content ol { margin: 0.3rem 0 0.6rem 1.2rem; padding: 0; }
 .ai-msg-content li { margin-bottom: 0.2rem; }
 .ai-msg-content strong { font-weight: 600; }
+/* Comprehensive reading layout */
+.ai-reading-section {
+  margin-bottom: 1rem;
+}
+.ai-reading-section-header {
+  display: flex; align-items: center; gap: 0.5rem;
+  margin-bottom: 0.6rem; padding-bottom: 0.45rem;
+  border-bottom: 2px solid #00BFA5;
+}
+.ai-reading-section-icon { font-size: 1.15rem; }
+.ai-reading-section-title {
+  font-size: 0.95rem; font-weight: 700; color: #00BFA5;
+}
+.ai-reading-section-body {
+  font-size: 0.85rem; color: var(--text-2); line-height: 1.75;
+}
+.ai-reading-section-body p { margin: 0 0 0.6rem 0; }
+.ai-reading-section-body p:last-child { margin-bottom: 0; }
+.ai-reading-section-body strong { font-weight: 600; color: var(--text); }
+.ai-reading-section-body ul, .ai-reading-section-body ol { margin: 0.3rem 0 0.5rem 1.1rem; padding: 0; }
+.ai-reading-section-body li { margin-bottom: 0.15rem; }
+/* Category tile grid */
+.ai-reading-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem;
+  margin-top: 0.5rem; margin-bottom: 1rem;
+}
+.ai-reading-card {
+  background: var(--surface); border: 1px solid var(--border-light);
+  border-radius: 12px; padding: 1rem 1.1rem; transition: border-color 0.15s;
+}
+.ai-reading-card:hover { border-color: #00BFA5; }
+.ai-reading-card-header {
+  display: flex; align-items: center; gap: 0.5rem;
+  margin-bottom: 0.6rem; padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--border-light);
+}
+.ai-reading-card-icon { font-size: 1.15rem; }
+.ai-reading-card-title {
+  font-size: 0.88rem; font-weight: 700; color: #00BFA5;
+}
+.ai-reading-card-body {
+  font-size: 0.82rem; color: var(--text-2); line-height: 1.7;
+}
+.ai-reading-card-body p { margin: 0 0 0.5rem 0; }
+.ai-reading-card-body p:last-child { margin-bottom: 0; }
+.ai-reading-card-body strong { font-weight: 600; color: var(--text); }
+.ai-reading-card-body ul, .ai-reading-card-body ol { margin: 0.3rem 0 0.5rem 1.1rem; padding: 0; }
+.ai-reading-card-body li { margin-bottom: 0.15rem; }
 .ai-msg .ai-category-tag { margin-bottom: 0.4rem; }
 .ai-input-row {
   display: flex; gap: 0.5rem; align-items: flex-end;
@@ -712,6 +836,12 @@ footer strong { color: #FF6B00; }
   background: var(--surface); color: var(--text); font-weight: 600;
   box-shadow: var(--shadow);
 }
+.tab-btn.loading::after {
+  content: ''; display: inline-block; width: 6px; height: 6px; margin-left: 6px;
+  background: #00BFA5; border-radius: 50%; vertical-align: middle;
+  animation: pulse-dot 1s ease-in-out infinite;
+}
+@keyframes pulse-dot { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
 .tab-pane { display: none; flex-direction: column; gap: 1.25rem; }
 .tab-pane.active { display: flex; }
 
@@ -722,11 +852,16 @@ footer strong { color: #FF6B00; }
   .card-body { max-width: 100vw; }
 
   .header-inner { flex-direction: column; gap: 0.5rem; padding: 0.7rem 1rem; }
-  .brand { flex-direction: column; align-items: center; gap: 0.15rem; }
+  .brand { flex-direction: row; align-items: center; gap: 0.5rem; justify-content: center; }
+  .brand-logo { width: 30px; height: 30px; }
+  .brand-text { align-items: center; }
   .brand h1 { font-size: 1.15rem; }
   .brand span { font-size: 0.65rem; }
   .header-auth { flex-wrap: wrap; justify-content: center; }
   .container { padding: 0.5rem; gap: 0.75rem; overflow-x: hidden; width: 100%; }
+
+  /* Lagna + Rashi tiles: stack on mobile */
+  .lagna-rashi-grid { grid-template-columns: 1fr; gap: 0.75rem; }
 
   /* Input form: 2 col with buttons spanning full width */
   .input-form { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
@@ -790,6 +925,14 @@ footer strong { color: #FF6B00; }
   .t-seg .t-yr { font-size: 0.42rem; }
   .dasha-breadcrumb { font-size: 0.7rem; flex-wrap: wrap; }
 
+  /* Sade Sati mobile */
+  .ss-timeline { height: 22px; }
+  .ss-tl-seg { font-size: 0.42rem; }
+  .ss-phase-row { flex-wrap: wrap; gap: 0.3rem; }
+  .ss-phase-label { width: auto; }
+  .ss-phase-sign { width: auto; }
+  .ss-legend { gap: 0.5rem; }
+
   /* Tabs */
   .tab-bar { gap: 0.15rem; padding: 0.3rem; border-radius: 10px; flex-wrap: wrap; }
   .tab-btn { padding: 0.4rem 0.4rem; font-size: 0.68rem; border-radius: 6px; flex: 0 1 auto; min-width: 0; white-space: nowrap; }
@@ -811,7 +954,12 @@ footer strong { color: #FF6B00; }
 
   /* AI section */
   .ai-msg { max-width: 100%; font-size: 0.78rem; padding: 0.6rem 0.75rem; word-break: break-word; }
-  .ai-chat-thread { max-height: 350px; gap: 0.5rem; }
+  .ai-reading-grid { grid-template-columns: 1fr; }
+  .ai-reading-card { padding: 0.75rem 0.85rem; }
+  .ai-reading-card-body { font-size: 0.78rem; }
+  .ai-reading-section-body { font-size: 0.78rem; }
+  .ai-reading-section-title { font-size: 0.88rem; }
+  .ai-chat-thread { max-height: 60vh; gap: 0.5rem; }
   .ai-textarea { font-size: 16px; min-height: 40px; padding: 0.6rem; }
   .ai-ask-btn { padding: 0.45rem 0.85rem; font-size: 0.78rem; }
   .ai-helper { font-size: 0.65rem; }
@@ -846,6 +994,7 @@ footer strong { color: #FF6B00; }
 @media (max-width: 600px) {
   .input-form { grid-template-columns: 1fr; }
   .tab-btn { font-size: 0.62rem; padding: 0.35rem 0.3rem; }
+  .brand-logo { width: 26px; height: 26px; }
   .brand h1 { font-size: 1rem; }
   .card-header h2 { font-size: 0.8rem; }
   .card-header { padding: 0.45rem 0.6rem; }
@@ -876,7 +1025,58 @@ footer strong { color: #FF6B00; }
 
 <header>
   <div class="header-inner">
-    <div class="brand"><h1>Astrojyoti AI</h1><span>Ancient Vision. Algorithmic Insight</span></div>
+    <div class="brand">
+      <svg class="brand-logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="jupiterGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="30%" stop-color="#fff8e1"/>
+            <stop offset="60%" stop-color="#ffd54f"/>
+            <stop offset="100%" stop-color="#e07000" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="jupiterCore" cx="45%" cy="42%" r="50%">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="50%" stop-color="#fff3c4"/>
+            <stop offset="100%" stop-color="#ffb300"/>
+          </radialGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="2.5" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <!-- Soft outer aura -->
+        <circle cx="50" cy="50" r="46" fill="url(#jupiterGlow)" opacity="0.3"/>
+        <!-- Bow (Dhanush) — crescent cradling the orb -->
+        <path d="M18 72 Q12 50 22 30 Q30 16 44 12" fill="none" stroke="#ffd54f" stroke-width="2.8" stroke-linecap="round" opacity="0.85"/>
+        <path d="M18 72 Q12 50 22 30 Q30 16 44 12" fill="none" stroke="#fff8e1" stroke-width="1.2" stroke-linecap="round" opacity="0.4"/>
+        <!-- Bowstring -->
+        <line x1="44" y1="12" x2="18" y2="72" stroke="#ffd54f" stroke-width="1" opacity="0.4"/>
+        <!-- Jupiter's luminous orb — cradled by the bow -->
+        <circle cx="54" cy="48" r="22" fill="url(#jupiterGlow)" opacity="0.5"/>
+        <circle cx="54" cy="48" r="15" fill="url(#jupiterCore)" filter="url(#glow)"/>
+        <!-- Subtle Jupiter bands -->
+        <ellipse cx="54" cy="43" rx="12" ry="1.5" fill="rgba(255,179,0,0.2)"/>
+        <ellipse cx="54" cy="50" rx="13" ry="1.8" fill="rgba(255,179,0,0.15)"/>
+        <ellipse cx="54" cy="55" rx="11" ry="1.3" fill="rgba(255,179,0,0.12)"/>
+        <!-- Twin stars — Castor & Pollux -->
+        <g filter="url(#glow)">
+          <circle cx="76" cy="18" r="2.5" fill="#fff8e1"/>
+          <circle cx="84" cy="24" r="2" fill="#fff3c4"/>
+        </g>
+        <!-- Small star sparkles -->
+        <circle cx="78" cy="38" r="1" fill="#ffd54f" opacity="0.4"/>
+        <circle cx="88" cy="14" r="0.8" fill="#ffd54f" opacity="0.3"/>
+        <circle cx="70" cy="10" r="0.8" fill="#ffd54f" opacity="0.35"/>
+        <!-- Arrow nocked on string pointing upward — aim & purpose -->
+        <line x1="30" y1="44" x2="14" y2="16" stroke="#ffd54f" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+        <!-- Arrowhead -->
+        <path d="M14 16 L12 22 L17.5 19Z" fill="#ffd54f" opacity="0.7"/>
+        <!-- Arrow fletching -->
+        <path d="M29 42 Q27 46 31 46" fill="none" stroke="#ffd54f" stroke-width="0.8" opacity="0.5"/>
+        <path d="M30 43 Q28 47 32 46" fill="none" stroke="#ffd54f" stroke-width="0.8" opacity="0.4"/>
+      </svg>
+      <div class="brand-text"><h1>Punarvasu AI</h1><span>Return of the Light</span></div>
+    </div>
     <div class="header-auth" id="headerAuth">
       <a href="/auth/google" class="google-btn" id="signInBtn">Sign in with Google</a>
     </div>
@@ -944,7 +1144,7 @@ footer strong { color: #FF6B00; }
   <button class="tab-btn" data-tab="charts" onclick="switchTab('charts')">Vargas</button>
   <button class="tab-btn" data-tab="yogas" onclick="switchTab('yogas')">Yogas</button>
   <button class="tab-btn" data-tab="dasha" onclick="switchTab('dasha')">Dasha & Transits</button>
-  <button class="tab-btn" data-tab="ai" onclick="switchTab('ai')">AI Reading</button>
+  <button class="tab-btn" data-tab="ai" onclick="switchTab('ai');onAITabClick();">AI Reading</button>
   <button class="tab-btn" data-tab="btr" onclick="switchTab('btr')">BTR</button>
 </div>
 
@@ -956,9 +1156,15 @@ footer strong { color: #FF6B00; }
   <div class="card-body"><div class="kv-grid" id="birthDataGrid"></div></div>
 </div>
 
-<div class="card accent-teal">
+<div class="lagna-rashi-grid">
+<div class="card accent-teal" style="margin:0;">
   <div class="card-header"><h2>Lagna</h2><span class="sub">Ascendant</span></div>
   <div class="card-body"><div class="pill-grid" id="lagnaGrid"></div></div>
+</div>
+<div class="card accent-teal" style="margin:0;">
+  <div class="card-header"><h2>Rashi</h2><span class="sub">Moon Sign</span></div>
+  <div class="card-body"><div class="pill-grid" id="rashiGrid"></div></div>
+</div>
 </div>
 
 <div class="card accent-amber">
@@ -1075,6 +1281,21 @@ footer strong { color: #FF6B00; }
   </div>
 </div>
 
+<div class="card accent-amber" id="sadesatiCard" style="display:none;">
+  <div class="card-header">
+    <h2>Sade Sati & Dhaiya</h2>
+    <span class="sub">Saturn's transit over natal Moon</span>
+  </div>
+  <div class="card-body">
+    <div id="sadesatiStatus"></div>
+    <div id="sadesatiInfo" style="font-size:0.82rem;color:var(--text-2);margin-bottom:0.75rem;"></div>
+    <div id="sadesatiTimeline"></div>
+    <div id="sadesatiLegend"></div>
+    <div id="sadesatiCycles"></div>
+    <div id="sadesatiDhaiya"></div>
+  </div>
+</div>
+
 <div class="card accent-cyan">
   <div class="card-header"><h2>Current Transits</h2><span class="sub" id="transitSub">Gochara — planetary positions now</span></div>
   <div class="card-body" style="overflow-x:auto;padding:0;">
@@ -1090,23 +1311,38 @@ footer strong { color: #FF6B00; }
 <!-- Tab: AI Reading -->
 <div class="tab-pane" id="tab-ai">
 
-<div class="ai-section visible" id="aiSection">
+<div class="ai-signin-prompt" id="aiSigninPrompt" style="display:none;">
+  <div class="card accent-teal">
+    <div class="card-body" style="text-align:center;padding:2.5rem 1.5rem;">
+      <div style="font-size:2rem;margin-bottom:0.75rem;">&#x1F52E;</div>
+      <h3 style="margin:0 0 0.5rem;color:var(--text);">AI Jyotish Reading</h3>
+      <p style="color:var(--text-3);font-size:0.85rem;margin-bottom:1.25rem;">Sign in with Google to get personalized AI-powered Vedic astrology readings for your chart.</p>
+      <a href="/auth/google" class="google-btn" style="display:inline-block;">Sign in with Google</a>
+    </div>
+  </div>
+</div>
+
+<div class="ai-section" id="aiSection">
 <div class="card accent-teal">
   <div class="card-header"><h2>AI Jyotish Reading</h2><span class="sub">Powered by Gemini</span></div>
   <div class="card-body">
+    <div id="aiGeneratePrompt" style="text-align:center;padding:1.5rem 0;">
+      <p style="color:var(--text-3);font-size:0.88rem;margin-bottom:1rem;">Get a comprehensive AI-powered Vedic astrology reading for this chart.</p>
+      <button class="ai-ask-btn" id="aiGenerateBtn" onclick="autoGenerateReading()" style="padding:0.6rem 1.8rem;font-size:0.9rem;">Generate Reading</button>
+    </div>
     <div class="ai-chat-thread" id="aiChatThread"></div>
     <div class="ai-loading" id="aiLoading">
       <div class="ai-spinner"></div>
       <div class="ai-step" id="aiStep">Analyzing chart...</div>
     </div>
     <div class="ai-error" id="aiError"></div>
-    <div class="ai-input-row">
+    <div class="ai-input-row" id="aiInputRow" style="display:none;">
       <textarea class="ai-textarea" id="aiQuestion" maxlength="500" rows="2"
-        placeholder="Ask about this chart... e.g. career, health, marriage prospects"
+        placeholder="Ask a follow-up question... e.g. career, health, marriage prospects"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();askAI();}"></textarea>
       <button class="ai-ask-btn" id="aiAskBtn" onclick="askAI()">Ask</button>
     </div>
-    <span class="ai-helper" id="aiHelper">10 questions per day</span>
+    <span class="ai-helper" id="aiHelper">25 questions per day</span>
   </div>
 </div>
 </div>
@@ -1261,6 +1497,8 @@ function fetchChart() {
   };
 
   lastInputPayload = payload;
+  currentSavedChartId = null;
+  _cachedReadingData = null;
   document.getElementById("loadingOverlay").classList.add("active");
   document.getElementById("errorBanner").classList.remove("active");
   document.getElementById("generateBtn").disabled = true;
@@ -1343,9 +1581,6 @@ function renderLagna(data) {
   var l = data.lagna;
   var pills = [
     ["Sign", l.sign_name],
-    ["Sign Number", l.sign],
-    ["Degree", l.degree],
-    ["Total Longitude", l.lon_fmt],
     ["Nakshatra", l.nakshatra + " Pada " + l.pada],
     ["Nakshatra Lord", l.nak_lord],
     ["Sign Lord", l.sign_lord]
@@ -1355,6 +1590,23 @@ function renderLagna(data) {
     html += '<div class="pill"><span class="k">' + p[0] + '</span><span class="v">' + p[1] + '</span></div>';
   });
   document.getElementById("lagnaGrid").innerHTML = html;
+
+  // Rashi tile (Moon sign)
+  var NAK_LORDS = {"Ashwini":"Ketu","Bharani":"Venus","Krittika":"Sun","Rohini":"Moon","Mrigashira":"Mars","Ardra":"Rahu","Punarvasu":"Jupiter","Pushya":"Saturn","Ashlesha":"Mercury","Magha":"Ketu","Purva Phalguni":"Venus","Uttara Phalguni":"Sun","Hasta":"Moon","Chitra":"Mars","Swati":"Rahu","Vishakha":"Jupiter","Anuradha":"Saturn","Jyeshtha":"Mercury","Mula":"Ketu","Purva Ashadha":"Venus","Uttara Ashadha":"Sun","Shravana":"Moon","Dhanishta":"Mars","Shatabhisha":"Rahu","Purva Bhadrapada":"Jupiter","Uttara Bhadrapada":"Saturn","Revati":"Mercury"};
+  var moon = null;
+  data.planets.forEach(function(p) { if (p.name === "Moon") moon = p; });
+  if (moon) {
+    var rPills = [
+      ["Sign", moon.sign_name],
+      ["Nakshatra", moon.nakshatra + " Pada " + moon.pada],
+      ["Nakshatra Lord", NAK_LORDS[moon.nakshatra] || ""]
+    ];
+    var rHtml = '';
+    rPills.forEach(function(p) {
+      rHtml += '<div class="pill"><span class="k">' + p[0] + '</span><span class="v">' + p[1] + '</span></div>';
+    });
+    document.getElementById("rashiGrid").innerHTML = rHtml;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2019,6 +2271,7 @@ function renderDashaSection(data) {
   dashaPath = [];
   renderTimeline(d);
   renderDasha(d);
+  renderSadesati(data);
 }
 
 function renderTimeline(d) {
@@ -2108,6 +2361,167 @@ function renderDasha(d) {
     }
     var mx = Math.max.apply(null, items.map(function(i) { return daysBetween(i.start, i.end); }));
     renderDashaRows(items, mx / 365.25, false, d);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SADE SATI & DHAIYA
+// ═══════════════════════════════════════════════════════════════════
+
+var SS_COLORS = { Rising: "#FF8C33", Peak: "#E53935", Setting: "#FFB300", Dhaiya: "#00BCD4" };
+
+function renderSadesatiTimeline(ss) {
+  var container = document.getElementById("sadesatiTimeline");
+  container.innerHTML = "";
+
+  // Collect all periods (phases + dhaiya) with their type
+  var allPeriods = [];
+  ss.cycles.forEach(function(c) {
+    c.phases.forEach(function(p) {
+      allPeriods.push({ start: parseDate(p.start), end: parseDate(p.end), label: p.phase, color: SS_COLORS[p.phase] });
+    });
+  });
+  ss.dhaiya.forEach(function(d) {
+    allPeriods.push({ start: parseDate(d.start), end: parseDate(d.end), label: "Dhaiya", color: SS_COLORS.Dhaiya });
+  });
+
+  if (!allPeriods.length) { container.innerHTML = '<div style="font-size:0.78rem;color:var(--text-3);padding:0.5rem 0;">No Sade Sati or Dhaiya periods in the scanned range.</div>'; return; }
+
+  allPeriods.sort(function(a, b) { return a.start - b.start; });
+
+  // Determine timeline range
+  var tStart = allPeriods[0].start;
+  var tEnd = allPeriods[allPeriods.length - 1].end;
+  var totalMs = tEnd - tStart;
+  if (totalMs <= 0) return;
+
+  var now = new Date();
+
+  // Build segments (including gaps)
+  var bar = document.createElement("div");
+  bar.className = "ss-timeline";
+
+  var cursor = tStart.getTime();
+  allPeriods.forEach(function(p) {
+    var pStartMs = p.start.getTime();
+    var pEndMs = p.end.getTime();
+
+    // Gap before this period
+    if (pStartMs > cursor) {
+      var gapPct = ((pStartMs - cursor) / totalMs) * 100;
+      var gapSeg = document.createElement("div");
+      gapSeg.className = "ss-tl-seg gap";
+      gapSeg.style.flex = gapPct.toFixed(2);
+      bar.appendChild(gapSeg);
+    }
+
+    var pct = ((pEndMs - pStartMs) / totalMs) * 100;
+    var seg = document.createElement("div");
+    seg.className = "ss-tl-seg";
+    if (now >= p.start && now < p.end) seg.className += " current-period";
+    seg.style.flex = pct.toFixed(2);
+    seg.style.background = p.color;
+    seg.title = p.label + ": " + formatDateShort(p.start) + " \u2192 " + formatDateShort(p.end);
+    if (pct > 3) seg.textContent = p.label.slice(0, 3);
+    bar.appendChild(seg);
+
+    cursor = Math.max(cursor, pEndMs);
+  });
+
+  container.appendChild(bar);
+
+  // Year markers
+  var years = document.createElement("div");
+  years.className = "ss-tl-years";
+  var startYear = tStart.getFullYear();
+  var endYear = tEnd.getFullYear();
+  var step = Math.max(1, Math.round((endYear - startYear) / 8));
+  for (var y = startYear; y <= endYear; y += step) {
+    var span = document.createElement("span");
+    span.textContent = y;
+    years.appendChild(span);
+  }
+  container.appendChild(years);
+}
+
+function formatDateShort(d) {
+  var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return d.getDate() + "-" + months[d.getMonth()] + "-" + d.getFullYear();
+}
+
+function renderSadesati(data) {
+  var card = document.getElementById("sadesatiCard");
+  var ss = data.sadesati;
+  if (!ss) { card.style.display = "none"; return; }
+  card.style.display = "";
+
+  // Status badge
+  var statusEl = document.getElementById("sadesatiStatus");
+  var cur = ss.current_status;
+  var statusClass = "inactive";
+  var statusText = "Inactive \u2014 Saturn in " + cur.sign;
+  if (cur.active && cur.type === "sadesati") {
+    statusClass = "active-sadesati";
+    statusText = "Sade Sati Active \u2014 " + cur.phase + " phase (Saturn in " + cur.sign + ")";
+  } else if (cur.active && cur.type === "dhaiya") {
+    statusClass = "active-dhaiya";
+    statusText = "Dhaiya Active \u2014 " + cur.phase + " (Saturn in " + cur.sign + ")";
+  }
+  statusEl.innerHTML = '<div class="ss-status ' + statusClass + '"><span class="dot"></span>' + statusText + '</div>';
+
+  // Info line
+  var infoEl = document.getElementById("sadesatiInfo");
+  infoEl.innerHTML = '<strong>Moon Sign:</strong> ' + ss.moon_sign +
+    ' &middot; <strong>Sade Sati signs:</strong> ' + ss.sadesati_signs.join(", ") +
+    ' &middot; <strong>Dhaiya signs:</strong> ' + ss.dhaiya_signs.join(", ");
+
+  // Timeline
+  renderSadesatiTimeline(ss);
+
+  // Legend
+  var legendEl = document.getElementById("sadesatiLegend");
+  legendEl.innerHTML = '<div class="ss-legend">' +
+    '<div class="ss-legend-item"><span class="ss-legend-swatch" style="background:#FF8C33;"></span>Rising (12th)</div>' +
+    '<div class="ss-legend-item"><span class="ss-legend-swatch" style="background:#E53935;"></span>Peak (1st)</div>' +
+    '<div class="ss-legend-item"><span class="ss-legend-swatch" style="background:#FFB300;"></span>Setting (2nd)</div>' +
+    '<div class="ss-legend-item"><span class="ss-legend-swatch" style="background:#00BCD4;"></span>Dhaiya (4th/8th)</div>' +
+    '</div>';
+
+  // Cycle detail cards
+  var cyclesEl = document.getElementById("sadesatiCycles");
+  var html = '';
+  ss.cycles.forEach(function(c) {
+    html += '<div class="ss-cycle">';
+    html += '<div class="ss-cycle-header"><span>Sade Sati #' + c.cycle_number + ' &mdash; ' + c.start + ' to ' + c.end + '</span><span class="ss-dur">' + c.duration_years + ' years</span></div>';
+    html += '<div class="ss-cycle-body">';
+    c.phases.forEach(function(p) {
+      var color = SS_COLORS[p.phase] || "#999";
+      html += '<div class="ss-phase-row">';
+      html += '<span class="ss-phase-dot" style="background:' + color + ';"></span>';
+      html += '<span class="ss-phase-label" style="color:' + color + ';">' + p.phase + '</span>';
+      html += '<span class="ss-phase-sign">' + p.sign + '</span>';
+      html += '<span class="ss-phase-dates">' + p.start + ' \u2192 ' + p.end + '</span>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+  });
+  cyclesEl.innerHTML = html;
+
+  // Dhaiya periods
+  var dhaiyaEl = document.getElementById("sadesatiDhaiya");
+  if (ss.dhaiya.length) {
+    var dhtml = '<div class="ss-section-title">Dhaiya Periods (Kantaka / Ashtama Shani)</div>';
+    ss.dhaiya.forEach(function(d) {
+      dhtml += '<div class="ss-phase-row">';
+      dhtml += '<span class="ss-phase-dot" style="background:#00BCD4;"></span>';
+      dhtml += '<span class="ss-phase-label" style="color:#00BCD4;">Dhaiya</span>';
+      dhtml += '<span class="ss-phase-sign">' + d.sign + ' (' + d.position + ')</span>';
+      dhtml += '<span class="ss-phase-dates">' + d.start + ' \u2192 ' + d.end + '</span>';
+      dhtml += '</div>';
+    });
+    dhaiyaEl.innerHTML = dhtml;
+  } else {
+    dhaiyaEl.innerHTML = '';
   }
 }
 
@@ -2434,9 +2848,11 @@ function escAttr(s) { return s.replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
 
 var currentUser = null;
 var lastInputPayload = null;
-var aiRemainingCount = 10;
+var aiRemainingCount = 25;
 var _editingChartId = null;
 var _editingChartName = '';
+var currentSavedChartId = null;
+var _cachedReadingData = null;
 
 function checkAuth() {
   fetch("/api/me")
@@ -2494,6 +2910,7 @@ function saveCurrentChart() {
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (data.error) { alert(data.error); return; }
+    currentSavedChartId = data.id;
     closeSaveModal();
     alert("Chart saved!");
   })
@@ -2667,6 +3084,8 @@ function loadSavedChart(id) {
       // Render chart
       chartData = data.chart_data;
       lastInputPayload = inp;
+      currentSavedChartId = data.id;
+      _cachedReadingData = data.reading || null;
       renderAll(chartData);
       document.getElementById("chartContent").style.display = "flex";
       document.getElementById("chartContent").style.flexDirection = "column";
@@ -3210,10 +3629,13 @@ var aiLimitReached = false;
 
 function checkAIAvailability() {
   var section = document.getElementById("aiSection");
+  var signinPrompt = document.getElementById("aiSigninPrompt");
   if (currentUser && chartData) {
     section.classList.add("visible");
+    signinPrompt.style.display = "none";
   } else {
     section.classList.remove("visible");
+    signinPrompt.style.display = currentUser ? "none" : "block";
   }
 }
 
@@ -3223,17 +3645,39 @@ renderAll = function(data) {
   checkAIAvailability();
   // Reset AI conversation when a new chart is loaded
   aiConversation = [];
+  _aiReadingRequested = false;
   document.getElementById("aiChatThread").innerHTML = "";
   document.getElementById("aiError").classList.remove("active");
   document.getElementById("aiLoading").classList.remove("active");
+  var generatePrompt = document.getElementById("aiGeneratePrompt");
+  var inputRow = document.getElementById("aiInputRow");
   if (aiLimitReached) {
     document.getElementById("aiAskBtn").disabled = true;
     document.getElementById("aiQuestion").disabled = true;
-    document.getElementById("aiHelper").textContent = "Daily limit reached (0 of 10 remaining)";
-  } else {
+    document.getElementById("aiHelper").textContent = "Daily limit reached (0 of 25 remaining)";
+    if (generatePrompt) generatePrompt.style.display = "none";
+    if (inputRow) inputRow.style.display = "none";
+  } else if (currentUser && chartData && _cachedReadingData && (_cachedReadingData.categories || _cachedReadingData.general)) {
+    // Display cached reading
+    renderReadingGrid(_cachedReadingData);
+    var summaryParts = [];
+    if (_cachedReadingData.general) summaryParts.push("General: " + _cachedReadingData.general);
+    if (_cachedReadingData.categories) summaryParts = summaryParts.concat(_cachedReadingData.categories.map(function(c) { return c.title + ": " + c.reading; }));
+    if (_cachedReadingData.dasha_advice) summaryParts.push("Dasha: " + _cachedReadingData.dasha_advice);
+    if (_cachedReadingData.remedies) summaryParts.push("Remedies: " + _cachedReadingData.remedies);
+    var summary = summaryParts.join("\n\n");
+    aiConversation.push({role: "user", text: "Comprehensive birth chart reading"});
+    aiConversation.push({role: "assistant", text: summary});
+    if (generatePrompt) generatePrompt.style.display = "none";
+    if (inputRow) inputRow.style.display = "flex";
     document.getElementById("aiAskBtn").disabled = false;
     document.getElementById("aiQuestion").disabled = false;
-    document.getElementById("aiHelper").textContent = aiRemainingCount + " of 10 questions remaining today";
+    document.getElementById("aiHelper").textContent = aiRemainingCount + " of 25 questions remaining today";
+  } else {
+    // Show generate button
+    if (generatePrompt) generatePrompt.style.display = "block";
+    if (inputRow) inputRow.style.display = "none";
+    document.getElementById("aiHelper").textContent = aiRemainingCount + " of 25 questions remaining today";
   }
   // Reset BTR state and auto-fetch boundaries
   btrData = null;
@@ -3283,6 +3727,186 @@ function appendChatMsg(role, text, category) {
   }
   thread.appendChild(div);
   thread.scrollTop = thread.scrollHeight;
+}
+
+function renderReadingGrid(data) {
+  var thread = document.getElementById("aiChatThread");
+
+  // 1. General overview section
+  if (data && data.general) {
+    var generalSection = document.createElement("div");
+    generalSection.className = "ai-reading-section";
+    generalSection.innerHTML =
+      '<div class="ai-reading-section-header">' +
+        '<span class="ai-reading-section-icon">\ud83c\udf1f</span>' +
+        '<span class="ai-reading-section-title">General Overview</span>' +
+      '</div>' +
+      '<div class="ai-reading-section-body">' + marked.parse(data.general) + '</div>';
+    thread.appendChild(generalSection);
+  }
+
+  // 2. Category tiles in 2-column grid
+  var categories = (data && data.categories) || [];
+  if (categories.length > 0) {
+    var grid = document.createElement("div");
+    grid.className = "ai-reading-grid";
+    categories.forEach(function(cat) {
+      var card = document.createElement("div");
+      card.className = "ai-reading-card";
+      card.innerHTML =
+        '<div class="ai-reading-card-header">' +
+          '<span class="ai-reading-card-icon">' + (cat.icon || '') + '</span>' +
+          '<span class="ai-reading-card-title">' + (cat.title || '') + '</span>' +
+        '</div>' +
+        '<div class="ai-reading-card-body">' + marked.parse(cat.reading || '') + '</div>';
+      grid.appendChild(card);
+    });
+    thread.appendChild(grid);
+  }
+
+  // 3. Current Dasha advice section
+  if (data && data.dasha_advice) {
+    var dashaSection = document.createElement("div");
+    dashaSection.className = "ai-reading-section";
+    dashaSection.innerHTML =
+      '<div class="ai-reading-section-header">' +
+        '<span class="ai-reading-section-icon">\u23f3</span>' +
+        '<span class="ai-reading-section-title">Current Dasha Period</span>' +
+      '</div>' +
+      '<div class="ai-reading-section-body">' + marked.parse(data.dasha_advice) + '</div>';
+    thread.appendChild(dashaSection);
+  }
+
+  // 4. Remedies section
+  if (data && data.remedies) {
+    var remediesSection = document.createElement("div");
+    remediesSection.className = "ai-reading-section";
+    remediesSection.innerHTML =
+      '<div class="ai-reading-section-header">' +
+        '<span class="ai-reading-section-icon">\ud83d\udd2e</span>' +
+        '<span class="ai-reading-section-title">Recommended Remedies</span>' +
+      '</div>' +
+      '<div class="ai-reading-section-body">' + marked.parse(data.remedies) + '</div>';
+    thread.appendChild(remediesSection);
+  }
+
+  thread.scrollTop = thread.scrollHeight;
+}
+
+var _aiReadingRequested = false;
+
+function onAITabClick() {
+  // Auto-generate reading the first time the AI tab is opened for a chart
+  if (!currentUser || !chartData) return;
+  if (_aiReadingRequested) return;  // already requested or loaded
+  if (aiLimitReached) return;
+  if (aiConversation.length > 0) return;  // reading already loaded
+  var thread = document.getElementById("aiChatThread");
+  if (thread.children.length > 0) return;  // content already present
+  _aiReadingRequested = true;
+  autoGenerateReading();
+}
+
+function autoGenerateReading() {
+  var defaultQuestion = "Comprehensive birth chart reading";
+  var generatePrompt = document.getElementById("aiGeneratePrompt");
+  var inputRow = document.getElementById("aiInputRow");
+  var btn = document.getElementById("aiAskBtn");
+  var input = document.getElementById("aiQuestion");
+  var loading = document.getElementById("aiLoading");
+  var errorEl = document.getElementById("aiError");
+  var tabBtn = document.querySelector('.tab-btn[data-tab="ai"]');
+  var genBtn = document.getElementById("aiGenerateBtn");
+
+  // Hide generate button, show loading
+  if (generatePrompt) generatePrompt.style.display = "none";
+  if (genBtn) genBtn.disabled = true;
+  errorEl.classList.remove("active");
+  loading.classList.add("active");
+  if (tabBtn) tabBtn.classList.add("loading");
+
+  var stepIdx = 0;
+  document.getElementById("aiStep").textContent = AI_STEPS[0];
+  var stepTimer = setInterval(function() {
+    stepIdx++;
+    if (stepIdx < AI_STEPS.length) {
+      document.getElementById("aiStep").textContent = AI_STEPS[stepIdx];
+    }
+  }, 4000);
+
+  fetch("/api/ask", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      question: defaultQuestion,
+      chart_data: chartData,
+      conversation: [],
+      initial_reading: true,
+      chart_id: currentSavedChartId
+    })
+  })
+  .then(function(r) { return r.json().then(function(d) { return {status: r.status, data: d}; }); })
+  .then(function(resp) {
+    clearInterval(stepTimer);
+    loading.classList.remove("active");
+    if (tabBtn) tabBtn.classList.remove("loading");
+
+    if (resp.data.error) {
+      errorEl.textContent = resp.data.error;
+      errorEl.classList.add("active");
+      // Show generate button again so user can retry
+      if (generatePrompt) generatePrompt.style.display = "block";
+      if (genBtn) genBtn.disabled = false;
+      if (resp.status === 429 && resp.data.error.indexOf("Daily limit") >= 0) {
+        aiLimitReached = true;
+        document.getElementById("aiHelper").textContent = "Daily limit reached";
+        if (generatePrompt) generatePrompt.style.display = "none";
+      }
+      return;
+    }
+
+    // Render structured reading
+    var readingData = resp.data.reading_data;
+    if (readingData && (readingData.categories || readingData.general)) {
+      renderReadingGrid(readingData);
+      var summaryParts = [];
+      if (readingData.general) summaryParts.push("General: " + readingData.general);
+      if (readingData.categories) summaryParts = summaryParts.concat(readingData.categories.map(function(c) { return c.title + ": " + c.reading; }));
+      if (readingData.dasha_advice) summaryParts.push("Dasha: " + readingData.dasha_advice);
+      if (readingData.remedies) summaryParts.push("Remedies: " + readingData.remedies);
+      var summary = summaryParts.join("\n\n");
+      aiConversation.push({role: "user", text: defaultQuestion});
+      aiConversation.push({role: "assistant", text: summary});
+    } else {
+      // Fallback: render as plain text
+      var reading = resp.data.reading || JSON.stringify(resp.data.reading_data);
+      appendChatMsg("assistant", reading, "comprehensive");
+      aiConversation.push({role: "user", text: defaultQuestion});
+      aiConversation.push({role: "assistant", text: reading});
+    }
+
+    if (resp.data.remaining !== undefined) {
+      aiRemainingCount = resp.data.remaining;
+      aiLimitReached = aiRemainingCount <= 0;
+      document.getElementById("aiHelper").textContent = aiRemainingCount + " of 25 questions remaining today";
+    }
+
+    // Show follow-up input row, hide generate button
+    if (inputRow) inputRow.style.display = "flex";
+    btn.disabled = false;
+    input.disabled = false;
+    input.focus();
+  })
+  .catch(function(err) {
+    clearInterval(stepTimer);
+    loading.classList.remove("active");
+    if (tabBtn) tabBtn.classList.remove("loading");
+    errorEl.textContent = "Network error: " + err.message;
+    errorEl.classList.add("active");
+    // Show generate button again so user can retry
+    if (generatePrompt) generatePrompt.style.display = "block";
+    if (genBtn) genBtn.disabled = false;
+  });
 }
 
 function askAI() {
@@ -3352,7 +3976,7 @@ function askAI() {
     if (resp.data.remaining !== undefined) {
       aiRemainingCount = resp.data.remaining;
       aiLimitReached = aiRemainingCount <= 0;
-      document.getElementById("aiHelper").textContent = aiRemainingCount + " of 10 questions remaining today";
+      document.getElementById("aiHelper").textContent = aiRemainingCount + " of 25 questions remaining today";
     }
 
     btn.disabled = false;

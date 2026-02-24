@@ -248,14 +248,15 @@ def divisional_sign(lon, division):
 
 # ── Dignity detection ──────────────────────────────────────────────────────
 
-def get_dignity(planet_name, sign_idx, house, deg_in_sign=0):
+def get_dignity(planet_name, sign_idx, house, deg_in_sign=0, is_divisional=False):
     """Return dignity string or None.
 
     deg_in_sign: degree within the sign (0–30) for degree-range checks.
-    Defaults to 0, which makes Moolatrikona sign-only for divisional charts.
+    is_divisional: True for D9, D10 etc. — skips degree-based checks (moolatrikona)
+                   since divisional charts don't have meaningful degree positions.
     """
     # Moon: Moolatrikona (Taurus 4°–20°) takes precedence over exaltation
-    if planet_name == "Moon" and sign_idx == 1:
+    if not is_divisional and planet_name == "Moon" and sign_idx == 1:
         if 4 <= deg_in_sign <= 20:
             return "moolatrikona"
         # 0°–3° Taurus → exalted (falls through below)
@@ -268,8 +269,8 @@ def get_dignity(planet_name, sign_idx, house, deg_in_sign=0):
     if planet_name in DEBILITATION and DEBILITATION[planet_name] == sign_idx:
         return "debilitated"
 
-    # Moolatrikona (degree-range-based)
-    if planet_name in MOOLATRIKONA_RANGES:
+    # Moolatrikona (degree-range-based) — only for D1 where degrees are meaningful
+    if not is_divisional and planet_name in MOOLATRIKONA_RANGES:
         mt_sign, mt_from, mt_to = MOOLATRIKONA_RANGES[planet_name]
         if sign_idx == mt_sign and mt_from <= deg_in_sign <= mt_to:
             return "moolatrikona"
@@ -463,6 +464,171 @@ def calculate_dasha(data, birth_dt):
         "maha": maha_fmt,
         "antar": antar,
         "pratyantar": pratyantar
+    }
+
+
+# ── Sade Sati & Dhaiya ───────────────────────────────────────────────────
+
+def calculate_sadesati(moon_lon, jd_birth):
+    """Calculate Sade Sati and Dhaiya periods across the native's lifetime.
+
+    Sade Sati: Saturn transiting 12th, 1st, 2nd signs from natal Moon.
+    Dhaiya (Kantaka/Ashtama Shani): Saturn in 4th or 8th from Moon.
+    """
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
+
+    moon_sign = lon_to_sign(moon_lon)  # 0-11
+
+    # Signs that trigger Sade Sati (12th, 1st, 2nd from Moon)
+    ss_signs = [(moon_sign - 1) % 12, moon_sign, (moon_sign + 1) % 12]
+    ss_phase_names = ["Rising", "Peak", "Setting"]
+
+    # Signs that trigger Dhaiya (4th, 8th from Moon)
+    dh_signs = [(moon_sign + 3) % 12, (moon_sign + 7) % 12]
+    dh_labels = {(moon_sign + 3) % 12: "4th from Moon", (moon_sign + 7) % 12: "8th from Moon"}
+
+    def saturn_sidereal_sign(jd):
+        """Get Saturn's sidereal sign index (0-11) at a given Julian day."""
+        pos, _ = swe.calc_ut(jd, swe.SATURN)
+        ayanamsa = swe.get_ayanamsa_ut(jd)
+        sid_lon = (pos[0] - ayanamsa) % 360
+        return int(sid_lon / 30)
+
+    def fmt_jd(jd):
+        """Convert Julian day to dd-Mon-YYYY string."""
+        y, m, d, h = swe.revjul(jd)
+        dt = datetime(int(y), int(m), int(d))
+        return dt.strftime("%d-%b-%Y")
+
+    # Coarse scan: step through 90 years in 15-day increments
+    scan_years = 90
+    step_days = 15.0
+    total_steps = int(scan_years * 365.25 / step_days)
+
+    # Build list of (jd, sign) samples
+    transitions = []  # list of (jd_crossing, old_sign, new_sign)
+    prev_sign = saturn_sidereal_sign(jd_birth)
+
+    for i in range(1, total_steps + 1):
+        jd_now = jd_birth + i * step_days
+        cur_sign = saturn_sidereal_sign(jd_now)
+        if cur_sign != prev_sign:
+            # Binary search for exact crossing point
+            lo = jd_now - step_days
+            hi = jd_now
+            for _ in range(25):
+                mid = (lo + hi) / 2
+                mid_sign = saturn_sidereal_sign(mid)
+                if mid_sign == prev_sign:
+                    lo = mid
+                else:
+                    hi = mid
+            transitions.append((hi, prev_sign, cur_sign))
+            prev_sign = cur_sign
+
+    # Build sign-occupancy intervals
+    intervals = []  # list of (start_jd, end_jd, sign)
+    if transitions:
+        # First interval: birth to first transition
+        intervals.append((jd_birth, transitions[0][0], saturn_sidereal_sign(jd_birth)))
+        for i in range(len(transitions) - 1):
+            intervals.append((transitions[i][0], transitions[i + 1][0], transitions[i][2]))
+        # Last interval: last transition to end of scan
+        jd_end = jd_birth + scan_years * 365.25
+        intervals.append((transitions[-1][0], jd_end, transitions[-1][2]))
+
+    # Filter for Sade Sati phases
+    ss_intervals = []  # (start_jd, end_jd, sign, phase_name)
+    for start, end, sign in intervals:
+        if sign in ss_signs:
+            phase_idx = ss_signs.index(sign)
+            ss_intervals.append((start, end, sign, ss_phase_names[phase_idx]))
+
+    # Filter for Dhaiya periods
+    dh_intervals = []  # (start_jd, end_jd, sign, position_label)
+    for start, end, sign in intervals:
+        if sign in dh_signs:
+            dh_intervals.append((start, end, sign, dh_labels[sign]))
+
+    # Group Sade Sati intervals into cycles
+    # Adjacent SS intervals with gap < 365 days belong to the same cycle
+    # (Saturn retrograde can create gaps of several months)
+    cycles = []
+    current_cycle_phases = []
+    for iv in ss_intervals:
+        if current_cycle_phases:
+            gap = iv[0] - current_cycle_phases[-1][1]
+            if gap > 365:
+                # Start new cycle
+                cycles.append(current_cycle_phases)
+                current_cycle_phases = []
+        current_cycle_phases.append(iv)
+    if current_cycle_phases:
+        cycles.append(current_cycle_phases)
+
+    # Format cycles
+    formatted_cycles = []
+    for i, phases in enumerate(cycles):
+        cycle_start = phases[0][0]
+        cycle_end = phases[-1][1]
+        dur_years = (cycle_end - cycle_start) / 365.25
+        formatted_phases = []
+        for start, end, sign, phase_name in phases:
+            formatted_phases.append({
+                "sign": SIGNS[sign],
+                "phase": phase_name,
+                "start": fmt_jd(start),
+                "end": fmt_jd(end)
+            })
+        formatted_cycles.append({
+            "cycle_number": i + 1,
+            "start": fmt_jd(cycle_start),
+            "end": fmt_jd(cycle_end),
+            "duration_years": round(dur_years, 1),
+            "phases": formatted_phases
+        })
+
+    # Format Dhaiya periods
+    formatted_dhaiya = []
+    for start, end, sign, pos_label in dh_intervals:
+        formatted_dhaiya.append({
+            "sign": SIGNS[sign],
+            "position": pos_label,
+            "start": fmt_jd(start),
+            "end": fmt_jd(end)
+        })
+
+    # Determine current status
+    now_jd = swe.julday(
+        datetime.utcnow().year, datetime.utcnow().month, datetime.utcnow().day,
+        datetime.utcnow().hour + datetime.utcnow().minute / 60.0
+    )
+    current_saturn_sign = saturn_sidereal_sign(now_jd)
+
+    current_status = {"active": False, "type": None, "phase": None, "sign": SIGNS[current_saturn_sign]}
+    if current_saturn_sign in ss_signs:
+        phase_idx = ss_signs.index(current_saturn_sign)
+        current_status = {
+            "active": True,
+            "type": "sadesati",
+            "phase": ss_phase_names[phase_idx],
+            "sign": SIGNS[current_saturn_sign]
+        }
+    elif current_saturn_sign in dh_signs:
+        current_status = {
+            "active": True,
+            "type": "dhaiya",
+            "phase": dh_labels[current_saturn_sign],
+            "sign": SIGNS[current_saturn_sign]
+        }
+
+    return {
+        "moon_sign": SIGNS[moon_sign],
+        "sadesati_signs": [SIGNS[s] for s in ss_signs],
+        "dhaiya_signs": [SIGNS[s] for s in dh_signs],
+        "cycles": formatted_cycles,
+        "dhaiya": formatted_dhaiya,
+        "current_status": current_status
     }
 
 
@@ -1119,7 +1285,7 @@ def compute_chart(year, month, day, hour, minute, lat, lon, tz_offset, place="")
                 s = divisional_sign(p["lon"], div)
             h = ((s - chart_lagna_sign) % 12) + 1
             d_deg = p["lon"] % 30 if div == 1 else 0
-            dig = get_dignity(name, s, h, d_deg)
+            dig = get_dignity(name, s, h, d_deg, is_divisional=(div != 1))
             div_digs[ABBR[name]] = dig
         dignities[label] = div_digs
 
@@ -1128,6 +1294,9 @@ def compute_chart(year, month, day, hour, minute, lat, lon, tz_offset, place="")
 
     # Dasha
     dasha = calculate_dasha(data, birth_dt)
+
+    # Sade Sati & Dhaiya
+    sadesati = calculate_sadesati(data["planets"]["Moon"]["lon"], jd)
 
     # Ashtakavarga
     ashtak = calculate_ashtakavarga(data)
@@ -1191,7 +1360,8 @@ def compute_chart(year, month, day, hour, minute, lat, lon, tz_offset, place="")
         "doshas": doshas,
         "aspects": aspects,
         "panchang": panchang,
-        "karakas": karakas
+        "karakas": karakas,
+        "sadesati": sadesati
     }
 
 
