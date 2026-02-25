@@ -3,10 +3,10 @@
   "appName": "Graha Logic",
   "webDir": "www",
   "server": {
-    "url": "https://jyotish-app-333157384151.us-central1.run.app",
+    "url": "https://grahalogic.ai",
     "cleartext": false,
     "allowNavigation": [
-      "jyotish-app-333157384151.us-central1.run.app",
+      "grahalogic.ai",
       "accounts.google.com"
     ]
   },
