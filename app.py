@@ -399,6 +399,7 @@ def api_btr():
 
 
 @app.route("/api/btr/ask", methods=["POST"])
+@login_required
 def api_btr_ask():
     data = request.get_json()
     if not data:
