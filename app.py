@@ -807,12 +807,12 @@ def api_ask():
         return jsonify({"error": "Failed to generate reading. Please try again later."}), 500
 
 
-# Try to init DB at startup, but don't block if it fails —
-# init_db() will be retried on the first DB-touching request.
-try:
-    init_db()
-except Exception:
-    pass
+# Try to init DB at startup in a background thread so a stalled connection
+# (e.g. SSL handshake hang) never blocks the gunicorn worker from booting.
+import threading as _threading
+_t = _threading.Thread(target=init_db, daemon=True)
+_t.start()
+_t.join(timeout=8)  # give up after 8 s; init_db will retry on first request
 
 
 @app.before_request
