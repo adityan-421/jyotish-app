@@ -73,11 +73,16 @@ variables = {
 steps = prompts_config["initial_reading_steps"]
 for step in steps:
     prompt_text = variables["chart_data"]  # simple substitution
-    # Apply template substitution
-    import string
-    class SafeDict(dict):
-        def __missing__(self, key): return "{" + key + "}"
-    prompt_text = step["prompt"].format_map(SafeDict(variables))
+    # Apply template substitution (safe — ignores literal JSON braces in prompt)
+    import re
+    def _safe_sub(template, vars_):
+        def _repl(m):
+            k = m.group(1)
+            v = vars_.get(k)
+            if v is None: return m.group(0)
+            return v if isinstance(v, str) else str(v)
+        return re.sub(r'\{(\w+)\}', _repl, template)
+    prompt_text = _safe_sub(step["prompt"], variables)
 
     logger.info("Calling Gemini (%s chars prompt)...", len(prompt_text))
     response = model.generate_content(prompt_text)
