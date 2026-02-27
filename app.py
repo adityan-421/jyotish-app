@@ -75,7 +75,21 @@ def _run_prompt_chain(model, steps, variables):
         prompt_text = _safe_substitute(step["prompt"], variables)
 
         response = model.generate_content(prompt_text)
-        result_text = response.text.strip()
+        try:
+            result_text = response.text.strip()
+        except ValueError:
+            # Gemini raises ValueError when finish_reason != STOP (e.g. RECITATION, MAX_TOKENS).
+            # The content is still present in candidates — extract it directly.
+            result_text = ""
+            try:
+                for part in response.candidates[0].content.parts:
+                    if hasattr(part, "text") and part.text:
+                        result_text += part.text
+            except Exception:
+                pass
+            result_text = result_text.strip()
+            if not result_text:
+                raise
 
         # Process response based on type
         if step["response_type"] == "json":
