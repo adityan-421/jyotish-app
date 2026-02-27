@@ -53,8 +53,14 @@ full_chart["current_date"] = datetime.now().strftime("%d-%b-%Y")
 if "dasha" in full_chart and "maha" in full_chart.get("dasha", {}):
     mahas = full_chart["dasha"]["maha"]
     today = datetime.now()
-    relevant = [m for m in mahas
-                if datetime.strptime(m["end"], "%Y-%m-%d") >= today] if mahas else mahas
+    def _parse_date(s):
+        for fmt in ("%Y-%m-%d", "%d-%b-%Y", "%Y/%m/%d"):
+            try:
+                return datetime.strptime(s, fmt)
+            except (ValueError, TypeError):
+                pass
+        return today  # fallback: treat as current so it's included
+    relevant = [m for m in mahas if _parse_date(m["end"]) >= today] if mahas else mahas
     full_chart["dasha"] = dict(full_chart["dasha"])
     full_chart["dasha"]["maha"] = relevant[:6] if len(relevant) > 6 else relevant
 
