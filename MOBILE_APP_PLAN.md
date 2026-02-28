@@ -1,0 +1,630 @@
+# Graha Logic — Mobile App Plan (iOS + Android)
+
+## Recommended Approach: React Native (Expo)
+
+**Why React Native with Expo:**
+- Single codebase for both iOS and Android
+- Expo simplifies build/deploy (EAS Build for App Store + Play Store)
+- Existing Flask backend stays untouched — mobile app calls the same REST API
+- Hot reload for rapid development
+- Rich ecosystem for charts (react-native-svg), navigation, auth
+- No need to learn Swift/Kotlin separately
+
+**Alternative considered:** Flutter — also viable, but React Native has a larger ecosystem for the specific UI components needed (SVG charts, markdown rendering, OAuth).
+
+---
+
+## Architecture Overview
+
+```
+┌─────────────────────────────┐
+│     React Native (Expo)     │
+│   iOS App  +  Android App   │
+├─────────────────────────────┤
+│  Navigation (React Nav)     │
+│  State (Zustand / Context)  │
+│  API Layer (axios/fetch)    │
+│  Secure Storage (tokens)    │
+│  SVG Charts (react-native-svg) │
+└──────────┬──────────────────┘
+           │ HTTPS
+           ▼
+┌─────────────────────────────┐
+│   Existing Flask Backend    │
+│   https://grahalogic.ai     │
+│   (Cloud Run — no changes)  │
+└─────────────────────────────┘
+```
+
+---
+
+## Screen-by-Screen Mockups
+
+### 1. SPLASH / ONBOARDING
+
+```
+┌─────────────────────────┐
+│                         │
+│                         │
+│      ✦ ✦ ✦ ✦ ✦ ✦       │
+│                         │
+│     GRAHA LOGIC         │
+│                         │
+│   Ancient Vision,       │
+│   Algorithmic Insight   │
+│                         │
+│                         │
+│  ┌───────────────────┐  │
+│  │  Sign in with Google│ │
+│  └───────────────────┘  │
+│                         │
+│  ┌───────────────────┐  │
+│  │  Continue as Guest │  │
+│  └───────────────────┘  │
+│                         │
+│                         │
+└─────────────────────────┘
+```
+
+---
+
+### 2. HOME SCREEN (Chart Input)
+
+```
+┌─────────────────────────┐
+│ ☰  GRAHA LOGIC    👤    │
+├─────────────────────────┤
+│                         │
+│  📋 My Charts (3/20) ▸  │
+│  ┌─────────────────┐    │
+│  │ Rahul Sharma    │    │
+│  │ Mumbai · 15 Jan │    │
+│  ├─────────────────┤    │
+│  │ Priya Patel     │    │
+│  │ Delhi · 3 Mar   │    │
+│  └─────────────────┘    │
+│                         │
+│  ── New Chart ────────  │
+│                         │
+│  Birth Date             │
+│  ┌───────────────────┐  │
+│  │ 📅  27 Feb 2026   │  │
+│  └───────────────────┘  │
+│                         │
+│  Birth Time             │
+│  ┌───────────────────┐  │
+│  │ 🕐  14:30         │  │
+│  └───────────────────┘  │
+│                         │
+│  Birth Place            │
+│  ┌───────────────────┐  │
+│  │ 🔍  Search place..│  │
+│  └───────────────────┘  │
+│                         │
+│  Timezone: UTC +5:30 ✓  │
+│  Lat: 19.076  Lon: 72.87│
+│                         │
+│  ┌───────────────────┐  │
+│  │  ✦ GENERATE CHART │  │
+│  └───────────────────┘  │
+│                         │
+└─────────────────────────┘
+```
+
+---
+
+### 3. CHART RESULT — Tab Bar Navigation
+
+```
+┌─────────────────────────┐
+│ ←  Rahul Sharma   💾 ⋮  │
+├─────────────────────────┤
+│                         │
+│  ♈ Aries Lagna          │
+│  Ashwini · Pada 2       │
+│                         │
+│  ☽ Cancer Rashi          │
+│  Pushya · Pada 1        │
+│                         │
+│ ┌─────────┬─────────┐   │
+│ │         │         │   │
+│ │   D1    │   D9    │   │
+│ │ (Rashi) │(Navamsha│   │
+│ │         │         │   │
+│ │  ◇ SVG  │  ◇ SVG  │   │
+│ │  Chart  │  Chart  │   │
+│ │         │         │   │
+│ └─────────┴─────────┘   │
+│                         │
+│  PANCHANG                │
+│  ┌─────────────────────┐│
+│  │ Tithi    Shukla 4   ││
+│  │ Vara     Shukra     ││
+│  │ Naksh.   Pushya     ││
+│  │ Yoga     Siddha     ││
+│  │ Karana   Balava     ││
+│  └─────────────────────┘│
+│                         │
+│  PLANETS ▸              │
+│  ┌─────────────────────┐│
+│  │ ☉ Sun   Aqu  3°12' ││
+│  │ ☽ Moon  Can  8°45' ││
+│  │ ♂ Mars  Ari 22°01' ││
+│  │ ...                 ││
+│  └─────────────────────┘│
+│                         │
+├─────────────────────────┤
+│ 📊    ◇    ✦   ⏱   🤖  │
+│Summ  Chart Yoga Dasha AI│
+└─────────────────────────┘
+```
+
+---
+
+### 4. CHARTS TAB (Divisional Charts)
+
+```
+┌─────────────────────────┐
+│ ←  Rahul Sharma   💾 ⋮  │
+├─────────────────────────┤
+│                         │
+│  ┌──┬──┬──┬──┬──┐      │
+│  │D1│D9│D10│D12│D60│    │
+│  └──┴──┴──┴──┴──┘      │
+│     ▔▔                  │
+│                         │
+│  D9 — Navamsha          │
+│  ┌─────────────────┐    │
+│  │                 │    │
+│  │    ◇ Diamond    │    │
+│  │    SVG Chart    │    │
+│  │    (Full Width) │    │
+│  │                 │    │
+│  │  Tap planet to  │    │
+│  │  see aspects    │    │
+│  │                 │    │
+│  └─────────────────┘    │
+│                         │
+│  BHAVA TABLE            │
+│  ┌─────────────────────┐│
+│  │ H1  Ari  Sun,Mars  ││
+│  │ H2  Tau  —         ││
+│  │ H3  Gem  Mercury   ││
+│  │ H4  Can  Moon      ││
+│  │ ...                 ││
+│  └─────────────────────┘│
+│                         │
+│  ASHTAKAVARGA           │
+│  ┌─────────────────────┐│
+│  │ ▓▓▓░░▓▓▓▓░▓▓       ││
+│  │ Ari Tau Gem Can ... ││
+│  └─────────────────────┘│
+│                         │
+├─────────────────────────┤
+│ 📊    ◇    ✦   ⏱   🤖  │
+│Summ  Chart Yoga Dasha AI│
+└─────────────────────────┘
+```
+
+---
+
+### 5. YOGAS & DOSHAS TAB
+
+```
+┌─────────────────────────┐
+│ ←  Rahul Sharma   💾 ⋮  │
+├─────────────────────────┤
+│                         │
+│  YOGAS (5 found)        │
+│  ┌─────────────────────┐│
+│  │ ✦ Gajakesari Yoga  ││
+│  │ Moon & Jupiter in   ││
+│  │ trine → Wisdom &   ││
+│  │ Protection          ││
+│  ├─────────────────────┤│
+│  │ ✦ Raja Yoga         ││
+│  │ 9th & 10th lords    ││
+│  │ in kendra → Royal   ││
+│  │ success             ││
+│  ├─────────────────────┤│
+│  │ ✦ Parivartana Yoga  ││
+│  │ Mars ↔ Jupiter      ││
+│  │ exchange → Mutual   ││
+│  │ strengthening       ││
+│  └─────────────────────┘│
+│                         │
+│  DOSHAS (2 found)       │
+│  ┌─────────────────────┐│
+│  │ ⚠ Mangal Dosha      ││
+│  │ Mars in 7th from    ││
+│  │ Lagna               ││
+│  │ Severity: Moderate  ││
+│  │ Cancelled: Jupiter  ││
+│  │ aspects 7th house   ││
+│  ├─────────────────────┤│
+│  │ ⚠ Papakartha Yoga   ││
+│  │ Saturn in enemy     ││
+│  │ sign + 8th house    ││
+│  │ Severity: Severe    ││
+│  └─────────────────────┘│
+│                         │
+├─────────────────────────┤
+│ 📊    ◇    ✦   ⏱   🤖  │
+│Summ  Chart Yoga Dasha AI│
+└─────────────────────────┘
+```
+
+---
+
+### 6. DASHA TAB
+
+```
+┌─────────────────────────┐
+│ ←  Rahul Sharma   💾 ⋮  │
+├─────────────────────────┤
+│                         │
+│  CURRENT PERIOD         │
+│  ┌─────────────────────┐│
+│  │ ♃ Jupiter Maha Dasha││
+│  │ 2019 — 2035 (16y)  ││
+│  │                     ││
+│  │ ♄ Saturn Antara     ││
+│  │ Mar 2025 — Sep 2027││
+│  └─────────────────────┘│
+│                         │
+│  TIMELINE               │
+│  ┌─────────────────────┐│
+│  │Ke Ve Su Mo Ma Ra Ju ││
+│  │░░ ░░ ░░ ░░ ░░ ░░ ▓▓││
+│  │              Sa Me  ││
+│  │              ░░ ░░  ││
+│  └─────────────────────┘│
+│                         │
+│  Maha ▸ Antara          │
+│  ┌─────────────────────┐│
+│  │ ♃ Jupiter  2019-2022││
+│  │ ██████████░░░░░░░░░ ││
+│  ├─────────────────────┤│
+│  │ ♄ Saturn   2022-2025││
+│  │ ████████░░░░░░░░░░░ ││
+│  ├─────────────────────┤│
+│  │ ☿ Mercury  2025-2028││  ← current
+│  │ ███░░░░░░░░░░░░░░░░ ││
+│  └─────────────────────┘│
+│                         │
+│  SADE SATI              │
+│  ┌─────────────────────┐│
+│  │ Status: Inactive ●  ││
+│  │                     ││
+│  │ Timeline:           ││
+│  │ ░░░░▓▓▓▓▓░░░░░░░░░ ││
+│  │ 2030    2037        ││
+│  │ Next: Rising phase  ││
+│  │ starts 2030         ││
+│  └─────────────────────┘│
+│                         │
+├─────────────────────────┤
+│ 📊    ◇    ✦   ⏱   🤖  │
+│Summ  Chart Yoga Dasha AI│
+└─────────────────────────┘
+```
+
+---
+
+### 7. AI READING TAB
+
+```
+┌─────────────────────────┐
+│ ←  Rahul Sharma   💾 ⋮  │
+├─────────────────────────┤
+│                         │
+│  ✦ AI JYOTISH READING  │
+│                         │
+│  GENERAL OVERVIEW       │
+│  ┌─────────────────────┐│
+│  │ Strong Jupiter in   ││
+│  │ kendra blesses this ││
+│  │ chart with wisdom   ││
+│  │ and spiritual       ││
+│  │ growth...           ││
+│  └─────────────────────┘│
+│                         │
+│  ┌──────┐  ┌──────┐    │
+│  │💼    │  │❤️    │    │
+│  │Career│  │Relat.│    │
+│  │Strong│  │Good  │    │
+│  │Jupit.│  │Venus │    │
+│  │in 10 │  │in 7  │    │
+│  └──────┘  └──────┘    │
+│  ┌──────┐  ┌──────┐    │
+│  │💰    │  │🏥    │    │
+│  │Financ│  │Health│    │
+│  │Dhana │  │Watch │    │
+│  │Yoga  │  │digest│    │
+│  └──────┘  └──────┘    │
+│                         │
+│  REMEDIES               │
+│  ┌─────────────────────┐│
+│  │ 💎 Yellow Sapphire  ││
+│  │ 🙏 Guru Mantra      ││
+│  │ 🕉  Thursday fasting ││
+│  └─────────────────────┘│
+│                         │
+│  ┌─────────────────────┐│
+│  │ Ask a question...   ││
+│  │              [Send] ││
+│  └─────────────────────┘│
+│  12 of 25 remaining     │
+│                         │
+├─────────────────────────┤
+│ 📊    ◇    ✦   ⏱   🤖  │
+│Summ  Chart Yoga Dasha AI│
+└─────────────────────────┘
+```
+
+---
+
+### 8. BTR SCREEN (Full Screen, accessed via menu)
+
+```
+┌─────────────────────────┐
+│ ←  Birth Time Rectify   │
+├─────────────────────────┤
+│                         │
+│  LAGNA BOUNDARIES       │
+│  ┌─────────────────────┐│
+│  │ Chart │ Now │ Sens. ││
+│  │───────┼─────┼───────││
+│  │ D1    │ Ari │ 23min ││
+│  │       │     │ Stable││
+│  │ D9    │ Leo │ 4min  ││
+│  │       │     │ Crit! ││
+│  │ D10   │ Sco │ 12min ││
+│  │       │     │ Sens. ││
+│  └─────────────────────┘│
+│                         │
+│  D1 TIMELINE            │
+│  ┌─────────────────────┐│
+│  │  Pisces │▼| Aries   ││
+│  │ ◄─23min─┼──47min─► ││
+│  └─────────────────────┘│
+│                         │
+│  AI VERIFICATION        │
+│  ┌─────────────────────┐│
+│  │ Your age: [    ]    ││
+│  │ Additional info:    ││
+│  │ [                 ] ││
+│  │                     ││
+│  │ [Generate Questions]││
+│  └─────────────────────┘│
+│                         │
+│  Q1: Did you marry     │
+│  before age 30?        │
+│  ○ Yes  ○ No  ○ Unsure │
+│                         │
+│  Q2: Major career      │
+│  change in early 20s?  │
+│  ○ Yes  ○ No  ○ Unsure │
+│                         │
+│  [Analyze Answers]      │
+│                         │
+│  RESULT                 │
+│  ┌─────────────────────┐│
+│  │ Suggested: +8 min   ││
+│  │ Confidence: High ●  ││
+│  │ D9 shifts to Virgo  ││
+│  │                     ││
+│  │ [Apply Correction]  ││
+│  └─────────────────────┘│
+│                         │
+└─────────────────────────┘
+```
+
+---
+
+### 9. SIDE MENU / DRAWER
+
+```
+┌─────────────────────────┐
+│ ┌─────────────────┐     │
+│ │  👤 Rahul S.    │     │
+│ │  rahul@gmail.com│     │
+│ ├─────────────────┤     │
+│ │                 │     │
+│ │  🏠 Home        │     │
+│ │  📋 My Charts   │     │
+│ │  ⏱  BTR Tool    │     │
+│ │  💬 Chat History│     │
+│ │  ──────────     │     │
+│ │  ⚙  Settings    │     │
+│ │  ❓ About       │     │
+│ │  🚪 Sign Out    │     │
+│ │                 │     │
+│ └─────────────────┘     │
+│                         │
+│                         │
+│                         │
+│                         │
+└─────────────────────────┘
+```
+
+---
+
+### 10. MY CHARTS LIST
+
+```
+┌─────────────────────────┐
+│ ← My Charts      3/20  │
+├─────────────────────────┤
+│                         │
+│  ┌─────────────────────┐│
+│  │ Rahul Sharma        ││
+│  │ Mumbai, India       ││
+│  │ 15 Jan 1990, 14:30  ││
+│  │ ♈ Aries Lagna       ││
+│  │           ✏️  🗑️    ││
+│  ├─────────────────────┤│
+│  │ Priya Patel         ││
+│  │ Delhi, India        ││
+│  │ 3 Mar 1995, 06:15   ││
+│  │ ♋ Cancer Lagna      ││
+│  │           ✏️  🗑️    ││
+│  ├─────────────────────┤│
+│  │ Baby Sharma         ││
+│  │ Mumbai, India       ││
+│  │ 27 Feb 2026, 09:00  ││
+│  │ ♊ Gemini Lagna      ││
+│  │           ✏️  🗑️    ││
+│  └─────────────────────┘│
+│                         │
+│  ┌───────────────────┐  │
+│  │  + New Chart      │  │
+│  └───────────────────┘  │
+│                         │
+└─────────────────────────┘
+```
+
+---
+
+## Implementation Phases
+
+### Phase 1: Foundation (Weeks 1-2)
+- [ ] Initialize Expo project with TypeScript
+- [ ] Set up React Navigation (stack + bottom tabs)
+- [ ] Create API service layer (axios wrapper for all endpoints)
+- [ ] Implement Google OAuth (expo-auth-session)
+- [ ] Secure token storage (expo-secure-store)
+- [ ] Build Home screen with birth data input form
+- [ ] Place autocomplete (OpenStreetMap Nominatim)
+- [ ] Native date/time pickers
+
+### Phase 2: Chart Display (Weeks 3-4)
+- [ ] Build SVG diamond chart component (react-native-svg)
+- [ ] Summary tab (Lagna, Rashi, Panchang, Planets, Karakas)
+- [ ] Charts tab (D1/D9/D10/D12/D60 with horizontal chip selector)
+- [ ] Bhava table component
+- [ ] Ashtakavarga bar chart
+- [ ] Planet tap → aspect tooltip (replaces hover on web)
+
+### Phase 3: Yogas, Doshas, Dasha (Weeks 5-6)
+- [ ] Yogas & Doshas tab (card list with severity badges)
+- [ ] Dasha tab with current period card
+- [ ] Dasha timeline bar (horizontal scroll)
+- [ ] Drill-down: Maha → Antara → Pratyantara (breadcrumb nav)
+- [ ] Sade Sati timeline visualization
+- [ ] Current transits section
+
+### Phase 4: AI & BTR (Weeks 7-8)
+- [ ] AI Reading tab with structured grid display
+- [ ] Markdown rendering for AI responses (react-native-markdown-display)
+- [ ] Follow-up question input with conversation history
+- [ ] Question counter (X of 25 remaining)
+- [ ] BTR screen (full screen via stack nav)
+- [ ] BTR boundaries table + D1 timeline
+- [ ] BTR AI verification flow (questions → analysis → apply)
+
+### Phase 5: Chart Management & Polish (Weeks 9-10)
+- [ ] Save chart modal
+- [ ] My Charts list screen (load / edit / delete)
+- [ ] Edit chart flow with update
+- [ ] Chat history screen (grouped by date)
+- [ ] Pull-to-refresh on chart lists
+- [ ] Loading states, error states, empty states
+- [ ] Haptic feedback on key actions
+- [ ] Dark mode support (optional)
+
+### Phase 6: App Store Submission (Weeks 11-12)
+- [ ] App icon and splash screen design
+- [ ] App Store screenshots (6.7", 6.1", iPad)
+- [ ] Play Store screenshots
+- [ ] Privacy policy page
+- [ ] App Store description and metadata
+- [ ] TestFlight beta testing
+- [ ] Play Store internal testing
+- [ ] Submit to both stores
+
+---
+
+## Key Dependencies (npm packages)
+
+```json
+{
+  "expo": "~52.x",
+  "react-native": "0.76.x",
+  "@react-navigation/native": "^7.x",
+  "@react-navigation/bottom-tabs": "^7.x",
+  "@react-navigation/stack": "^7.x",
+  "react-native-svg": "^15.x",
+  "expo-auth-session": "~6.x",
+  "expo-secure-store": "~14.x",
+  "expo-haptics": "~14.x",
+  "react-native-markdown-display": "^7.x",
+  "axios": "^1.x",
+  "zustand": "^5.x"
+}
+```
+
+---
+
+## Backend Changes Needed
+
+**Minimal changes required:**
+
+1. **CORS headers** — Add `flask-cors` to allow requests from mobile app (if not already present)
+2. **Token-based auth** — Mobile can't use browser cookies easily. Add JWT or API token flow alongside existing session auth:
+   - Mobile sends Google ID token → backend verifies → returns session token
+   - Mobile stores token in SecureStore, sends as `Authorization: Bearer <token>` header
+3. **Push notifications (future)** — Add endpoint to register device tokens for dasha period alerts
+
+---
+
+## Estimated Cost
+
+| Item | Cost |
+|------|------|
+| Apple Developer Account | $99/year |
+| Google Play Developer Account | $25 one-time |
+| Expo EAS Build (free tier) | $0 |
+| Total to launch | ~$124 |
+
+---
+
+## File Structure
+
+```
+graha-logic-mobile/
+├── app/
+│   ├── (tabs)/
+│   │   ├── _layout.tsx          # Bottom tab navigator
+│   │   ├── summary.tsx          # Summary tab
+│   │   ├── charts.tsx           # Divisional charts tab
+│   │   ├── yogas.tsx            # Yogas & Doshas tab
+│   │   ├── dasha.tsx            # Dasha tab
+│   │   └── ai-reading.tsx       # AI Reading tab
+│   ├── home.tsx                 # Home/input screen
+│   ├── btr.tsx                  # BTR screen
+│   ├── my-charts.tsx            # Saved charts list
+│   ├── chat-history.tsx         # AI chat history
+│   └── _layout.tsx              # Root stack navigator
+├── components/
+│   ├── DiamondChart.tsx         # SVG diamond chart
+│   ├── PlanetTable.tsx          # Planets table
+│   ├── DashaTimeline.tsx        # Dasha timeline bar
+│   ├── SadeSatiTimeline.tsx     # Sade Sati visualization
+│   ├── AshtakavargaChart.tsx    # Bar chart
+│   ├── PlaceAutocomplete.tsx    # Place search
+│   ├── ChartCard.tsx            # Saved chart list item
+│   └── YogaCard.tsx             # Yoga/Dosha card
+├── services/
+│   ├── api.ts                   # API client (all endpoints)
+│   ├── auth.ts                  # Google OAuth + token management
+│   └── storage.ts               # SecureStore helpers
+├── stores/
+│   └── chartStore.ts            # Zustand state (current chart, saved charts)
+├── theme/
+│   ├── colors.ts                # Color palette
+│   └── typography.ts            # Font sizes, weights
+├── app.json                     # Expo config
+├── package.json
+└── tsconfig.json
+```
