@@ -257,6 +257,31 @@ def save_ai_question(user_id, question, category, reading):
         cur.close()
 
 
+def get_all_charts_for_backfill():
+    """Return all saved charts (id, user_id, input_data) for recomputation."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT id, user_id, input_data FROM saved_charts ORDER BY id")
+        rows = cur.fetchall()
+        cur.close()
+    return [
+        {"id": r["id"], "user_id": r["user_id"], "input_data": json.loads(r["input_data"])}
+        for r in rows
+    ]
+
+
+def bulk_update_chart_data(chart_id, chart_data):
+    """Update only chart_data for a given chart (no reading reset)."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE saved_charts SET chart_data=%s WHERE id=%s",
+            (json.dumps(chart_data), chart_id),
+        )
+        conn.commit()
+        cur.close()
+
+
 def get_ai_history(user_id):
     with get_db() as conn:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)

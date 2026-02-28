@@ -17,6 +17,7 @@ from datetime import datetime
 from database import (
     init_db, reset_pool, upsert_user, save_chart, get_charts, get_chart, delete_chart,
     update_chart, update_chart_reading, count_charts, get_question_count_today, save_ai_question, get_ai_history,
+    get_all_charts_for_backfill, bulk_update_chart_data,
 )
 
 from pathlib import Path
@@ -552,6 +553,34 @@ def api_btr_ask():
         error_type = type(e).__name__
         logger.error("BTR AI error (%s): %s", error_type, str(e))
         return jsonify({"error": "Failed to generate BTR analysis. Please try again later."}), 500
+
+
+@app.route("/api/backfill", methods=["POST"])
+def api_backfill():
+    """Recompute chart_data for all saved charts using the latest engine."""
+    secret = request.headers.get("X-Backfill-Secret", "")
+    if secret != os.environ.get("BACKFILL_SECRET", ""):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    charts = get_all_charts_for_backfill()
+    updated = 0
+    errors = []
+    for chart in charts:
+        inp = chart["input_data"]
+        try:
+            result = compute_chart(
+                int(inp["year"]), int(inp["month"]), int(inp["day"]),
+                int(inp.get("hour", 12)), int(inp.get("minute", 0)),
+                float(inp["lat"]), float(inp["lon"]),
+                float(inp.get("tz_offset", 5.5)),
+                str(inp.get("place", "")),
+            )
+            bulk_update_chart_data(chart["id"], result)
+            updated += 1
+        except Exception as e:
+            errors.append({"id": chart["id"], "error": str(e)})
+
+    return jsonify({"updated": updated, "errors": errors, "total": len(charts)})
 
 
 @app.route("/api/timezone", methods=["POST"])
