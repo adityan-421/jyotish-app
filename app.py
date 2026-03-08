@@ -827,13 +827,19 @@ def api_ask():
                 "remaining": remaining,
             })
         else:
-            # Normal question flow
+            # Normal question flow — send full chart data
+            full_chart = dict(chart_data)
+            if "dasha" in full_chart and "maha" in full_chart.get("dasha", {}):
+                full_chart["dasha"] = dict(full_chart["dasha"])
+                full_chart["dasha"]["maha"] = _relevant_maha_periods(full_chart["dasha"]["maha"])
+            full_chart["current_date"] = datetime.now().strftime("%d-%b-%Y")
             variables = {
                 "question": question,
                 "categories": ", ".join(LIFE_CATEGORIES),
                 "today": datetime.now().strftime("%d-%b-%Y"),
                 "conversation": build_conv_context(conversation),
                 "raw_chart_data": chart_data,
+                "chart_data": json.dumps(full_chart, indent=2),
             }
             reading = _run_prompt_chain(model, prompts_config["steps"], variables)
             category = variables.get("category", "other")
