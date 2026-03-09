@@ -108,6 +108,13 @@ def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS app_cache (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
             conn.commit()
             cur.close()
         _db_initialized = True
@@ -277,6 +284,39 @@ def bulk_update_chart_data(chart_id, chart_data):
         cur.execute(
             "UPDATE saved_charts SET chart_data=%s WHERE id=%s",
             (json.dumps(chart_data), chart_id),
+        )
+        conn.commit()
+        cur.close()
+
+
+def get_cached_value(key, max_age_days=7):
+    """Return cached value if it exists and is fresher than max_age_days, else None."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT value, created_at FROM app_cache WHERE key = %s",
+            (key,),
+        )
+        row = cur.fetchone()
+        cur.close()
+    if not row:
+        return None
+    from datetime import datetime, timezone
+    age = datetime.now(timezone.utc) - row["created_at"].replace(tzinfo=timezone.utc)
+    if age.total_seconds() > max_age_days * 86400:
+        return None
+    return json.loads(row["value"])
+
+
+def set_cached_value(key, value):
+    """Upsert a value into app_cache, resetting created_at."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO app_cache (key, value, created_at)
+               VALUES (%s, %s, CURRENT_TIMESTAMP)
+               ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, created_at = CURRENT_TIMESTAMP""",
+            (key, json.dumps(value)),
         )
         conn.commit()
         cur.close()

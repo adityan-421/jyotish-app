@@ -17,7 +17,7 @@ from datetime import datetime
 from database import (
     init_db, reset_pool, upsert_user, save_chart, get_charts, get_chart, delete_chart,
     update_chart, update_chart_reading, count_charts, get_question_count_today, save_ai_question, get_ai_history,
-    get_all_charts_for_backfill, bulk_update_chart_data,
+    get_all_charts_for_backfill, bulk_update_chart_data, get_cached_value, set_cached_value,
 )
 
 from pathlib import Path
@@ -856,9 +856,7 @@ def api_ask():
         return jsonify({"error": "Failed to generate reading. Please try again later."}), 500
 
 
-# ── Cosmic weather cache ─────────────────────────────────────────────────────
-_cosmic_weather_cache = {"ts": None, "data": None}
-_COSMIC_WEATHER_TTL = 7 * 24 * 3600  # 7 days in seconds
+# Cosmic weather is cached in Postgres (app_cache table) with a 7-day TTL.
 
 
 @app.route("/api/panchang")
@@ -913,14 +911,16 @@ def api_transits():
 
 @app.route("/api/cosmic-weather")
 def api_cosmic_weather():
-    import time
-    now_ts = time.time()
-    cached = _cosmic_weather_cache
-    if cached["ts"] and (now_ts - cached["ts"]) < _COSMIC_WEATHER_TTL and cached["data"]:
-        return jsonify(cached["data"])
+    # Check DB cache first (persists across container restarts and instances)
+    try:
+        cached = get_cached_value("cosmic_weather", max_age_days=7)
+        if cached:
+            return jsonify(cached)
+    except Exception as e:
+        logger.warning("Cosmic weather DB read failed: %s", e)
+
     try:
         transits = compute_transits()
-        # Build a short summary of current positions for the prompt
         planet_summary = ", ".join(
             f"{t['planet']} in {t['sign']}" + (" (R)" if t['retrograde'] else "")
             for t in transits
@@ -944,14 +944,13 @@ def api_cosmic_weather():
         text = response.text.strip()
 
         result = {"text": text, "generated_on": today_str, "transits_used": planet_summary}
-        _cosmic_weather_cache["ts"] = now_ts
-        _cosmic_weather_cache["data"] = result
+        try:
+            set_cached_value("cosmic_weather", result)
+        except Exception as e:
+            logger.warning("Cosmic weather DB write failed: %s", e)
         return jsonify(result)
     except Exception as e:
         logger.error("Cosmic weather error: %s", e)
-        # Return cached even if stale, rather than error
-        if cached["data"]:
-            return jsonify(cached["data"])
         return jsonify({"text": "The cosmos is momentarily quiet. Check back soon.", "generated_on": "", "transits_used": ""}), 200
 
 
