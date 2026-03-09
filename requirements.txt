@@ -9,3 +9,4 @@ gunicorn>=21.2
 psycopg2-binary>=2.9
 requests>=2.31
 google-cloud-aiplatform>=1.50
+google-genai>=1.0

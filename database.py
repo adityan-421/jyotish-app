@@ -115,6 +115,25 @@ def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS pending_readings (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL REFERENCES users(id),
+                    chart_id INTEGER,
+                    prompt TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    batch_name TEXT,
+                    batch_index INTEGER,
+                    reading_data TEXT,
+                    error TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_pending_readings_status
+                ON pending_readings(status);
+            """)
             conn.commit()
             cur.close()
         _db_initialized = True
@@ -314,6 +333,89 @@ def get_stats():
         "users_with_charts": users_with_charts,
         "per_user": per_user,
     }
+
+
+def create_pending_reading(reading_id, user_id, chart_id, prompt):
+    """Insert a new pending reading request."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO pending_readings (id, user_id, chart_id, prompt, status)
+               VALUES (%s, %s, %s, %s, 'pending')""",
+            (reading_id, user_id, chart_id, prompt),
+        )
+        conn.commit()
+        cur.close()
+    return reading_id
+
+
+def get_pending_readings_by_status(status):
+    """Return all pending readings with the given status."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT * FROM pending_readings WHERE status = %s ORDER BY created_at",
+            (status,),
+        )
+        rows = cur.fetchall()
+        cur.close()
+    return rows
+
+
+def mark_readings_submitted(reading_ids, batch_name):
+    """Update readings to submitted status with batch info."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        for idx, rid in enumerate(reading_ids):
+            cur.execute(
+                """UPDATE pending_readings
+                   SET status='submitted', batch_name=%s, batch_index=%s, updated_at=CURRENT_TIMESTAMP
+                   WHERE id=%s""",
+                (batch_name, idx, rid),
+            )
+        conn.commit()
+        cur.close()
+
+
+def complete_reading(reading_id, reading_data_json):
+    """Mark a reading as completed with its result."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """UPDATE pending_readings
+               SET status='completed', reading_data=%s, updated_at=CURRENT_TIMESTAMP
+               WHERE id=%s""",
+            (reading_data_json, reading_id),
+        )
+        conn.commit()
+        cur.close()
+
+
+def fail_reading(reading_id, error_msg):
+    """Mark a reading as failed."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """UPDATE pending_readings
+               SET status='failed', error=%s, updated_at=CURRENT_TIMESTAMP
+               WHERE id=%s""",
+            (error_msg, reading_id),
+        )
+        conn.commit()
+        cur.close()
+
+
+def get_reading_status(reading_id):
+    """Return status info for a pending reading."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT id, user_id, chart_id, status, reading_data, error, created_at FROM pending_readings WHERE id = %s",
+            (reading_id,),
+        )
+        row = cur.fetchone()
+        cur.close()
+    return row
 
 
 def get_cached_value(key, max_age_days=7):

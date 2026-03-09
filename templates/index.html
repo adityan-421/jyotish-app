@@ -3986,6 +3986,66 @@ function onAITabClick() {
   autoGenerateReading();
 }
 
+function pollReadingStatus(readingId, stepTimer, loading, tabBtn, errorEl,
+                           generatePrompt, genBtn, inputRow, btn, input, defaultQuestion) {
+  var pollCount = 0;
+  var maxPolls = 120; // 20 min max at 10s intervals
+  var pollInterval = setInterval(function() {
+    pollCount++;
+    if (pollCount > maxPolls) {
+      clearInterval(pollInterval);
+      clearInterval(stepTimer);
+      loading.classList.remove("active");
+      if (tabBtn) tabBtn.classList.remove("loading");
+      errorEl.textContent = "Reading timed out. Please try again.";
+      errorEl.classList.add("active");
+      if (generatePrompt) generatePrompt.style.display = "block";
+      if (genBtn) genBtn.disabled = false;
+      return;
+    }
+    fetch("/api/reading-status/" + readingId)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.status === "completed" && data.reading_data) {
+        clearInterval(pollInterval);
+        clearInterval(stepTimer);
+        loading.classList.remove("active");
+        if (tabBtn) tabBtn.classList.remove("loading");
+        var readingData = data.reading_data;
+        if (readingData && (readingData.categories || readingData.general)) {
+          renderReadingGrid(readingData);
+          var summaryParts = [];
+          if (readingData.general) summaryParts.push("General: " + readingData.general);
+          if (readingData.categories) summaryParts = summaryParts.concat(readingData.categories.map(function(c) { return c.title + ": " + c.reading; }));
+          if (readingData.dasha_advice) summaryParts.push("Dasha: " + readingData.dasha_advice);
+          if (readingData.remedies) summaryParts.push("Remedies: " + readingData.remedies);
+          var summary = summaryParts.join("\n\n");
+          aiConversation.push({role: "user", text: defaultQuestion});
+          aiConversation.push({role: "assistant", text: summary});
+        }
+        // Cache on chart for instant loading next time
+        if (currentSavedChartId) {
+          _cachedReadingData = readingData;
+        }
+        if (inputRow) inputRow.style.display = "flex";
+        if (btn) btn.disabled = false;
+        if (input) { input.disabled = false; input.focus(); }
+      } else if (data.status === "failed") {
+        clearInterval(pollInterval);
+        clearInterval(stepTimer);
+        loading.classList.remove("active");
+        if (tabBtn) tabBtn.classList.remove("loading");
+        errorEl.textContent = data.error || "Reading generation failed. Please try again.";
+        errorEl.classList.add("active");
+        if (generatePrompt) generatePrompt.style.display = "block";
+        if (genBtn) genBtn.disabled = false;
+      }
+      // else still pending/submitted — keep polling
+    })
+    .catch(function() { /* ignore transient errors, keep polling */ });
+  }, 10000);
+}
+
 function autoGenerateReading() {
   var defaultQuestion = "Comprehensive birth chart reading";
   var generatePrompt = document.getElementById("aiGeneratePrompt");
@@ -4026,14 +4086,12 @@ function autoGenerateReading() {
   })
   .then(function(r) { return r.json().then(function(d) { return {status: r.status, data: d}; }); })
   .then(function(resp) {
-    clearInterval(stepTimer);
-    loading.classList.remove("active");
-    if (tabBtn) tabBtn.classList.remove("loading");
-
     if (resp.data.error) {
+      clearInterval(stepTimer);
+      loading.classList.remove("active");
+      if (tabBtn) tabBtn.classList.remove("loading");
       errorEl.textContent = resp.data.error;
       errorEl.classList.add("active");
-      // Show generate button again so user can retry
       if (generatePrompt) generatePrompt.style.display = "block";
       if (genBtn) genBtn.disabled = false;
       if (resp.status === 429 && resp.data.error.indexOf("Daily limit") >= 0) {
@@ -4044,7 +4102,23 @@ function autoGenerateReading() {
       return;
     }
 
-    // Render structured reading
+    // Batch mode: reading queued for async processing
+    if (resp.data.status === "queued" && resp.data.reading_id) {
+      document.getElementById("aiStep").textContent = "Your reading is being prepared...";
+      if (resp.data.remaining !== undefined) {
+        aiRemainingCount = resp.data.remaining;
+        document.getElementById("aiHelper").textContent = aiRemainingCount + " of 25 questions remaining today";
+      }
+      pollReadingStatus(resp.data.reading_id, stepTimer, loading, tabBtn, errorEl,
+                         generatePrompt, genBtn, inputRow, btn, input, defaultQuestion);
+      return;
+    }
+
+    // Synchronous fallback (shouldn't happen for initial readings but kept for safety)
+    clearInterval(stepTimer);
+    loading.classList.remove("active");
+    if (tabBtn) tabBtn.classList.remove("loading");
+
     var readingData = resp.data.reading_data;
     if (readingData && (readingData.categories || readingData.general)) {
       renderReadingGrid(readingData);
@@ -4057,7 +4131,6 @@ function autoGenerateReading() {
       aiConversation.push({role: "user", text: defaultQuestion});
       aiConversation.push({role: "assistant", text: summary});
     } else {
-      // Fallback: render as plain text
       var reading = resp.data.reading || JSON.stringify(resp.data.reading_data);
       appendChatMsg("assistant", reading, "comprehensive");
       aiConversation.push({role: "user", text: defaultQuestion});
@@ -4070,7 +4143,6 @@ function autoGenerateReading() {
       document.getElementById("aiHelper").textContent = aiRemainingCount + " of 25 questions remaining today";
     }
 
-    // Show follow-up input row, hide generate button
     if (inputRow) inputRow.style.display = "flex";
     btn.disabled = false;
     input.disabled = false;

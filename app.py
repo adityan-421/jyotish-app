@@ -18,6 +18,8 @@ from database import (
     init_db, reset_pool, upsert_user, save_chart, get_charts, get_chart, delete_chart,
     update_chart, update_chart_reading, count_charts, get_question_count_today, save_ai_question, get_ai_history,
     get_all_charts_for_backfill, bulk_update_chart_data, get_cached_value, set_cached_value, get_stats,
+    create_pending_reading, get_pending_readings_by_status, mark_readings_submitted,
+    complete_reading, fail_reading, get_reading_status,
 )
 
 from pathlib import Path
@@ -44,7 +46,7 @@ def build_conv_context(conversation):
     if not conversation:
         return ""
     ctx = "PRIOR CONVERSATION:\n"
-    for turn in conversation[-8:]:
+    for turn in conversation[-4:]:
         role = turn.get("role", "user").upper()
         ctx += f"{role}: {turn.get('text', '')}\n\n"
     ctx += "Continue the conversation naturally. Reference prior discussion where relevant.\n\n"
@@ -78,7 +80,7 @@ def _run_prompt_chain(model, steps, variables, default_thinking_budget=None):
         # Build generation config with thinking budget if specified
         thinking_budget = step.get("thinking_budget", default_thinking_budget)
         gen_kwargs = {}
-        if thinking_budget is not None:
+        if thinking_budget:
             gen_kwargs["generation_config"] = {
                 "thinking_config": {"thinking_budget": int(thinking_budget)}
             }
@@ -563,6 +565,151 @@ def api_btr_ask():
         return jsonify({"error": "Failed to generate BTR analysis. Please try again later."}), 500
 
 
+@app.route("/api/reading-status/<reading_id>")
+@login_required
+def api_reading_status(reading_id):
+    """Poll for batch reading completion."""
+    user_id = session["user"]["id"]
+    reading = get_reading_status(reading_id)
+    if not reading or reading["user_id"] != user_id:
+        return jsonify({"error": "Reading not found"}), 404
+
+    result = {"status": reading["status"], "reading_id": reading_id}
+    if reading["status"] == "completed" and reading["reading_data"]:
+        try:
+            result["reading_data"] = json.loads(reading["reading_data"])
+        except (json.JSONDecodeError, TypeError):
+            result["reading_data"] = reading["reading_data"]
+    elif reading["status"] == "failed":
+        result["error"] = reading.get("error", "Reading generation failed")
+    return jsonify(result)
+
+
+@app.route("/api/cron/submit-readings", methods=["POST"])
+def cron_submit_readings():
+    """Collect pending readings and submit as Gemini batch job."""
+    secret = request.headers.get("X-Cron-Secret", "")
+    if secret != os.environ.get("CRON_SECRET", os.environ.get("BACKFILL_SECRET", "")):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    pending = get_pending_readings_by_status("pending")
+    if not pending:
+        return jsonify({"submitted": 0})
+
+    from google import genai
+
+    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    prompts_config = load_prompts()
+    model_name = prompts_config.get("model", "gemini-2.5-flash")
+
+    inline_requests = []
+    reading_ids = []
+    for r in pending:
+        inline_requests.append({
+            "contents": [{"parts": [{"text": r["prompt"]}], "role": "user"}],
+        })
+        reading_ids.append(r["id"])
+
+    try:
+        batch_job = client.batches.create(
+            model=model_name,
+            src=inline_requests,
+            config={"display_name": f"readings-{datetime.now().strftime('%Y%m%d-%H%M%S')}"},
+        )
+        mark_readings_submitted(reading_ids, batch_job.name)
+        return jsonify({"submitted": len(reading_ids), "batch_name": batch_job.name})
+    except Exception as e:
+        logger.error("Batch submit failed: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/cron/check-readings", methods=["POST"])
+def cron_check_readings():
+    """Check submitted batch jobs and store completed readings."""
+    secret = request.headers.get("X-Cron-Secret", "")
+    if secret != os.environ.get("CRON_SECRET", os.environ.get("BACKFILL_SECRET", "")):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    submitted = get_pending_readings_by_status("submitted")
+    if not submitted:
+        return jsonify({"checked": 0, "completed": 0})
+
+    from google import genai
+
+    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+
+    # Group by batch_name
+    batches = {}
+    for r in submitted:
+        if r.get("batch_name"):
+            batches.setdefault(r["batch_name"], []).append(r)
+
+    completed_count = 0
+    failed_count = 0
+
+    for batch_name, readings in batches.items():
+        try:
+            batch_job = client.batches.get(name=batch_name)
+        except Exception as e:
+            logger.error("Failed to fetch batch %s: %s", batch_name, e)
+            continue
+
+        state = batch_job.state.name if hasattr(batch_job.state, "name") else str(batch_job.state)
+
+        if state not in ("JOB_STATE_SUCCEEDED", "SUCCEEDED"):
+            if state in ("JOB_STATE_FAILED", "FAILED"):
+                for r in readings:
+                    fail_reading(r["id"], "Batch job failed")
+                    failed_count += 1
+            continue
+
+        # Extract results from inline responses
+        responses = batch_job.dest.inlined_responses if batch_job.dest else []
+        readings_sorted = sorted(readings, key=lambda r: r.get("batch_index", 0))
+
+        for i, r in enumerate(readings_sorted):
+            try:
+                resp = responses[i] if i < len(responses) else None
+                if not resp or not resp.response:
+                    fail_reading(r["id"], "No response from batch")
+                    failed_count += 1
+                    continue
+
+                result_text = resp.response.text.strip()
+                cleaned = result_text
+                if cleaned.startswith("```"):
+                    cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
+                    if cleaned.endswith("```"):
+                        cleaned = cleaned[:-3].strip()
+                reading_data = json.loads(cleaned)
+
+                complete_reading(r["id"], json.dumps(reading_data))
+                completed_count += 1
+
+                # Cache on saved chart if chart_id present
+                if r.get("chart_id"):
+                    try:
+                        update_chart_reading(r["chart_id"], r["user_id"], reading_data)
+                    except Exception as e:
+                        logger.warning("Failed to cache reading for chart %s: %s", r["chart_id"], e)
+
+            except Exception as e:
+                logger.error("Failed to parse reading %s: %s", r["id"], e)
+                fail_reading(r["id"], str(e))
+                failed_count += 1
+
+    # Mark stale pending readings (>30 min) as failed
+    stale = get_pending_readings_by_status("pending")
+    for r in stale:
+        if r.get("created_at"):
+            age = (datetime.now() - r["created_at"]).total_seconds()
+            if age > 1800:
+                fail_reading(r["id"], "Timed out waiting for batch submission")
+                failed_count += 1
+
+    return jsonify({"checked": len(submitted), "completed": completed_count, "failed": failed_count})
+
+
 @app.route("/api/stats", methods=["POST"])
 def api_stats():
     """Return aggregate usage stats (protected by backfill secret)."""
@@ -787,18 +934,13 @@ def api_ask():
     chart_id = data.get("chart_id")  # optional: cache reading back to saved chart
 
     try:
-        import vertexai
-        from vertexai.generative_models import GenerativeModel
-
-        project_id = os.environ.get("GCP_PROJECT", "grahalogic")
-        location = os.environ.get("GCP_LOCATION", "us-central1")
-        vertexai.init(project=project_id, location=location)
-
         prompts_config = load_prompts()
-        model = GenerativeModel(prompts_config.get("model", "gemini-2.5-flash"))
 
         if initial_reading and "initial_reading_steps" in prompts_config:
-            # Comprehensive reading — send full chart data
+            # Queue initial reading for batch processing (50% cheaper)
+            import uuid
+            reading_id = str(uuid.uuid4())
+
             full_chart = dict(chart_data)
             if "dasha" in full_chart and "maha" in full_chart.get("dasha", {}):
                 full_chart["dasha"] = dict(full_chart["dasha"])
@@ -809,56 +951,53 @@ def api_ask():
                 "today": datetime.now().strftime("%d-%b-%Y"),
                 "chart_data": json.dumps(full_chart, indent=2),
             }
-            result = _run_prompt_chain(model, prompts_config["initial_reading_steps"], variables, prompts_config.get("default_thinking_budget"))
-            category = "comprehensive"
+            step = prompts_config["initial_reading_steps"][0]
+            prompt_text = _safe_substitute(step["prompt"], variables)
 
-            # result is the JSON string from the prompt chain
-            if isinstance(result, str):
-                try:
-                    cleaned = result.strip()
-                    if cleaned.startswith("```"):
-                        cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
-                        if cleaned.endswith("```"):
-                            cleaned = cleaned[:-3].strip()
-                    reading_data = json.loads(cleaned)
-                except json.JSONDecodeError:
-                    reading_data = prompts_config["initial_reading_steps"][0].get("json_fallback", {})
-            else:
-                reading_data = result if isinstance(result, dict) else {"categories": []}
-
-            # Save a summary to DB
-            save_ai_question(user_id, question, category,
-                             json.dumps(reading_data) if isinstance(reading_data, dict) else str(reading_data))
-
-            # Cache reading on the saved chart so it loads instantly next time
-            if chart_id:
-                try:
-                    update_chart_reading(chart_id, user_id, reading_data)
-                except Exception as e:
-                    logger.warning("Failed to cache reading for chart %s: %s", chart_id, e)
+            create_pending_reading(reading_id, user_id, chart_id, prompt_text)
+            save_ai_question(user_id, question or "Initial reading", "comprehensive", f"pending:{reading_id}")
 
             remaining = 25 - get_question_count_today(user_id)
             return jsonify({
-                "category": category,
-                "reading_data": reading_data,
+                "status": "queued",
+                "reading_id": reading_id,
                 "remaining": remaining,
             })
         else:
-            # Normal question flow — send full chart data
+            # Follow-up / normal question — real-time via Vertex AI
+            import vertexai
+            from vertexai.generative_models import GenerativeModel
+
+            project_id = os.environ.get("GCP_PROJECT", "grahalogic")
+            location = os.environ.get("GCP_LOCATION", "us-central1")
+            vertexai.init(project=project_id, location=location)
+
+            model = GenerativeModel(prompts_config.get("model", "gemini-2.5-flash"))
+
             full_chart = dict(chart_data)
             if "dasha" in full_chart and "maha" in full_chart.get("dasha", {}):
                 full_chart["dasha"] = dict(full_chart["dasha"])
                 full_chart["dasha"]["maha"] = _relevant_maha_periods(full_chart["dasha"]["maha"])
             full_chart["current_date"] = datetime.now().strftime("%d-%b-%Y")
+
             variables = {
                 "question": question,
                 "categories": ", ".join(LIFE_CATEGORIES),
                 "today": datetime.now().strftime("%d-%b-%Y"),
                 "conversation": build_conv_context(conversation),
                 "raw_chart_data": chart_data,
-                "chart_data": json.dumps(full_chart, indent=2),
             }
-            reading = _run_prompt_chain(model, prompts_config["steps"], variables, prompts_config.get("default_thinking_budget"))
+
+            # For follow-ups (has conversation), skip full chart_data — let
+            # extract_relevant_chart_data() populate it after categorization.
+            # Also disable thinking to save tokens on follow-ups.
+            if conversation:
+                thinking_budget = 0
+            else:
+                variables["chart_data"] = json.dumps(full_chart, indent=2)
+                thinking_budget = prompts_config.get("default_thinking_budget")
+
+            reading = _run_prompt_chain(model, prompts_config["steps"], variables, thinking_budget)
             category = variables.get("category", "other")
 
         # Save to DB
