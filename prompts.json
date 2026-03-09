@@ -1,11 +1,13 @@
 {
   "model": "gemini-2.5-flash",
+  "default_thinking_budget": 2048,
   "steps": [
     {
       "name": "categorize_and_factors",
       "prompt": "You are an expert Vedic astrologer (Jyotishi). Given the following question, do TWO things:\n\n1. Classify the question into exactly ONE of these life-area categories: {categories}\n2. Identify what astrological factors to examine for this category.\n\nReturn a JSON object with these keys:\n- \"category\": the single category name from the list above (lowercase)\n- \"houses\": array of house numbers (1-12) most relevant\n- \"planets\": array of planet names most relevant (e.g. [\"Sun\", \"Moon\", \"Mars\"])\n- \"divisional_charts\": which varga charts to check (e.g. [\"D1\", \"D9\"])\n- \"check_dasha\": boolean - whether to examine dasha periods\n- \"check_yogas\": boolean - whether to look for relevant yogas\n- \"check_ashtakavarga\": boolean - whether ashtakavarga is useful\n- \"special_considerations\": brief note on what to look for\n\nRespond with ONLY valid JSON, no markdown or explanation.\n\nQuestion: {question}",
       "response_type": "json",
       "output_var": "factors",
+      "thinking_budget": 512,
       "post_process": "extract_category_from_factors",
       "json_fallback": {
         "category": "other",
@@ -20,7 +22,7 @@
     },
     {
       "name": "reading",
-      "prompt": "You are an expert Vedic astrologer (Jyotishi) giving a personalized reading.\n\nTODAY'S DATE: {today}\n\n{conversation}CURRENT QUESTION: {question}\n\nLIFE AREA: {category}\n\nASTROLOGICAL FACTORS TO EXAMINE:\n{factors}\n\nCHART DATA:\n{chart_data}\n\nBased on the chart data and astrological factors above, provide a detailed Jyotish reading that addresses the question. Include:\n1. Key planetary positions and their significance for this question\n2. Relevant house analysis\n3. Any applicable yogas or special combinations\n4. Dasha period influences if relevant\n5. Practical guidance based on the astrological indications\n\nWrite in a warm, knowledgeable tone. Be specific to THIS chart — reference actual planet positions, signs, and houses from the data. Use the current_date and dasha date ranges to determine which Mahadasha and Antardasha is CURRENTLY running — do not guess or assume. If this is a follow-up question, keep the answer focused and concise (1-3 paragraphs). For initial questions, provide a fuller reading (3-5 paragraphs).",
+      "prompt": "You are an expert Vedic astrologer (Jyotishi) giving a personalized reading.\n\nTODAY'S DATE: {today}\n\n{conversation}CURRENT QUESTION: {question}\n\nLIFE AREA: {category}\n\nASTROLOGICAL FACTORS TO EXAMINE:\n{factors}\n\nCHART DATA:\n{chart_data}\n\nBased on the chart data and astrological factors above, provide a detailed Jyotish reading that addresses the question. Include:\n1. Key planetary positions and their significance for this question\n2. Relevant house analysis\n3. Any applicable yogas or special combinations\n4. Dasha period influences if relevant\n5. Practical guidance based on the astrological indications\n\nWrite in a warm, knowledgeable tone. Be specific to THIS chart — reference actual planet positions, signs, and houses from the data. Use the current_date and dasha date ranges to determine which Mahadasha and Antardasha is CURRENTLY running — do not guess or assume. If this is a follow-up question, be succinct and direct — answer in 1-2 short paragraphs maximum. Do not repeat information from previous readings. Get straight to the point. For initial questions, provide a fuller reading (3-5 paragraphs).",
       "response_type": "text",
       "output_var": "reading",
       "is_final": true

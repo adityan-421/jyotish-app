@@ -17,7 +17,7 @@ from datetime import datetime
 from database import (
     init_db, reset_pool, upsert_user, save_chart, get_charts, get_chart, delete_chart,
     update_chart, update_chart_reading, count_charts, get_question_count_today, save_ai_question, get_ai_history,
-    get_all_charts_for_backfill, bulk_update_chart_data, get_cached_value, set_cached_value,
+    get_all_charts_for_backfill, bulk_update_chart_data, get_cached_value, set_cached_value, get_stats,
 )
 
 from pathlib import Path
@@ -68,14 +68,22 @@ def _safe_substitute(template, variables):
     return re.sub(r'\{(\w+)\}', _replacer, template)
 
 
-def _run_prompt_chain(model, steps, variables):
+def _run_prompt_chain(model, steps, variables, default_thinking_budget=None):
     """Execute a sequence of prompt steps, returning the final output."""
     final_output = None
     for step in steps:
         # Format the prompt template with current variables
         prompt_text = _safe_substitute(step["prompt"], variables)
 
-        response = model.generate_content(prompt_text)
+        # Build generation config with thinking budget if specified
+        thinking_budget = step.get("thinking_budget", default_thinking_budget)
+        gen_kwargs = {}
+        if thinking_budget is not None:
+            gen_kwargs["generation_config"] = {
+                "thinking_config": {"thinking_budget": int(thinking_budget)}
+            }
+
+        response = model.generate_content(prompt_text, **gen_kwargs)
         try:
             result_text = response.text.strip()
         except ValueError:
@@ -471,7 +479,7 @@ def api_btr_ask():
             steps = prompts_config.get("btr_questions_steps", [])
             if not steps:
                 return jsonify({"error": "BTR question prompts not configured"}), 500
-            result = _run_prompt_chain(model, steps, variables)
+            result = _run_prompt_chain(model, steps, variables, prompts_config.get("default_thinking_budget"))
             # Parse result back to list if it's a string
             if isinstance(result, str):
                 try:
@@ -496,7 +504,7 @@ def api_btr_ask():
             steps = prompts_config.get("btr_analyze_steps", [])
             if not steps:
                 return jsonify({"error": "BTR analysis prompts not configured"}), 500
-            result = _run_prompt_chain(model, steps, variables)
+            result = _run_prompt_chain(model, steps, variables, prompts_config.get("default_thinking_budget"))
             # Parse result back to dict if it's a string
             if isinstance(result, str):
                 try:
@@ -527,7 +535,7 @@ def api_btr_ask():
             steps = prompts_config.get("btr_followup_steps", [])
             if not steps:
                 return jsonify({"error": "BTR followup prompts not configured"}), 500
-            result = _run_prompt_chain(model, steps, variables)
+            result = _run_prompt_chain(model, steps, variables, prompts_config.get("default_thinking_budget"))
             if isinstance(result, str):
                 try:
                     cleaned = result
@@ -553,6 +561,15 @@ def api_btr_ask():
         error_type = type(e).__name__
         logger.error("BTR AI error (%s): %s", error_type, str(e))
         return jsonify({"error": "Failed to generate BTR analysis. Please try again later."}), 500
+
+
+@app.route("/api/stats", methods=["POST"])
+def api_stats():
+    """Return aggregate usage stats (protected by backfill secret)."""
+    secret = request.headers.get("X-Backfill-Secret", "")
+    if secret != os.environ.get("BACKFILL_SECRET", ""):
+        return jsonify({"error": "Unauthorized"}), 401
+    return jsonify(get_stats())
 
 
 @app.route("/api/backfill", methods=["POST"])
@@ -625,7 +642,7 @@ def extract_relevant_chart_data(chart_data, category):
     cat = category.lower()
 
     # Determine which divisional charts to include
-    charts_to_include = ["D1"]
+    charts_to_include = ["D1", "D60"]
     if cat in ("spouse", "relationship"):
         charts_to_include.append("D9")
     elif cat in ("career", "business"):
@@ -792,7 +809,7 @@ def api_ask():
                 "today": datetime.now().strftime("%d-%b-%Y"),
                 "chart_data": json.dumps(full_chart, indent=2),
             }
-            result = _run_prompt_chain(model, prompts_config["initial_reading_steps"], variables)
+            result = _run_prompt_chain(model, prompts_config["initial_reading_steps"], variables, prompts_config.get("default_thinking_budget"))
             category = "comprehensive"
 
             # result is the JSON string from the prompt chain
@@ -841,7 +858,7 @@ def api_ask():
                 "raw_chart_data": chart_data,
                 "chart_data": json.dumps(full_chart, indent=2),
             }
-            reading = _run_prompt_chain(model, prompts_config["steps"], variables)
+            reading = _run_prompt_chain(model, prompts_config["steps"], variables, prompts_config.get("default_thinking_budget"))
             category = variables.get("category", "other")
 
         # Save to DB

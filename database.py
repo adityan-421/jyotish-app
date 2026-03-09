@@ -289,6 +289,33 @@ def bulk_update_chart_data(chart_id, chart_data):
         cur.close()
 
 
+def get_stats():
+    """Return aggregate stats: total users, total charts, charts per user."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT COUNT(*) as cnt FROM users")
+        total_users = cur.fetchone()["cnt"]
+        cur.execute("SELECT COUNT(*) as cnt FROM saved_charts")
+        total_charts = cur.fetchone()["cnt"]
+        cur.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM saved_charts")
+        users_with_charts = cur.fetchone()["cnt"]
+        cur.execute("""
+            SELECT u.name, u.email, COUNT(sc.id) as chart_count
+            FROM users u
+            LEFT JOIN saved_charts sc ON u.id = sc.user_id
+            GROUP BY u.id, u.name, u.email
+            ORDER BY chart_count DESC
+        """)
+        per_user = [{"name": r["name"], "email": r["email"], "chart_count": r["chart_count"]} for r in cur.fetchall()]
+        cur.close()
+    return {
+        "total_users": total_users,
+        "total_charts": total_charts,
+        "users_with_charts": users_with_charts,
+        "per_user": per_user,
+    }
+
+
 def get_cached_value(key, max_age_days=7):
     """Return cached value if it exists and is fresher than max_age_days, else None."""
     with get_db() as conn:
