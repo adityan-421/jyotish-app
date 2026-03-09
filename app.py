@@ -600,7 +600,7 @@ def cron_submit_readings():
 
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     prompts_config = load_prompts()
-    model_name = prompts_config.get("model", "gemini-2.5-flash")
+    model_name = prompts_config.get("batch_model", prompts_config.get("model", "gemini-2.5-flash"))
 
     inline_requests = []
     reading_ids = []

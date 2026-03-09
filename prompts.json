@@ -1,5 +1,6 @@
 {
   "model": "gemini-2.5-flash",
+  "batch_model": "gemini-2.5-flash-lite",
   "default_thinking_budget": 2048,
   "steps": [
     {
