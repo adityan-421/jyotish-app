@@ -1553,6 +1553,36 @@ def compute_btr(year, month, day, hour, minute, lat, lon, tz_offset):
 
 # ── Landing page features ─────────────────────────────────────────────────────
 
+def _find_tithi_boundary(jd_ref, tithi_idx, forward):
+    """
+    Find the JD when tithi_idx starts (forward=False) or ends (forward=True).
+    Steps in 15-min increments from jd_ref, then bisects to ~4-sec accuracy.
+    Returns JD or None.
+    """
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
+    step = (15.0 / 1440.0) * (1 if forward else -1)
+
+    def get_tidx(jd):
+        s, _ = get_sidereal_pos(jd, swe.SUN)
+        m, _ = get_sidereal_pos(jd, swe.MOON)
+        return int(((m - s) % 360) / 12)
+
+    prev_jd = jd_ref
+    for _ in range(120):  # 120 × 15 min = 30 hours max
+        curr_jd = prev_jd + step
+        if get_tidx(curr_jd) != tithi_idx:
+            lo, hi = (prev_jd, curr_jd) if forward else (curr_jd, prev_jd)
+            for _ in range(12):  # bisect → ~4-sec resolution
+                mid = (lo + hi) / 2
+                if get_tidx(mid) == tithi_idx:
+                    lo = mid
+                else:
+                    hi = mid
+            return hi
+        prev_jd = curr_jd
+    return None
+
+
 def _get_tz_coords(tz_str):
     """Approximate lat/lon from IANA timezone string using UTC offset."""
     try:
@@ -1600,6 +1630,13 @@ def compute_panchang(date_str, tz_str="UTC"):
     else:
         tithi_name = TITHIS[tithi_num]
 
+    # Tithi boundary JDs (converted to local time strings after jd_to_hhmm is defined)
+    try:
+        jd_tithi_start = _find_tithi_boundary(jd_noon, tithi_idx, forward=False)
+        jd_tithi_end   = _find_tithi_boundary(jd_noon, tithi_idx, forward=True)
+    except Exception:
+        jd_tithi_start = jd_tithi_end = None
+
     # Vara
     weekday = _dt(year, month, day).weekday()   # Mon=0 … Sun=6
     jyotish_vara_idx = (weekday + 1) % 7        # Sun=0 … Sat=6
@@ -1641,6 +1678,9 @@ def compute_panchang(date_str, tz_str="UTC"):
         loc_dt = utc_dt.astimezone(tz)
         return loc_dt.strftime("%-I:%M %p")
 
+    tithi_start_str = jd_to_hhmm(jd_tithi_start, tz) if jd_tithi_start else "—"
+    tithi_end_str   = jd_to_hhmm(jd_tithi_end,   tz) if jd_tithi_end   else "—"
+
     try:
         _, trise = swe.rise_trans(jd_search, swe.SUN, "", swe.CALC_RISE,  geopos, 0, 0)
         _, tset  = swe.rise_trans(jd_search, swe.SUN, "", swe.CALC_SET,   geopos, 0, 0)
@@ -1671,6 +1711,8 @@ def compute_panchang(date_str, tz_str="UTC"):
         "date": date_str,
         "tithi": f"{PAKSHA[paksha_idx]} {tithi_name}",
         "tithi_num": tithi_idx + 1,
+        "tithi_start": tithi_start_str,
+        "tithi_end": tithi_end_str,
         "paksha": PAKSHA[paksha_idx],
         "vara": vara,
         "vara_lord": vara_lord,

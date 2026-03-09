@@ -4219,7 +4219,7 @@ function loadPanchang() {
       var grid = document.getElementById("pancGrid");
       if (!grid) return;
       grid.innerHTML = [
-        {k:"Tithi",       v: d.tithi,                          s: d.paksha,          cls:"panch-highlight"},
+        {k:"Tithi",       v: d.tithi,                          s: d.tithi_start + " – " + d.tithi_end, cls:"panch-highlight"},
         {k:"Vara",        v: d.vara,                           s: d.vara_lord + " lord", cls:""},
         {k:"Nakshatra",   v: d.nakshatra + " " + d.nakshatra_pada, s: d.nakshatra_lord + " lord", cls:""},
         {k:"Yoga",        v: d.yoga,                           s: "",                cls:""},
