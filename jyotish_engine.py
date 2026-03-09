@@ -1549,3 +1549,176 @@ def compute_btr(year, month, day, hour, minute, lat, lon, tz_offset):
         "critical_charts": critical_charts,
         "planet_sensitivity": planet_sensitivity,
     }
+
+
+# ── Landing page features ─────────────────────────────────────────────────────
+
+def _get_tz_coords(tz_str):
+    """Approximate lat/lon from IANA timezone string using UTC offset."""
+    try:
+        from zoneinfo import ZoneInfo
+        from datetime import datetime as _dt
+        tz = ZoneInfo(tz_str)
+        offset_secs = _dt.now(tz).utcoffset().total_seconds()
+        return 20.0, (offset_secs / 3600) * 15
+    except Exception:
+        return 20.0, 0.0
+
+
+def compute_panchang(date_str, tz_str="UTC"):
+    """
+    Compute panchang for date_str ('YYYY-MM-DD') in the user's timezone.
+    Returns dict with tithi, vara, nakshatra, yoga, karana, rahu_kaal, gulika_kaal,
+    sunrise, sunset, moon_sign, sun_sign.
+    """
+    from zoneinfo import ZoneInfo
+    from datetime import datetime as _dt
+
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
+
+    try:
+        tz = ZoneInfo(tz_str)
+    except Exception:
+        tz = ZoneInfo("UTC")
+
+    year, month, day = map(int, date_str.split("-"))
+    local_noon = _dt(year, month, day, 12, 0, 0, tzinfo=tz)
+    utc_noon = local_noon.astimezone(ZoneInfo("UTC"))
+    jd_noon = swe.julday(utc_noon.year, utc_noon.month, utc_noon.day,
+                         utc_noon.hour + utc_noon.minute / 60.0)
+
+    sun_lon, _ = get_sidereal_pos(jd_noon, swe.SUN)
+    moon_lon, _ = get_sidereal_pos(jd_noon, swe.MOON)
+
+    # Tithi
+    diff = (moon_lon - sun_lon) % 360
+    tithi_idx = int(diff / 12)          # 0-29
+    tithi_num = tithi_idx % 15          # 0-14
+    paksha_idx = 0 if tithi_idx < 15 else 1
+    if tithi_num == 14:
+        tithi_name = "Purnima" if paksha_idx == 0 else "Amavasya"
+    else:
+        tithi_name = TITHIS[tithi_num]
+
+    # Vara
+    weekday = _dt(year, month, day).weekday()   # Mon=0 … Sun=6
+    jyotish_vara_idx = (weekday + 1) % 7        # Sun=0 … Sat=6
+    vara = VARAS[jyotish_vara_idx]
+    vara_lord = VARA_LORDS[jyotish_vara_idx]
+
+    # Nakshatra
+    nak_idx, pada = lon_to_nakshatra(moon_lon)
+
+    # Yoga
+    yoga_lon = (sun_lon + moon_lon) % 360
+    yoga_idx = int(yoga_lon / (360.0 / 27))
+
+    # Karana (half-tithi)
+    karana_idx_raw = int(diff / 6)   # 0-59
+    movable = ["Bava", "Balava", "Kaulava", "Taitila", "Garija", "Vanija", "Vishti"]
+    fixed_end = ["Shakuni", "Chatushpada", "Naga", "Kimstughna"]
+    if karana_idx_raw == 0:
+        karana = "Kimstughna"
+    elif karana_idx_raw >= 57:
+        karana = fixed_end[min(karana_idx_raw - 57, 2)]
+    else:
+        karana = movable[(karana_idx_raw - 1) % 7]
+
+    # Sunrise / Sunset / Rahu Kaal / Gulika Kaal
+    approx_lat, approx_lon = _get_tz_coords(tz_str)
+    geopos = (approx_lon, approx_lat, 0)
+
+    # Search from local 4 AM UTC equivalent
+    local_4am = _dt(year, month, day, 4, 0, 0, tzinfo=tz)
+    utc_4am = local_4am.astimezone(ZoneInfo("UTC"))
+    jd_search = swe.julday(utc_4am.year, utc_4am.month, utc_4am.day,
+                            utc_4am.hour + utc_4am.minute / 60.0)
+
+    def jd_to_hhmm(jd, tz):
+        y2, m2, d2, h2 = swe.revjul(jd)
+        hr = int(h2); mn = int((h2 - hr) * 60)
+        utc_dt = _dt(y2, m2, d2, hr, mn, tzinfo=ZoneInfo("UTC"))
+        loc_dt = utc_dt.astimezone(tz)
+        return loc_dt.strftime("%-I:%M %p")
+
+    try:
+        _, trise = swe.rise_trans(jd_search, swe.SUN, "", swe.CALC_RISE,  geopos, 0, 0)
+        _, tset  = swe.rise_trans(jd_search, swe.SUN, "", swe.CALC_SET,   geopos, 0, 0)
+        jd_rise = trise[0]; jd_set = tset[0]
+        day_dur = jd_set - jd_rise
+        seg = day_dur / 8.0
+
+        # Rahu Kaal segment (0-indexed): Mon=1,Tue=6,Wed=4,Thu=5,Fri=2,Sat=7,Sun=3
+        rahu_map = {0: 1, 1: 6, 2: 4, 3: 5, 4: 2, 5: 7, 6: 3}
+        rahu_seg = rahu_map[weekday]
+        rk_start = jd_rise + rahu_seg * seg
+        rk_end   = rk_start + seg
+
+        # Gulika Kaal segment (0-indexed): Mon=5,Tue=4,Wed=3,Thu=2,Fri=1,Sat=0,Sun=6
+        gulika_map = {0: 5, 1: 4, 2: 3, 3: 2, 4: 1, 5: 0, 6: 6}
+        gulika_seg = gulika_map[weekday]
+        gk_start = jd_rise + gulika_seg * seg
+        gk_end   = gk_start + seg
+
+        sunrise_str   = jd_to_hhmm(jd_rise, tz)
+        sunset_str    = jd_to_hhmm(jd_set,  tz)
+        rahu_kaal     = f"{jd_to_hhmm(rk_start, tz)} – {jd_to_hhmm(rk_end, tz)}"
+        gulika_kaal   = f"{jd_to_hhmm(gk_start, tz)} – {jd_to_hhmm(gk_end, tz)}"
+    except Exception:
+        sunrise_str = sunset_str = rahu_kaal = gulika_kaal = "—"
+
+    return {
+        "date": date_str,
+        "tithi": f"{PAKSHA[paksha_idx]} {tithi_name}",
+        "tithi_num": tithi_idx + 1,
+        "paksha": PAKSHA[paksha_idx],
+        "vara": vara,
+        "vara_lord": vara_lord,
+        "nakshatra": NAKSHATRAS[nak_idx],
+        "nakshatra_pada": pada,
+        "nakshatra_lord": NAKSHATRA_LORDS[nak_idx],
+        "yoga": YOGAS_PANCHANG[yoga_idx % 27],
+        "karana": karana,
+        "sunrise": sunrise_str,
+        "sunset": sunset_str,
+        "rahu_kaal": rahu_kaal,
+        "gulika_kaal": gulika_kaal,
+        "moon_sign": SIGNS[lon_to_sign(moon_lon)],
+        "sun_sign": SIGNS[lon_to_sign(sun_lon)],
+    }
+
+
+def compute_transits():
+    """Return current sidereal positions of all 9 grahas."""
+    from zoneinfo import ZoneInfo
+    from datetime import datetime as _dt
+
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
+    now = _dt.now(ZoneInfo("UTC"))
+    jd_now = swe.julday(now.year, now.month, now.day, now.hour + now.minute / 60.0)
+
+    result = []
+    for name, pid in PLANETS.items():
+        lon, speed = get_sidereal_pos(jd_now, pid)
+        sign_idx = lon_to_sign(lon)
+        nak_idx, pada = lon_to_nakshatra(lon)
+        result.append({
+            "planet": name, "abbr": ABBR[name],
+            "sign": SIGNS[sign_idx], "sign_idx": sign_idx,
+            "deg_in_sign": round(lon % 30, 1),
+            "nakshatra": NAKSHATRAS[nak_idx], "nakshatra_pada": pada,
+            "retrograde": speed < 0,
+        })
+
+    rahu_lon, ketu_lon = get_rahu_ketu(jd_now)
+    for name, lon in [("Rahu", rahu_lon), ("Ketu", ketu_lon)]:
+        sign_idx = lon_to_sign(lon)
+        nak_idx, pada = lon_to_nakshatra(lon)
+        result.append({
+            "planet": name, "abbr": ABBR[name],
+            "sign": SIGNS[sign_idx], "sign_idx": sign_idx,
+            "deg_in_sign": round(lon % 30, 1),
+            "nakshatra": NAKSHATRAS[nak_idx], "nakshatra_pada": pada,
+            "retrograde": True,
+        })
+    return result

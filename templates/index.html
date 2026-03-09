@@ -1006,6 +1006,115 @@ footer strong { color: #FF6B00; }
   .kv .v { font-size: 0.7rem; }
   .container { padding: 0.35rem; gap: 0.5rem; }
   .input-form input, .input-form select { width: 100%; min-width: 0; }
+
+  /* Panchang+Transits grid: single column on mobile */
+  #pancTransitGrid { grid-template-columns: 1fr !important; }
+}
+
+/* ============================
+   LANDING PAGE SECTIONS
+============================ */
+#landingPage { display: flex; flex-direction: column; gap: 1.25rem; }
+
+/* How It Works */
+.hiw-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+.hiw-step {
+  background: var(--surface); border: 1px solid var(--border-light);
+  border-radius: var(--radius); padding: 1.4rem 1.25rem; text-align: center;
+  position: relative;
+}
+.hiw-num {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff; font-size: 0.85rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 0.85rem;
+}
+.hiw-icon { font-size: 1.6rem; margin-bottom: 0.5rem; }
+.hiw-step h3 { font-size: 0.88rem; font-weight: 700; margin-bottom: 0.3rem; color: var(--text); }
+.hiw-step p { font-size: 0.75rem; color: var(--text-3); line-height: 1.55; }
+
+/* Transits strip */
+.transits-strip {
+  display: flex; flex-wrap: wrap; gap: 0.5rem;
+}
+.transit-pill {
+  background: var(--surface-2); border: 1px solid var(--border-light);
+  border-radius: 10px; padding: 0.45rem 0.75rem;
+  display: flex; align-items: center; gap: 0.4rem;
+  font-size: 0.75rem; color: var(--text-2); transition: border-color 0.15s;
+}
+.transit-pill:hover { border-color: var(--border); }
+.transit-planet { font-weight: 700; font-size: 0.72rem; }
+.transit-retro { color: var(--red); font-size: 0.68rem; font-weight: 700; }
+
+/* Panchang grid */
+.panchang-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+.panch-cell {
+  background: var(--surface-2); border: 1px solid var(--border-light);
+  border-radius: 10px; padding: 0.6rem 0.85rem;
+}
+.panch-cell .pk { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; color: var(--text-3); margin-bottom: 0.2rem; }
+.panch-cell .pv { font-size: 0.88rem; font-weight: 700; color: var(--text); }
+.panch-cell .ps { font-size: 0.68rem; color: var(--text-3); }
+
+.panch-highlight { border-color: var(--border); background: rgba(255,107,0,0.05); }
+.panch-highlight .pv { color: var(--accent); }
+.panch-rahu { border-color: rgba(229,57,53,0.2); background: rgba(229,57,53,0.04); }
+.panch-rahu .pk { color: var(--red); }
+
+/* Cosmic weather */
+.cosmic-weather-text {
+  font-size: 0.88rem; color: var(--text-2); line-height: 1.75;
+  font-style: italic; padding: 0.25rem 0;
+}
+.cosmic-meta { font-size: 0.68rem; color: var(--text-3); margin-top: 0.5rem; }
+
+/* Monthly Panchang */
+.month-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.month-nav h3 { font-family: 'Cinzel', serif; font-size: 0.95rem; font-weight: 700; color: var(--text); letter-spacing: 0.04em; }
+.month-arrow {
+  width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); cursor: pointer; font-size: 1rem; color: var(--text-2);
+  display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+}
+.month-arrow:hover { background: var(--surface-2); border-color: var(--accent); color: var(--accent); }
+
+.month-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 3px; font-size: 0.72rem;
+}
+.month-dow {
+  text-align: center; padding: 0.35rem 0; font-size: 0.62rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3);
+}
+.month-day {
+  border: 1px solid var(--border-light); border-radius: 8px;
+  padding: 0.35rem 0.4rem; min-height: 72px; cursor: default;
+  transition: border-color 0.15s, background 0.15s;
+  overflow: hidden; position: relative;
+}
+.month-day:hover { border-color: var(--border); background: var(--surface-2); }
+.month-day.today { border-color: var(--accent); background: rgba(255,107,0,0.05); }
+.month-day.other-month { opacity: 0.3; }
+.month-day.empty { border: none; background: transparent; }
+.md-num { font-weight: 700; font-size: 0.72rem; color: var(--text); margin-bottom: 0.15rem; }
+.month-day.today .md-num { color: var(--accent); }
+.md-tithi { font-size: 0.6rem; color: var(--accent); font-weight: 600; line-height: 1.2; }
+.md-nak   { font-size: 0.58rem; color: var(--text-3); line-height: 1.2; }
+.md-yoga  { font-size: 0.55rem; color: var(--teal); line-height: 1.2; }
+.month-loading { text-align: center; padding: 2rem; color: var(--text-3); font-size: 0.82rem; }
+
+@media (max-width: 768px) {
+  .hiw-grid { grid-template-columns: 1fr; }
+  .month-grid { font-size: 0.65rem; }
+  .month-day { min-height: 60px; padding: 0.25rem 0.3rem; }
 }
 
 /* Landscape on short screens (phones rotated) */
@@ -1090,6 +1199,100 @@ footer strong { color: #FF6B00; }
   <button class="btn-update" onclick="updateEditedChart()">Update Chart</button>
   <button class="btn-cancel-edit" onclick="cancelEdit()" title="Cancel edit">✕</button>
 </div>
+
+<!-- ===== LANDING PAGE ===== -->
+<div id="landingPage">
+
+  <!-- HOW IT WORKS -->
+  <div class="card accent-purple">
+    <div class="card-header">
+      <h2>How It Works</h2>
+      <span class="sub">Graha Logic in 3 steps</span>
+    </div>
+    <div class="card-body">
+      <div class="hiw-grid">
+        <div class="hiw-step">
+          <div class="hiw-num">1</div>
+          <div class="hiw-icon">✍️</div>
+          <h3>Enter Birth Details</h3>
+          <p>Provide your date, time, and place of birth. We use Lahiri ayanamsha for precise sidereal calculations.</p>
+        </div>
+        <div class="hiw-step">
+          <div class="hiw-num">2</div>
+          <div class="hiw-icon">◇</div>
+          <h3>Generate Your Chart</h3>
+          <p>Instantly compute your Lagna, Rashi, planetary positions, dashas, yogas, and all varga charts.</p>
+        </div>
+        <div class="hiw-step">
+          <div class="hiw-num">3</div>
+          <div class="hiw-icon">✦</div>
+          <h3>Get an AI Reading</h3>
+          <p>Ask any life question — career, health, relationships — and receive a personalised Jyotish reading powered by Gemini AI.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRANSITS + PANCHANG row -->
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;" id="pancTransitGrid">
+
+    <!-- TODAY'S PANCHANG -->
+    <div class="card accent-amber" id="pancCard">
+      <div class="card-header">
+        <h2>Today's Panchang</h2>
+        <span class="sub" id="pancDateLabel">—</span>
+      </div>
+      <div class="card-body">
+        <div class="panchang-grid" id="pancGrid">
+          <div class="panch-cell"><div class="pk">Loading…</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PLANETARY TRANSITS -->
+    <div class="card accent-teal" id="transitCard">
+      <div class="card-header">
+        <h2>Planetary Transits</h2>
+        <span class="sub">Current sidereal positions</span>
+      </div>
+      <div class="card-body">
+        <div class="transits-strip" id="transitStrip">
+          <div style="font-size:0.8rem; color:var(--text-3);">Loading…</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- COSMIC WEATHER -->
+  <div class="card accent-blue" id="cosmicCard">
+    <div class="card-header">
+      <h2>Cosmic Weather</h2>
+      <span class="sub">This week in the cosmos</span>
+    </div>
+    <div class="card-body">
+      <div class="cosmic-weather-text" id="cosmicText">Loading…</div>
+      <div class="cosmic-meta" id="cosmicMeta"></div>
+    </div>
+  </div>
+
+  <!-- MONTHLY PANCHANG -->
+  <div class="card accent-green" id="monthPancCard">
+    <div class="card-header">
+      <h2>Monthly Panchang</h2>
+      <span class="sub">Full month at a glance</span>
+    </div>
+    <div class="card-body">
+      <div class="month-nav">
+        <button class="month-arrow" onclick="changeMonth(-1)">&#8592;</button>
+        <h3 id="monthLabel">—</h3>
+        <button class="month-arrow" onclick="changeMonth(1)">&#8594;</button>
+      </div>
+      <div id="monthCalendar"><div class="month-loading">Loading…</div></div>
+    </div>
+  </div>
+
+</div><!-- /landingPage -->
 
 <!-- All chart content sections (hidden until data loads) -->
 <div id="chartContent">
@@ -1487,9 +1690,7 @@ function fetchChart() {
     }
     chartData = data;
     renderAll(data);
-    document.getElementById("chartContent").style.display = "flex";
-    document.getElementById("chartContent").style.flexDirection = "column";
-    document.getElementById("chartContent").style.gap = "1.25rem";
+    showChartContent();
     if (currentUser) document.getElementById("saveBtn").style.display = "block";
   })
   .catch(function(err) {
@@ -3056,9 +3257,7 @@ function loadSavedChart(id) {
       currentSavedChartId = data.id;
       _cachedReadingData = data.reading || null;
       renderAll(chartData);
-      document.getElementById("chartContent").style.display = "flex";
-      document.getElementById("chartContent").style.flexDirection = "column";
-      document.getElementById("chartContent").style.gap = "1.25rem";
+      showChartContent();
       closeMyCharts();
     })
     .catch(function(err) { alert("Failed to load chart: " + err.message); });
@@ -3977,6 +4176,183 @@ function askAI() {
 // INIT — auto-fetch default chart + check auth
 // ═══════════════════════════════════════════════════════════════════
 checkAuth();
+</script>
+
+<script>
+// ── Landing page state ──────────────────────────────────────────────────────
+var _userTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+var _calYear  = new Date().getFullYear();
+var _calMonth = new Date().getMonth() + 1; // 1-indexed
+var _monthCache = {};
+
+var MONTH_NAMES = ["January","February","March","April","May","June",
+                   "July","August","September","October","November","December"];
+var DOW_ABBR = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+// Planet symbol map
+var PLANET_SYMS = {
+  Sun:"☉", Moon:"☽", Mars:"♂", Mercury:"☿", Jupiter:"♃",
+  Venus:"♀", Saturn:"♄", Rahu:"☊", Ketu:"☋"
+};
+
+// Planet colors (same as chart)
+var T_COLORS = {
+  Sun:"#D97706", Moon:"#607D8B", Mars:"#C62828", Mercury:"#2E7D32",
+  Jupiter:"#F57F17", Venus:"#AD1457", Saturn:"#37474F", Rahu:"#546E7A", Ketu:"#6D4C41"
+};
+
+function loadLandingData() {
+  loadPanchang();
+  loadTransits();
+  loadCosmicWeather();
+  loadMonthCalendar(_calYear, _calMonth);
+}
+
+function loadPanchang() {
+  fetch("/api/panchang?tz=" + encodeURIComponent(_userTz))
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (d.error) return;
+      var label = document.getElementById("pancDateLabel");
+      if (label) label.textContent = d.vara + " · " + d.date;
+
+      var grid = document.getElementById("pancGrid");
+      if (!grid) return;
+      grid.innerHTML = [
+        {k:"Tithi",       v: d.tithi,                          s: d.paksha,          cls:"panch-highlight"},
+        {k:"Vara",        v: d.vara,                           s: d.vara_lord + " lord", cls:""},
+        {k:"Nakshatra",   v: d.nakshatra + " " + d.nakshatra_pada, s: d.nakshatra_lord + " lord", cls:""},
+        {k:"Yoga",        v: d.yoga,                           s: "",                cls:""},
+        {k:"Karana",      v: d.karana,                         s: "",                cls:""},
+        {k:"Moon in",     v: d.moon_sign,                      s: "",                cls:""},
+        {k:"Sunrise",     v: d.sunrise,                        s: "",                cls:""},
+        {k:"Rahu Kaal",   v: d.rahu_kaal,                      s: "Avoid auspicious starts", cls:"panch-rahu"},
+        {k:"Gulika Kaal", v: d.gulika_kaal,                    s: "",                cls:"panch-rahu"},
+      ].map(function(r){
+        return '<div class="panch-cell ' + r.cls + '">' +
+               '<div class="pk">' + r.k + '</div>' +
+               '<div class="pv">' + r.v + '</div>' +
+               (r.s ? '<div class="ps">' + r.s + '</div>' : '') +
+               '</div>';
+      }).join('');
+    })
+    .catch(function(){});
+}
+
+function loadTransits() {
+  fetch("/api/transits")
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (!d.transits) return;
+      var strip = document.getElementById("transitStrip");
+      if (!strip) return;
+      strip.innerHTML = d.transits.map(function(t) {
+        var col = T_COLORS[t.planet] || "#5c3d1a";
+        var sym = PLANET_SYMS[t.planet] || "";
+        var retro = t.retrograde ? '<span class="transit-retro">R</span>' : '';
+        return '<div class="transit-pill">' +
+               '<span class="transit-planet" style="color:' + col + ';">' + sym + ' ' + t.abbr + '</span>' +
+               '<span>' + t.sign + ' ' + t.deg_in_sign + '°</span>' +
+               retro +
+               '</div>';
+      }).join('');
+    })
+    .catch(function(){});
+}
+
+function loadCosmicWeather() {
+  fetch("/api/cosmic-weather")
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      var el = document.getElementById("cosmicText");
+      var meta = document.getElementById("cosmicMeta");
+      if (el) el.textContent = d.text || "—";
+      if (meta && d.generated_on) meta.textContent = "Updated " + d.generated_on;
+    })
+    .catch(function(){});
+}
+
+function changeMonth(delta) {
+  _calMonth += delta;
+  if (_calMonth > 12) { _calMonth = 1; _calYear++; }
+  if (_calMonth < 1)  { _calMonth = 12; _calYear--; }
+  loadMonthCalendar(_calYear, _calMonth);
+}
+
+function loadMonthCalendar(year, month) {
+  var lbl = document.getElementById("monthLabel");
+  if (lbl) lbl.textContent = MONTH_NAMES[month - 1] + " " + year;
+
+  var cacheKey = year + "-" + month;
+  if (_monthCache[cacheKey]) {
+    renderMonthCalendar(_monthCache[cacheKey], year, month);
+    return;
+  }
+
+  var cal = document.getElementById("monthCalendar");
+  if (cal) cal.innerHTML = '<div class="month-loading">Loading…</div>';
+
+  fetch("/api/panchang/month?year=" + year + "&month=" + month + "&tz=" + encodeURIComponent(_userTz))
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      _monthCache[cacheKey] = d;
+      renderMonthCalendar(d, year, month);
+    })
+    .catch(function(){
+      var cal2 = document.getElementById("monthCalendar");
+      if (cal2) cal2.innerHTML = '<div class="month-loading">Failed to load.</div>';
+    });
+}
+
+function renderMonthCalendar(data, year, month) {
+  var cal = document.getElementById("monthCalendar");
+  if (!cal) return;
+
+  var today = new Date();
+  var todayStr = today.getFullYear() + "-" +
+                 String(today.getMonth()+1).padStart(2,'0') + "-" +
+                 String(today.getDate()).padStart(2,'0');
+
+  // Day-of-week headers
+  var html = '<div class="month-grid">';
+  DOW_ABBR.forEach(function(d){ html += '<div class="month-dow">' + d + '</div>'; });
+
+  // First day of month (0=Sun…6=Sat)
+  var firstDay = new Date(year, month - 1, 1).getDay();
+  for (var i = 0; i < firstDay; i++) {
+    html += '<div class="month-day empty"></div>';
+  }
+
+  var days = data.days || [];
+  days.forEach(function(d) {
+    if (d.error) {
+      html += '<div class="month-day"><div class="md-num">' + parseInt(d.date.split('-')[2]) + '</div></div>';
+      return;
+    }
+    var dayNum = parseInt(d.date.split('-')[2]);
+    var isToday = d.date === todayStr;
+    html += '<div class="month-day' + (isToday ? ' today' : '') + '">' +
+            '<div class="md-num">' + dayNum + '</div>' +
+            '<div class="md-tithi">' + d.tithi + '</div>' +
+            '<div class="md-nak">' + d.nakshatra + '</div>' +
+            '<div class="md-yoga">' + d.yoga + '</div>' +
+            '</div>';
+  });
+
+  html += '</div>'; // close month-grid
+  cal.innerHTML = html;
+}
+
+// ── Hide landing / show chart ───────────────────────────────────────────────
+function showChartContent() {
+  var lp = document.getElementById("landingPage");
+  var cc = document.getElementById("chartContent");
+  if (lp) lp.style.display = "none";
+  if (cc) { cc.style.display = "flex"; cc.style.flexDirection = "column"; cc.style.gap = "1.25rem"; }
+}
+
+// Load landing data on page load
+document.addEventListener("DOMContentLoaded", loadLandingData);
 </script>
 </body>
 </html>

@@ -11,7 +11,7 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_cors import CORS
 from authlib.integrations.flask_client import OAuth
-from jyotish_engine import compute_chart, compute_btr, calculate_sadesati
+from jyotish_engine import compute_chart, compute_btr, calculate_sadesati, compute_panchang, compute_transits
 from zoneinfo import ZoneInfo
 from datetime import datetime
 from database import (
@@ -854,6 +854,105 @@ def api_ask():
         error_type = type(e).__name__
         logger.error("AI reading error (%s): %s", error_type, str(e))
         return jsonify({"error": "Failed to generate reading. Please try again later."}), 500
+
+
+# ── Cosmic weather cache ─────────────────────────────────────────────────────
+_cosmic_weather_cache = {"ts": None, "data": None}
+_COSMIC_WEATHER_TTL = 7 * 24 * 3600  # 7 days in seconds
+
+
+@app.route("/api/panchang")
+def api_panchang():
+    date_str = request.args.get("date")
+    tz_str   = request.args.get("tz", "UTC")
+    if not date_str:
+        from datetime import date as _date
+        from zoneinfo import ZoneInfo
+        try:
+            tz = ZoneInfo(tz_str)
+        except Exception:
+            tz = ZoneInfo("UTC")
+        date_str = datetime.now(tz).strftime("%Y-%m-%d")
+    try:
+        data = compute_panchang(date_str, tz_str)
+        return jsonify(data)
+    except Exception as e:
+        logger.error("Panchang error: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/panchang/month")
+def api_panchang_month():
+    tz_str = request.args.get("tz", "UTC")
+    try:
+        year  = int(request.args.get("year",  datetime.now().year))
+        month = int(request.args.get("month", datetime.now().month))
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid year/month"}), 400
+    import calendar
+    days_in_month = calendar.monthrange(year, month)[1]
+    result = []
+    for day in range(1, days_in_month + 1):
+        date_str = f"{year:04d}-{month:02d}-{day:02d}"
+        try:
+            result.append(compute_panchang(date_str, tz_str))
+        except Exception as e:
+            result.append({"date": date_str, "error": str(e)})
+    return jsonify({"year": year, "month": month, "days": result})
+
+
+@app.route("/api/transits")
+def api_transits():
+    try:
+        data = compute_transits()
+        return jsonify({"transits": data})
+    except Exception as e:
+        logger.error("Transits error: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/cosmic-weather")
+def api_cosmic_weather():
+    import time
+    now_ts = time.time()
+    cached = _cosmic_weather_cache
+    if cached["ts"] and (now_ts - cached["ts"]) < _COSMIC_WEATHER_TTL and cached["data"]:
+        return jsonify(cached["data"])
+    try:
+        transits = compute_transits()
+        # Build a short summary of current positions for the prompt
+        planet_summary = ", ".join(
+            f"{t['planet']} in {t['sign']}" + (" (R)" if t['retrograde'] else "")
+            for t in transits
+        )
+        today_str = datetime.now().strftime("%d %B %Y")
+
+        import vertexai
+        from vertexai.generative_models import GenerativeModel
+        vertexai.init(project=os.environ.get("GCP_PROJECT", "grahalogic"),
+                      location=os.environ.get("GCP_LOCATION", "us-central1"))
+        prompts_config = load_prompts()
+        model = GenerativeModel(prompts_config.get("model", "gemini-2.5-flash"))
+
+        prompt = (
+            f"Today is {today_str}. Current planetary transits (sidereal/Vedic): {planet_summary}.\n\n"
+            "As a Vedic astrologer, write a brief 'cosmic weather' update for this week in 2-3 sentences. "
+            "Mention 1-2 of the most significant transits and what they mean for people in general. "
+            "Keep it warm, insightful, and practical. Do not use markdown. Plain text only."
+        )
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+
+        result = {"text": text, "generated_on": today_str, "transits_used": planet_summary}
+        _cosmic_weather_cache["ts"] = now_ts
+        _cosmic_weather_cache["data"] = result
+        return jsonify(result)
+    except Exception as e:
+        logger.error("Cosmic weather error: %s", e)
+        # Return cached even if stale, rather than error
+        if cached["data"]:
+            return jsonify(cached["data"])
+        return jsonify({"text": "The cosmos is momentarily quiet. Check back soon.", "generated_on": "", "transits_used": ""}), 200
 
 
 # Try to init DB at startup in a background thread so a stalled connection
