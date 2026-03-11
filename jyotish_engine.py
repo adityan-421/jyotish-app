@@ -236,6 +236,12 @@ def divisional_sign(lon, division):
     elif division == 12:
         part = int(deg_in_sign / 2.5)
         return (sign_idx + part) % 12
+    elif division == 20:
+        part = int(deg_in_sign / 1.5)  # 30° / 20 = 1.5° per division
+        # Vimshamsha: movable signs start from Aries, fixed from Sagittarius, dual from Leo
+        element = sign_idx % 3  # 0=movable, 1=fixed, 2=dual
+        element_start = [0, 8, 4][element]
+        return (element_start + part) % 12
     elif division == 60:
         part = int(deg_in_sign / 0.5)  # 30° / 60 = 0.5° per division
         # Parashari D60: odd signs count from Aries, even signs count from Libra
@@ -1264,7 +1270,7 @@ def compute_chart(year, month, day, hour, minute, lat, lon, tz_offset, place="")
         })
 
     # Charts
-    divisions = {"D1": 1, "D9": 9, "D2": 2, "D3": 3, "D7": 7, "D10": 10, "D12": 12, "D60": 60}
+    divisions = {"D1": 1, "D9": 9, "D2": 2, "D3": 3, "D7": 7, "D10": 10, "D12": 12, "D20": 20, "D60": 60}
     charts = {}
     dignities = {}
     for label, div in divisions.items():
@@ -1451,8 +1457,8 @@ def compute_btr(year, month, day, hour, minute, lat, lon, tz_offset):
     )
     ayanamsa = swe.get_ayanamsa_ut(jd)
 
-    btr_divisions = [1, 2, 3, 7, 9, 10, 12, 60]
-    div_labels = {1: "D1", 2: "D2", 3: "D3", 7: "D7", 9: "D9", 10: "D10", 12: "D12", 60: "D60"}
+    btr_divisions = [1, 2, 3, 7, 9, 10, 12, 20, 60]
+    div_labels = {1: "D1", 2: "D2", 3: "D3", 7: "D7", 9: "D9", 10: "D10", 12: "D12", 20: "D20", 60: "D60"}
 
     boundaries = []
     critical_charts = []

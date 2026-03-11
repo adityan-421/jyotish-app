@@ -5,6 +5,7 @@ import os
 import json
 import functools
 import logging
+import requests as http_requests
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
@@ -187,11 +188,40 @@ google = oauth.register(
 )
 
 
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+
+_token_serializer = None
+
+def _get_serializer():
+    global _token_serializer
+    if _token_serializer is None:
+        _token_serializer = URLSafeTimedSerializer(app.secret_key, salt="mobile-auth")
+    return _token_serializer
+
+
+def get_current_user():
+    """Return the current user dict from session or Bearer token."""
+    user = session.get("user")
+    if user:
+        return user
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        try:
+            user = _get_serializer().loads(token, max_age=90 * 86400)  # 90 days
+            return user
+        except (BadSignature, SignatureExpired):
+            return None
+    return None
+
+
 def login_required(f):
     @functools.wraps(f)
     def decorated(*args, **kwargs):
-        if "user" not in session:
+        user = get_current_user()
+        if not user:
             return jsonify({"error": "Login required"}), 401
+        session["user"] = user  # populate session so downstream code works
         return f(*args, **kwargs)
     return decorated
 
@@ -253,9 +283,107 @@ def auth_logout():
     return redirect("/")
 
 
+@app.route("/auth/mobile", methods=["POST"])
+def auth_mobile():
+    """Exchange a Google token or auth code for a signed Bearer token."""
+    data = request.get_json() or {}
+    id_token = data.get("id_token")
+    access_token = data.get("access_token")
+    auth_code = data.get("auth_code")
+
+    if not id_token and not access_token and not auth_code:
+        return jsonify({"error": "id_token, access_token, or auth_code is required"}), 400
+
+    try:
+        if auth_code:
+            # Exchange auth code for tokens, then get user info
+            token_resp = http_requests.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code": auth_code,
+                    "client_id": data.get("client_id", os.environ.get("GOOGLE_CLIENT_ID")),
+                    "redirect_uri": data.get("redirect_uri", "grahalogic://"),
+                    "grant_type": "authorization_code",
+                },
+                timeout=10,
+            )
+            if token_resp.status_code != 200:
+                logger.error("Code exchange failed: %s", token_resp.text)
+                return jsonify({"error": "Code exchange failed"}), 401
+            tokens = token_resp.json()
+            at = tokens.get("access_token")
+            if not at:
+                return jsonify({"error": "No access token returned"}), 401
+            # Use the access token to get user info
+            resp = http_requests.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {at}"},
+                timeout=10,
+            )
+            if resp.status_code != 200:
+                return jsonify({"error": "Failed to fetch user info"}), 401
+            info = resp.json()
+            user_id = info.get("id")
+            email = info.get("email", "")
+            name = info.get("name", email.split("@")[0] if email else "")
+            picture = info.get("picture", "")
+        elif id_token:
+            # Verify via Google's tokeninfo endpoint
+            resp = http_requests.get(
+                "https://oauth2.googleapis.com/tokeninfo",
+                params={"id_token": id_token},
+                timeout=10,
+            )
+            if resp.status_code != 200:
+                return jsonify({"error": "Invalid Google token"}), 401
+            info = resp.json()
+            user_id = info.get("sub")
+            email = info.get("email", "")
+            name = info.get("name", email.split("@")[0] if email else "")
+            picture = info.get("picture", "")
+        else:
+            # Verify access token via Google's userinfo endpoint
+            resp = http_requests.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10,
+            )
+            if resp.status_code != 200:
+                return jsonify({"error": "Invalid Google access token"}), 401
+            info = resp.json()
+            user_id = info.get("id")
+            email = info.get("email", "")
+            name = info.get("name", email.split("@")[0] if email else "")
+            picture = info.get("picture", "")
+
+        if not user_id:
+            return jsonify({"error": "Invalid token payload"}), 401
+    except Exception as e:
+        logger.error("Google token verification failed: %s", e)
+        return jsonify({"error": "Token verification failed"}), 500
+
+    # Upsert user in database
+    for attempt in range(2):
+        try:
+            upsert_user(user_id, email, name, picture)
+            break
+        except Exception as e:
+            logger.warning("upsert_user attempt %d failed: %s", attempt + 1, e)
+            if attempt == 0:
+                reset_pool()
+                init_db()
+            else:
+                return jsonify({"error": "Login failed — please try again"}), 500
+
+    user = {"id": user_id, "email": email, "name": name, "picture": picture}
+    token = _get_serializer().dumps(user)
+
+    return jsonify({"token": token, "user": user})
+
+
 @app.route("/api/me")
 def api_me():
-    user = session.get("user")
+    user = get_current_user()
     if user:
         try:
             remaining = 25 - get_question_count_today(user["id"])
@@ -722,9 +850,11 @@ def api_stats():
 @app.route("/api/backfill", methods=["POST"])
 def api_backfill():
     """Recompute chart_data for all saved charts using the latest engine."""
-    secret = request.headers.get("X-Backfill-Secret", "")
-    if secret != os.environ.get("BACKFILL_SECRET", ""):
-        return jsonify({"error": "Unauthorized"}), 401
+    expected = os.environ.get("BACKFILL_SECRET")
+    if expected:
+        secret = request.headers.get("X-Backfill-Secret", "")
+        if secret != expected:
+            return jsonify({"error": "Unauthorized"}), 401
 
     charts = get_all_charts_for_backfill()
     updated = 0
