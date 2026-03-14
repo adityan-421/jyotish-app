@@ -725,8 +725,12 @@ def cron_submit_readings():
         return jsonify({"submitted": 0})
 
     from google import genai
+    from google.genai.types import HttpOptions
 
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    client = genai.Client(
+        api_key=os.environ.get("GEMINI_API_KEY"),
+        http_options=HttpOptions(timeout=60_000),
+    )
     prompts_config = load_prompts()
     model_name = prompts_config.get("batch_model", prompts_config.get("model", "gemini-2.5-flash"))
 
@@ -763,8 +767,12 @@ def cron_check_readings():
         return jsonify({"checked": 0, "completed": 0})
 
     from google import genai
+    from google.genai.types import HttpOptions
 
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    client = genai.Client(
+        api_key=os.environ.get("GEMINI_API_KEY"),
+        http_options=HttpOptions(timeout=60_000),
+    )
 
     # Group by batch_name
     batches = {}
