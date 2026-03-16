@@ -21,6 +21,7 @@ from database import (
     get_all_charts_for_backfill, bulk_update_chart_data, get_cached_value, set_cached_value, get_stats,
     create_pending_reading, get_pending_readings_by_status, mark_readings_submitted,
     complete_reading, fail_reading, get_reading_status,
+    set_own_chart, get_own_chart_id,
 )
 
 from pathlib import Path
@@ -389,7 +390,11 @@ def api_me():
             remaining = 25 - get_question_count_today(user["id"])
         except Exception:
             remaining = 25  # Assume full quota if DB is unreachable
-        return jsonify({"user": user, "ai_remaining": max(remaining, 0)})
+        try:
+            own_chart_id = get_own_chart_id(user["id"])
+        except Exception:
+            own_chart_id = None
+        return jsonify({"user": user, "ai_remaining": max(remaining, 0), "own_chart_id": own_chart_id})
     return jsonify({"user": None})
 
 
@@ -409,12 +414,17 @@ def api_save_chart():
     if not input_data or not chart_data:
         return jsonify({"error": "Missing input_data or chart_data"}), 400
 
+    is_own = data.get("is_own", False)
+
     user = session["user"]
     user_id = user["id"]
     upsert_user(user_id, user.get("email", ""), user.get("name", ""), user.get("picture", ""))
     chart_id, error = save_chart(user_id, name, input_data, chart_data)
     if error:
         return jsonify({"error": error}), 400
+
+    if is_own:
+        set_own_chart(user_id, chart_id)
 
     return jsonify({"id": chart_id, "message": "Chart saved"})
 
@@ -467,6 +477,23 @@ def api_update_chart(chart_id):
     if update_chart(chart_id, user_id, input_data, chart_data):
         return jsonify({"message": "Chart updated"})
     return jsonify({"error": "Chart not found"}), 404
+
+
+@app.route("/api/charts/<int:chart_id>/set-own", methods=["PUT"])
+@login_required
+def api_set_own_chart(chart_id):
+    user_id = session["user"]["id"]
+    if set_own_chart(user_id, chart_id):
+        return jsonify({"message": "Chart set as your own birth chart"})
+    return jsonify({"error": "Chart not found"}), 404
+
+
+@app.route("/api/charts/clear-own", methods=["PUT"])
+@login_required
+def api_clear_own_chart():
+    user_id = session["user"]["id"]
+    set_own_chart(user_id, None)
+    return jsonify({"message": "Own chart cleared"})
 
 
 @app.route("/api/ai-history")

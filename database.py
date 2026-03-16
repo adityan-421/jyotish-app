@@ -98,6 +98,7 @@ def init_db():
                 );
             """)
             cur.execute("ALTER TABLE saved_charts ADD COLUMN IF NOT EXISTS reading TEXT DEFAULT NULL")
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS own_chart_id INTEGER DEFAULT NULL")
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS ai_questions (
                     id SERIAL PRIMARY KEY,
@@ -195,6 +196,9 @@ def update_chart(chart_id, user_id, input_data, chart_data):
 def get_charts(user_id):
     with get_db() as conn:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT own_chart_id FROM users WHERE id = %s", (user_id,))
+        user_row = cur.fetchone()
+        own_id = user_row["own_chart_id"] if user_row else None
         cur.execute(
             """SELECT id, name, input_data, created_at FROM saved_charts
                WHERE user_id = %s ORDER BY created_at DESC""",
@@ -211,6 +215,7 @@ def get_charts(user_id):
             "place": inp.get("place", ""),
             "date": f"{inp.get('year')}-{inp.get('month', ''):02d}-{inp.get('day', ''):02d}" if inp.get("year") else "",
             "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            "is_own": r["id"] == own_id,
         })
     return results
 
@@ -218,6 +223,9 @@ def get_charts(user_id):
 def get_chart(chart_id, user_id):
     with get_db() as conn:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT own_chart_id FROM users WHERE id = %s", (user_id,))
+        user_row = cur.fetchone()
+        own_id = user_row["own_chart_id"] if user_row else None
         cur.execute(
             "SELECT * FROM saved_charts WHERE id = %s AND user_id = %s",
             (chart_id, user_id),
@@ -235,6 +243,7 @@ def get_chart(chart_id, user_id):
         "chart_data": json.loads(row["chart_data"]),
         "reading": reading,
         "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+        "is_own": row["id"] == own_id,
     }
 
 
@@ -243,6 +252,12 @@ def delete_chart(chart_id, user_id):
         cur = conn.cursor()
         cur.execute("DELETE FROM saved_charts WHERE id = %s AND user_id = %s", (chart_id, user_id))
         deleted = cur.rowcount
+        if deleted:
+            # Clear own_chart_id if this was the user's own chart
+            cur.execute(
+                "UPDATE users SET own_chart_id = NULL WHERE id = %s AND own_chart_id = %s",
+                (user_id, chart_id),
+            )
         conn.commit()
         cur.close()
         return deleted > 0
@@ -257,6 +272,32 @@ def update_chart_reading(chart_id, user_id, reading):
         )
         conn.commit()
         cur.close()
+
+
+def set_own_chart(user_id, chart_id):
+    """Set a chart as the user's own birth chart. Pass None to clear."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        if chart_id is not None:
+            # Verify chart belongs to user
+            cur.execute("SELECT id FROM saved_charts WHERE id = %s AND user_id = %s", (chart_id, user_id))
+            if not cur.fetchone():
+                cur.close()
+                return False
+        cur.execute("UPDATE users SET own_chart_id = %s WHERE id = %s", (chart_id, user_id))
+        conn.commit()
+        cur.close()
+        return True
+
+
+def get_own_chart_id(user_id):
+    """Return the user's own chart id, or None."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT own_chart_id FROM users WHERE id = %s", (user_id,))
+        row = cur.fetchone()
+        cur.close()
+    return row["own_chart_id"] if row else None
 
 
 def get_question_count_today(user_id):

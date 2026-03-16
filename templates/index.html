@@ -1379,7 +1379,7 @@ footer strong { color: #FF6B00; }
 <div class="tab-pane" id="tab-charts">
 
 <div class="card accent-amber">
-  <div class="card-header"><h2>Vargas</h2><span class="sub">North Indian Diamond &mdash; D1, D9, D2, D3, D7, D10, D12, D60</span></div>
+  <div class="card-header"><h2>Vargas</h2><span class="sub">North Indian Diamond &mdash; D1, D9, D2, D3, D7, D10, D12, D20, D60</span></div>
   <div class="card-body">
     <div class="chart-legend">
       <div class="legend-item"><span class="legend-sym">🌟</span> Exalted (Uchcha)</div>
@@ -1610,6 +1610,10 @@ footer strong { color: #FF6B00; }
   <div class="save-modal">
     <h3>Save Chart</h3>
     <input type="text" id="saveChartName" placeholder="e.g. My Birth Chart" maxlength="60" onkeydown="if(event.key==='Enter')saveCurrentChart()">
+    <label style="display:flex;align-items:center;gap:0.5rem;margin:0.75rem 0 0.25rem;font-size:0.85rem;color:#5a3e1b;cursor:pointer;">
+      <input type="checkbox" id="saveChartIsOwn" style="accent-color:#FF6B00;width:16px;height:16px;">
+      This is my birth chart
+    </label>
     <div class="save-modal-btns">
       <button class="btn-cancel" onclick="closeSaveModal()">Cancel</button>
       <button class="btn-save" onclick="saveCurrentChart()">Save</button>
@@ -3061,6 +3065,7 @@ function updateAuthUI() {
 function openSaveModal() {
   if (!chartData) return;
   document.getElementById("saveChartName").value = "";
+  document.getElementById("saveChartIsOwn").checked = false;
   document.getElementById("saveModalOverlay").classList.add("open");
   setTimeout(function() { document.getElementById("saveChartName").focus(); }, 100);
 }
@@ -3073,11 +3078,12 @@ function saveCurrentChart() {
   var name = document.getElementById("saveChartName").value.trim();
   if (!name) { alert("Please enter a name for the chart."); return; }
   if (!chartData || !lastInputPayload) { alert("No chart to save. Generate a chart first."); return; }
+  var isOwn = document.getElementById("saveChartIsOwn").checked;
 
   fetch("/api/charts/save", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ name: name, input_data: lastInputPayload, chart_data: chartData })
+    body: JSON.stringify({ name: name, input_data: lastInputPayload, chart_data: chartData, is_own: isOwn })
   })
   .then(function(r) { return r.json(); })
   .then(function(data) {
@@ -3167,10 +3173,15 @@ function loadMyCharts() {
       }
       var html = '';
       data.charts.forEach(function(c) {
+        var ownLabel = c.is_own ? '<span style="color:#FF6B00;font-size:0.85rem;margin-left:0.4rem;" title="My birth chart">&#9733;</span>' : '';
+        var ownBtn = c.is_own
+          ? '<button class="btn-own active" onclick="clearOwnChart()" title="Remove as my chart" style="color:#FF6B00;font-weight:700;">&#9733; My Chart</button>'
+          : '<button class="btn-own" onclick="setOwnChart(' + c.id + ')" title="Set as my birth chart" style="color:#999;">&#9734; Set as Mine</button>';
         html += '<div class="saved-chart-item">' +
-          '<div class="saved-chart-name">' + escHtml(c.name) + '</div>' +
+          '<div class="saved-chart-name">' + escHtml(c.name) + ownLabel + '</div>' +
           '<div class="saved-chart-meta">' + escHtml(c.place || "Unknown place") + ' &middot; ' + escHtml(c.date || "") + '</div>' +
           '<div class="saved-chart-actions">' +
+            ownBtn +
             '<button class="btn-load" onclick="loadSavedChart(' + c.id + ')">Load</button>' +
             '<button class="btn-edit" onclick="editSavedChart(' + c.id + ',\'' + escAttr(c.name) + '\')">Edit</button>' +
             '<button class="btn-delete" onclick="deleteSavedChart(' + c.id + ',\'' + escAttr(c.name) + '\')">Delete</button>' +
@@ -3274,6 +3285,26 @@ function deleteSavedChart(id, name) {
       loadMyCharts();
     })
     .catch(function(err) { alert("Failed to delete: " + err.message); });
+}
+
+function setOwnChart(id) {
+  fetch("/api/charts/" + id + "/set-own", { method: "PUT" })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) { alert(data.error); return; }
+      loadMyCharts();
+    })
+    .catch(function(err) { alert("Failed to set: " + err.message); });
+}
+
+function clearOwnChart() {
+  fetch("/api/charts/clear-own", { method: "PUT" })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) { alert(data.error); return; }
+      loadMyCharts();
+    })
+    .catch(function(err) { alert("Failed to clear: " + err.message); });
 }
 
 // ═══════════════════════════════════════════════════════════════════

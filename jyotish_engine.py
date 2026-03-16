@@ -238,17 +238,20 @@ def divisional_sign(lon, division):
         return (sign_idx + part) % 12
     elif division == 20:
         part = int(deg_in_sign / 1.5)  # 30° / 20 = 1.5° per division
-        # Vimshamsha: movable signs start from Aries, fixed from Sagittarius, dual from Leo
-        element = sign_idx % 3  # 0=movable, 1=fixed, 2=dual
-        element_start = [0, 8, 4][element]
+        # Vimshamsha: element-based starting signs (like D9) to ensure
+        # Rahu/Ketu (always 180° apart) land in opposite D20 signs.
+        # Fire→Aries, Earth→Capricorn, Air→Libra, Water→Cancer
+        element = sign_idx % 4
+        element_start = [0, 9, 6, 3][element]
         return (element_start + part) % 12
     elif division == 60:
         part = int(deg_in_sign / 0.5)  # 30° / 60 = 0.5° per division
-        # Parashari D60: odd signs count from Aries, even signs count from Libra
+        # Parashari D60: odd signs from Aries, even from Libra.
+        # Add sign_idx offset so opposite signs (same parity) differ by 6.
         if sign_idx % 2 == 0:  # odd sign (0-indexed even = 1st, 3rd, etc.)
-            return part % 12
+            return (sign_idx + part) % 12
         else:  # even sign
-            return (6 + part) % 12
+            return (sign_idx + 6 + part) % 12
     return sign_idx
 
 
