@@ -222,7 +222,7 @@ def get_charts(user_id):
         user_row = cur.fetchone()
         own_id = user_row["own_chart_id"] if user_row else None
         cur.execute(
-            """SELECT id, name, input_data, created_at, is_own_chart FROM saved_charts
+            """SELECT id, name, input_data, created_at FROM saved_charts
                WHERE user_id = %s ORDER BY created_at DESC""",
             (user_id,),
         )
