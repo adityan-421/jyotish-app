@@ -3175,7 +3175,7 @@ function loadMyCharts() {
       var charts = data.charts.slice().sort(function(a, b) {
         if (a.is_own_chart && !b.is_own_chart) return -1;
         if (!a.is_own_chart && b.is_own_chart) return 1;
-        return 0;
+        return a.name.localeCompare(b.name);
       });
       var html = '';
       charts.forEach(function(c) {
