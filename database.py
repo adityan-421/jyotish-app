@@ -98,6 +98,7 @@ def init_db():
                 );
             """)
             cur.execute("ALTER TABLE saved_charts ADD COLUMN IF NOT EXISTS reading TEXT DEFAULT NULL")
+            cur.execute("ALTER TABLE saved_charts ADD COLUMN IF NOT EXISTS is_own_chart BOOLEAN DEFAULT FALSE")
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS ai_questions (
                     id SERIAL PRIMARY KEY,
@@ -133,6 +134,28 @@ def init_db():
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_pending_readings_status
                 ON pending_readings(status);
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_predictions (
+                    id SERIAL PRIMARY KEY,
+                    user_id TEXT NOT NULL REFERENCES users(id),
+                    type TEXT NOT NULL,
+                    period_start DATE NOT NULL,
+                    prediction_text TEXT,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    batch_name TEXT,
+                    batch_index INTEGER,
+                    error TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cur.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_user_predictions_unique
+                ON user_predictions(user_id, type, period_start);
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_user_predictions_status
+                ON user_predictions(status);
             """)
             conn.commit()
             cur.close()
@@ -196,7 +219,7 @@ def get_charts(user_id):
     with get_db() as conn:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            """SELECT id, name, input_data, created_at FROM saved_charts
+            """SELECT id, name, input_data, created_at, is_own_chart FROM saved_charts
                WHERE user_id = %s ORDER BY created_at DESC""",
             (user_id,),
         )
@@ -211,6 +234,7 @@ def get_charts(user_id):
             "place": inp.get("place", ""),
             "date": f"{inp.get('year')}-{inp.get('month', ''):02d}-{inp.get('day', ''):02d}" if inp.get("year") else "",
             "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            "is_own_chart": bool(r["is_own_chart"]),
         })
     return results
 
@@ -235,6 +259,7 @@ def get_chart(chart_id, user_id):
         "chart_data": json.loads(row["chart_data"]),
         "reading": reading,
         "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+        "is_own_chart": bool(row.get("is_own_chart")),
     }
 
 
@@ -246,6 +271,41 @@ def delete_chart(chart_id, user_id):
         conn.commit()
         cur.close()
         return deleted > 0
+
+
+def set_own_chart(chart_id, user_id):
+    """Mark chart_id as the user's own chart, clearing any previous selection.
+    If chart_id is None, just clears the flag for all user's charts."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE saved_charts SET is_own_chart = FALSE WHERE user_id = %s",
+            (user_id,),
+        )
+        if chart_id is not None:
+            cur.execute(
+                "UPDATE saved_charts SET is_own_chart = TRUE WHERE id = %s AND user_id = %s",
+                (chart_id, user_id),
+            )
+            updated = cur.rowcount
+        else:
+            updated = 1
+        conn.commit()
+        cur.close()
+        return updated > 0
+
+
+def get_own_chart_id(user_id):
+    """Return the chart_id the user has marked as their own, or None."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT id FROM saved_charts WHERE user_id = %s AND is_own_chart = TRUE LIMIT 1",
+            (user_id,),
+        )
+        row = cur.fetchone()
+        cur.close()
+    return row["id"] if row else None
 
 
 def update_chart_reading(chart_id, user_id, reading):
@@ -472,3 +532,124 @@ def get_ai_history(user_id):
         }
         for r in rows
     ]
+
+
+# ── User Predictions ──────────────────────────────────────────────────────
+
+def get_users_with_own_chart():
+    """Return list of {user_id, chart_id, chart_data} for all users with own chart set."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("""
+            SELECT sc.id as chart_id, sc.user_id, sc.chart_data
+            FROM saved_charts sc
+            WHERE sc.is_own_chart = TRUE
+        """)
+        rows = cur.fetchall()
+        cur.close()
+    return [
+        {"user_id": r["user_id"], "chart_id": r["chart_id"], "chart_data": json.loads(r["chart_data"])}
+        for r in rows
+    ]
+
+
+def insert_user_prediction(user_id, pred_type, period_start):
+    """Insert a pending prediction row. Returns the new id, or None if already exists."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO user_predictions (user_id, type, period_start)
+               VALUES (%s, %s, %s)
+               ON CONFLICT (user_id, type, period_start) DO NOTHING
+               RETURNING id""",
+            (user_id, pred_type, period_start),
+        )
+        row = cur.fetchone()
+        conn.commit()
+        cur.close()
+    return row[0] if row else None
+
+
+def get_pending_predictions():
+    """Return all prediction rows with status 'pending'."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT id, user_id, type, period_start FROM user_predictions WHERE status = 'pending' ORDER BY id"
+        )
+        rows = cur.fetchall()
+        cur.close()
+    return rows
+
+
+def mark_predictions_submitted(prediction_ids, batch_name):
+    """Update predictions to submitted status with batch tracking info."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        for idx, pid in enumerate(prediction_ids):
+            cur.execute(
+                """UPDATE user_predictions
+                   SET status='submitted', batch_name=%s, batch_index=%s
+                   WHERE id=%s""",
+                (batch_name, idx, pid),
+            )
+        conn.commit()
+        cur.close()
+
+
+def get_submitted_predictions():
+    """Return all prediction rows with status 'submitted'."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT id, user_id, type, period_start, batch_name, batch_index "
+            "FROM user_predictions WHERE status = 'submitted' ORDER BY id"
+        )
+        rows = cur.fetchall()
+        cur.close()
+    return rows
+
+
+def complete_prediction(prediction_id, text):
+    """Mark a prediction as completed with its text."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE user_predictions SET status='completed', prediction_text=%s WHERE id=%s",
+            (text, prediction_id),
+        )
+        conn.commit()
+        cur.close()
+
+
+def fail_prediction(prediction_id, error_msg):
+    """Mark a prediction as failed."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE user_predictions SET status='failed', error=%s WHERE id=%s",
+            (error_msg, prediction_id),
+        )
+        conn.commit()
+        cur.close()
+
+
+def get_user_predictions(user_id, week_start_str, month_start_str):
+    """Return completed daily_week, weekly, and monthly predictions for a user."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            """SELECT type, period_start, prediction_text
+               FROM user_predictions
+               WHERE user_id = %s
+                 AND status = 'completed'
+                 AND (
+                   (type = 'daily_week' AND period_start = %s) OR
+                   (type = 'weekly'     AND period_start = %s) OR
+                   (type = 'monthly'    AND period_start = %s)
+                 )""",
+            (user_id, week_start_str, week_start_str, month_start_str),
+        )
+        rows = cur.fetchall()
+        cur.close()
+    return {r["type"]: r["prediction_text"] for r in rows}

@@ -12,7 +12,7 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_cors import CORS
 from authlib.integrations.flask_client import OAuth
-from jyotish_engine import compute_chart, compute_btr, calculate_sadesati, compute_panchang, compute_transits
+from jyotish_engine import compute_chart, compute_btr, calculate_sadesati, compute_panchang, compute_transits, compute_transits_for_date
 from zoneinfo import ZoneInfo
 from datetime import datetime
 from database import (
@@ -21,6 +21,10 @@ from database import (
     get_all_charts_for_backfill, bulk_update_chart_data, get_cached_value, set_cached_value, get_stats,
     create_pending_reading, get_pending_readings_by_status, mark_readings_submitted,
     complete_reading, fail_reading, get_reading_status,
+    set_own_chart, get_own_chart_id,
+    get_users_with_own_chart, insert_user_prediction, get_pending_predictions,
+    mark_predictions_submitted, get_submitted_predictions, complete_prediction,
+    fail_prediction, get_user_predictions,
 )
 
 from pathlib import Path
@@ -389,7 +393,11 @@ def api_me():
             remaining = 25 - get_question_count_today(user["id"])
         except Exception:
             remaining = 25  # Assume full quota if DB is unreachable
-        return jsonify({"user": user, "ai_remaining": max(remaining, 0)})
+        try:
+            own_chart_id = get_own_chart_id(user["id"])
+        except Exception:
+            own_chart_id = None
+        return jsonify({"user": user, "ai_remaining": max(remaining, 0), "own_chart_id": own_chart_id})
     return jsonify({"user": None})
 
 
@@ -467,6 +475,23 @@ def api_update_chart(chart_id):
     if update_chart(chart_id, user_id, input_data, chart_data):
         return jsonify({"message": "Chart updated"})
     return jsonify({"error": "Chart not found"}), 404
+
+
+@app.route("/api/charts/<int:chart_id>/set-own", methods=["PUT"])
+@login_required
+def api_set_own_chart(chart_id):
+    """Mark this chart as the user's own (personal) chart, or unset if already marked."""
+    user_id = session["user"]["id"]
+    # Verify the chart belongs to this user
+    chart = get_chart(chart_id, user_id)
+    if not chart:
+        return jsonify({"error": "Chart not found"}), 404
+    # If already own, toggle off (unset)
+    if chart.get("is_own_chart"):
+        set_own_chart(None, user_id)
+        return jsonify({"message": "Own chart unset", "own_chart_id": None})
+    set_own_chart(chart_id, user_id)
+    return jsonify({"message": "Own chart set", "own_chart_id": chart_id})
 
 
 @app.route("/api/ai-history")
@@ -711,6 +736,357 @@ def api_reading_status(reading_id):
     elif reading["status"] == "failed":
         result["error"] = reading.get("error", "Reading generation failed")
     return jsonify(result)
+
+
+# ── Prediction helpers ────────────────────────────────────────────────────
+
+def _get_week_start(dt=None):
+    """Return the ISO date string for Monday of the current (or given) week."""
+    d = (dt or datetime.now()).date()
+    return (d - timedelta(days=d.weekday())).isoformat()
+
+
+def _get_month_start(dt=None):
+    """Return the ISO date string for the 1st of the current (or given) month."""
+    d = (dt or datetime.now()).date()
+    return d.replace(day=1).isoformat()
+
+
+def _find_current_dasha(dasha):
+    """Return (maha_lord, antar_lord, antar_end_str) for today from dasha data."""
+    today = datetime.now()
+    maha_lord = antar_lord = antar_end = None
+    for m in dasha.get("maha", []):
+        try:
+            if datetime.strptime(m["start"], "%d-%b-%Y") <= today <= datetime.strptime(m["end"], "%d-%b-%Y"):
+                maha_lord = m["lord"]
+                break
+        except Exception:
+            continue
+    if maha_lord and maha_lord in dasha.get("antar", {}):
+        for a in dasha["antar"][maha_lord]:
+            try:
+                if datetime.strptime(a["start"], "%d-%b-%Y") <= today <= datetime.strptime(a["end"], "%d-%b-%Y"):
+                    antar_lord = a["lord"]
+                    antar_end = a["end"]
+                    break
+            except Exception:
+                continue
+    return maha_lord, antar_lord, antar_end
+
+
+def _build_natal_summary(chart_data):
+    """Compact natal chart summary string for prediction prompts."""
+    lagna = chart_data.get("lagna", {})
+    planets = {p["name"]: p for p in chart_data.get("planets", [])}
+    dasha = chart_data.get("dasha", {})
+    sadesati = chart_data.get("sadesati", {})
+
+    moon = planets.get("Moon", {})
+    maha_lord, antar_lord, antar_end = _find_current_dasha(dasha)
+
+    planet_lines = []
+    for name in ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu", "Ketu"]:
+        p = planets.get(name)
+        if p:
+            retro = "(R)" if p.get("retro") else ""
+            planet_lines.append(
+                f"  {name}: {p.get('sign_name','')} H{p.get('house','')} {p.get('nakshatra','')} {retro}".rstrip()
+            )
+
+    lines = [
+        f"Ascendant: {lagna.get('sign_name','')} ({lagna.get('nakshatra','')}; lord: {lagna.get('sign_lord','')})",
+        f"Natal Moon: {moon.get('sign_name','')} – {moon.get('nakshatra','')} nakshatra",
+        "Planets:",
+        *planet_lines,
+    ]
+    if maha_lord:
+        dasha_line = f"Current Dasha: {maha_lord} Mahadasha"
+        if antar_lord:
+            dasha_line += f" → {antar_lord} Antardasha (until {antar_end})"
+        lines.append(dasha_line)
+    if sadesati and sadesati.get("active"):
+        lines.append(
+            f"Sade Sati ACTIVE — Phase: {sadesati.get('phase','')}, Saturn in {sadesati.get('sign','')}"
+        )
+    return "\n".join(lines)
+
+
+def _format_transit_compact(transits):
+    """One-line compact transit summary."""
+    parts = []
+    for t in transits:
+        r = "(R)" if t.get("retrograde") and t["planet"] not in ("Rahu", "Ketu") else ""
+        parts.append(f"{t['planet']}:{t['sign']}{r}")
+    return " | ".join(parts)
+
+
+def _build_daily_week_prompt(natal_summary, week_dates, prompts_config):
+    """Build the 7-day prediction prompt for one user."""
+    template = prompts_config.get("daily_week_prediction", "")
+    day_blocks = []
+    for date_str in week_dates:
+        try:
+            transits = compute_transits_for_date(date_str)
+            panchang = compute_panchang(date_str, "UTC")
+        except Exception as e:
+            logger.warning("Transit/panchang error for %s: %s", date_str, e)
+            transits, panchang = [], {}
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        day_name = dt.strftime("%A")
+        transit_str = _format_transit_compact(transits)
+        p_str = (
+            f"Tithi:{panchang.get('tithi','?')} "
+            f"Nak:{panchang.get('nakshatra','?')} "
+            f"Yoga:{panchang.get('yoga','?')}"
+        )
+        day_blocks.append(f"{day_name} {date_str}: {transit_str} | {p_str}")
+
+    week_range = f"{week_dates[0]} (Mon) to {week_dates[-1]} (Sun)"
+    daily_data = "\n".join(day_blocks)
+    return template.format(natal_summary=natal_summary, week_range=week_range, daily_data=daily_data)
+
+
+def _build_weekly_prompt(natal_summary, week_dates, prompts_config):
+    """Build the single weekly prediction prompt for one user."""
+    template = prompts_config.get("weekly_prediction", "")
+    # Compute transits for Mon, Wed, Sun to capture week arc
+    weekly_lines = []
+    for date_str in [week_dates[0], week_dates[2], week_dates[6]]:
+        try:
+            transits = compute_transits_for_date(date_str)
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            weekly_lines.append(f"{dt.strftime('%A')} {date_str}: {_format_transit_compact(transits)}")
+        except Exception:
+            pass
+    week_range = f"{week_dates[0]} (Mon) to {week_dates[6]} (Sun)"
+    return template.format(
+        natal_summary=natal_summary,
+        week_range=week_range,
+        weekly_transits="\n".join(weekly_lines),
+    )
+
+
+def _build_monthly_prompt(natal_summary, month_start_str, prompts_config):
+    """Build the monthly prediction prompt for one user."""
+    template = prompts_config.get("monthly_prediction", "")
+    from datetime import date as _date
+    import calendar
+    year, month = map(int, month_start_str.split("-")[:2])
+    last_day = calendar.monthrange(year, month)[1]
+    mid_str = f"{year}-{month:02d}-15"
+    end_str = f"{year}-{month:02d}-{last_day}"
+    transit_blocks = []
+    for label, date_str in [("Start", month_start_str), ("Mid", mid_str), ("End", end_str)]:
+        try:
+            transits = compute_transits_for_date(date_str)
+            transit_blocks.append(f"{label} ({date_str}): {_format_transit_compact(transits)}")
+        except Exception:
+            pass
+    month_name = _date(year, month, 1).strftime("%B %Y")
+    return template.format(
+        natal_summary=natal_summary,
+        month_name=month_name,
+        month_transits="\n".join(transit_blocks),
+    )
+
+
+# ── Prediction API endpoints ──────────────────────────────────────────────
+
+@app.route("/api/predictions")
+@login_required
+def api_get_predictions():
+    """Return this user's current daily/weekly/monthly predictions."""
+    user_id = session["user"]["id"]
+    today = datetime.now().date()
+    week_start = _get_week_start()
+    month_start = _get_month_start()
+
+    raw = get_user_predictions(user_id, week_start, month_start)
+
+    # Parse the daily_week JSON array → find today's entry
+    daily_text = None
+    daily_raw = raw.get("daily_week")
+    if daily_raw:
+        try:
+            days = json.loads(daily_raw)
+            today_str = today.isoformat()
+            for entry in days:
+                if entry.get("date") == today_str:
+                    daily_text = entry.get("text")
+                    break
+        except Exception:
+            pass
+
+    own_chart_id = get_own_chart_id(user_id)
+    return jsonify({
+        "daily": daily_text,
+        "weekly": raw.get("weekly"),
+        "monthly": raw.get("monthly"),
+        "week_start": week_start,
+        "month_start": month_start,
+        "own_chart_id": own_chart_id,
+    })
+
+
+@app.route("/api/cron/submit-predictions", methods=["POST"])
+def cron_submit_predictions():
+    """Generate and submit prediction batch for all users with own chart set.
+
+    Query params:
+      type: 'daily_week' | 'weekly' | 'monthly'  (default: all three)
+    """
+    secret = request.headers.get("X-Cron-Secret", "")
+    if secret != os.environ.get("CRON_SECRET", os.environ.get("BACKFILL_SECRET", "")):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    pred_type = request.args.get("type")  # None means all
+    types_to_run = [pred_type] if pred_type else ["daily_week", "weekly", "monthly"]
+
+    users = get_users_with_own_chart()
+    if not users:
+        return jsonify({"submitted": 0, "message": "No users with own chart"})
+
+    prompts_config = load_prompts()
+
+    # Calculate period dates
+    now = datetime.now()
+    week_start = _get_week_start(now)
+    month_start = _get_month_start(now)
+    week_dates = [
+        (datetime.strptime(week_start, "%Y-%m-%d") + timedelta(days=i)).strftime("%Y-%m-%d")
+        for i in range(7)
+    ]
+
+    # Build prompts and insert pending rows
+    pending_rows = []  # list of (db_id, prompt_text)
+    for u in users:
+        natal_summary = _build_natal_summary(u["chart_data"])
+        for t in types_to_run:
+            period = week_start if t in ("daily_week", "weekly") else month_start
+            # Skip if already exists (unique constraint returns None)
+            db_id = insert_user_prediction(u["user_id"], t, period)
+            if db_id is None:
+                continue  # already generated this period
+            if t == "daily_week":
+                prompt = _build_daily_week_prompt(natal_summary, week_dates, prompts_config)
+            elif t == "weekly":
+                prompt = _build_weekly_prompt(natal_summary, week_dates, prompts_config)
+            else:
+                prompt = _build_monthly_prompt(natal_summary, month_start, prompts_config)
+            pending_rows.append((db_id, prompt))
+
+    if not pending_rows:
+        return jsonify({"submitted": 0, "message": "All predictions already generated for this period"})
+
+    from google import genai
+    from google.genai.types import HttpOptions
+
+    client = genai.Client(
+        api_key=os.environ.get("GEMINI_API_KEY"),
+        http_options=HttpOptions(timeout=60_000),
+    )
+    model_name = prompts_config.get("batch_model", prompts_config.get("model", "gemini-2.5-flash"))
+
+    BATCH_SIZE = 500
+    total_submitted = 0
+
+    for chunk_start in range(0, len(pending_rows), BATCH_SIZE):
+        chunk = pending_rows[chunk_start:chunk_start + BATCH_SIZE]
+        inline_requests = [
+            {"contents": [{"parts": [{"text": prompt}], "role": "user"}]}
+            for _, prompt in chunk
+        ]
+        db_ids = [db_id for db_id, _ in chunk]
+        try:
+            batch_job = client.batches.create(
+                model=model_name,
+                src=inline_requests,
+                config={"display_name": f"predictions-{now.strftime('%Y%m%d-%H%M%S')}-{chunk_start}"},
+            )
+            mark_predictions_submitted(db_ids, batch_job.name)
+            total_submitted += len(chunk)
+        except Exception as e:
+            logger.error("Prediction batch submit failed: %s", e)
+            for db_id in db_ids:
+                fail_prediction(db_id, str(e))
+
+    return jsonify({"submitted": total_submitted, "users": len(users)})
+
+
+@app.route("/api/cron/check-predictions", methods=["POST"])
+def cron_check_predictions():
+    """Poll submitted prediction batches and store completed results."""
+    secret = request.headers.get("X-Cron-Secret", "")
+    if secret != os.environ.get("CRON_SECRET", os.environ.get("BACKFILL_SECRET", "")):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    submitted = get_submitted_predictions()
+    if not submitted:
+        return jsonify({"checked": 0, "completed": 0})
+
+    from google import genai
+    from google.genai.types import HttpOptions
+
+    client = genai.Client(
+        api_key=os.environ.get("GEMINI_API_KEY"),
+        http_options=HttpOptions(timeout=60_000),
+    )
+
+    # Group by batch_name
+    batches = {}
+    for r in submitted:
+        if r.get("batch_name"):
+            batches.setdefault(r["batch_name"], []).append(r)
+
+    completed_count = 0
+    failed_count = 0
+
+    for batch_name, preds in batches.items():
+        try:
+            batch_job = client.batches.get(name=batch_name)
+        except Exception as e:
+            logger.error("Failed to fetch prediction batch %s: %s", batch_name, e)
+            continue
+
+        state = batch_job.state.name if hasattr(batch_job.state, "name") else str(batch_job.state)
+        if state not in ("JOB_STATE_SUCCEEDED", "SUCCEEDED"):
+            if state in ("JOB_STATE_FAILED", "FAILED"):
+                for p in preds:
+                    fail_prediction(p["id"], "Batch job failed")
+                    failed_count += 1
+            continue
+
+        responses = batch_job.dest.inlined_responses if batch_job.dest else []
+        preds_sorted = sorted(preds, key=lambda r: r.get("batch_index") or 0)
+
+        for i, p in enumerate(preds_sorted):
+            try:
+                resp = responses[i] if i < len(responses) else None
+                if not resp or not resp.response:
+                    fail_prediction(p["id"], "No response from batch")
+                    failed_count += 1
+                    continue
+
+                result_text = resp.response.text.strip()
+                # Strip markdown fences if present
+                if result_text.startswith("```"):
+                    result_text = result_text.split("\n", 1)[1] if "\n" in result_text else result_text[3:]
+                    if result_text.endswith("```"):
+                        result_text = result_text[:-3].strip()
+
+                # daily_week expects a JSON array; weekly/monthly are plain text
+                if p["type"] == "daily_week":
+                    json.loads(result_text)  # validate JSON; raises if invalid
+
+                complete_prediction(p["id"], result_text)
+                completed_count += 1
+            except Exception as e:
+                logger.error("Failed to process prediction %s: %s", p["id"], e)
+                fail_prediction(p["id"], str(e))
+                failed_count += 1
+
+    return jsonify({"checked": len(submitted), "completed": completed_count, "failed": failed_count})
 
 
 @app.route("/api/cron/submit-readings", methods=["POST"])
@@ -1046,8 +1422,10 @@ def api_ask():
     if not data:
         return jsonify({"error": "No JSON body provided"}), 400
 
+    initial_reading = data.get("initial_reading", False)
+
     question = (data.get("question") or "").strip()
-    if not question:
+    if not question and not initial_reading:
         return jsonify({"error": "Question is required"}), 400
     if len(question) > 500:
         return jsonify({"error": "Question too long (max 500 characters)"}), 400
@@ -1067,8 +1445,6 @@ def api_ask():
 
     # Ensure user exists in DB
     upsert_user(user_id, user.get("email", ""), user.get("name", ""), user.get("picture", ""))
-
-    initial_reading = data.get("initial_reading", False)
     chart_id = data.get("chart_id")  # optional: cache reading back to saved chart
 
     try:

@@ -1736,6 +1736,39 @@ def compute_panchang(date_str, tz_str="UTC"):
     }
 
 
+def compute_transits_for_date(date_str):
+    """Return sidereal positions of all 9 grahas for a given date (noon UTC)."""
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
+    year, month, day = map(int, date_str.split("-"))
+    jd = swe.julday(year, month, day, 12.0)
+
+    result = []
+    for name, pid in PLANETS.items():
+        lon, speed = get_sidereal_pos(jd, pid)
+        sign_idx = lon_to_sign(lon)
+        nak_idx, pada = lon_to_nakshatra(lon)
+        result.append({
+            "planet": name, "abbr": ABBR[name],
+            "sign": SIGNS[sign_idx], "sign_idx": sign_idx,
+            "deg_in_sign": round(lon % 30, 1),
+            "nakshatra": NAKSHATRAS[nak_idx], "nakshatra_pada": pada,
+            "retrograde": speed < 0,
+        })
+
+    rahu_lon, ketu_lon = get_rahu_ketu(jd)
+    for name, lon in [("Rahu", rahu_lon), ("Ketu", ketu_lon)]:
+        sign_idx = lon_to_sign(lon)
+        nak_idx, pada = lon_to_nakshatra(lon)
+        result.append({
+            "planet": name, "abbr": ABBR[name],
+            "sign": SIGNS[sign_idx], "sign_idx": sign_idx,
+            "deg_in_sign": round(lon % 30, 1),
+            "nakshatra": NAKSHATRAS[nak_idx], "nakshatra_pada": pada,
+            "retrograde": True,
+        })
+    return result
+
+
 def compute_transits():
     """Return current sidereal positions of all 9 grahas."""
     from zoneinfo import ZoneInfo
