@@ -417,12 +417,17 @@ def api_save_chart():
     if not input_data or not chart_data:
         return jsonify({"error": "Missing input_data or chart_data"}), 400
 
+    is_own = data.get("is_own", False)
+
     user = session["user"]
     user_id = user["id"]
     upsert_user(user_id, user.get("email", ""), user.get("name", ""), user.get("picture", ""))
     chart_id, error = save_chart(user_id, name, input_data, chart_data)
     if error:
         return jsonify({"error": error}), 400
+
+    if is_own:
+        set_own_chart(user_id, chart_id)
 
     return jsonify({"id": chart_id, "message": "Chart saved"})
 
@@ -482,15 +487,13 @@ def api_update_chart(chart_id):
 def api_set_own_chart(chart_id):
     """Mark this chart as the user's own (personal) chart, or unset if already marked."""
     user_id = session["user"]["id"]
-    # Verify the chart belongs to this user
     chart = get_chart(chart_id, user_id)
     if not chart:
         return jsonify({"error": "Chart not found"}), 404
-    # If already own, toggle off (unset)
     if chart.get("is_own_chart"):
-        set_own_chart(None, user_id)
+        set_own_chart(user_id, None)
         return jsonify({"message": "Own chart unset", "own_chart_id": None})
-    set_own_chart(chart_id, user_id)
+    set_own_chart(user_id, chart_id)
     return jsonify({"message": "Own chart set", "own_chart_id": chart_id})
 
 
