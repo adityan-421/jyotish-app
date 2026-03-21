@@ -2070,14 +2070,8 @@ function buildDiamond(c, idx) {
       svg += '<text x="' + pos.sx + '" y="' + (pos.sy - 11) + '" text-anchor="middle" font-family="Inter,sans-serif" font-size="7.5" fill="#FF6B00" font-weight="700" letter-spacing="0.5">ASC</text>';
     }
     if (c.al === h) {
-      var TRIANGLE_AL = {3:{x:18,y:22}, 5:{x:18,y:185}, 9:{x:322,y:185}, 11:{x:322,y:22}};
-      var alPos = TRIANGLE_AL[h];
-      if (alPos) {
-        svg += '<text x="' + alPos.x + '" y="' + alPos.y + '" text-anchor="middle" font-family="Inter,sans-serif" font-size="8.5" fill="#FF6B00" font-weight="700" font-style="italic">AL</text>';
-      } else {
-        var alX = pos.sx > 170 ? pos.sx - 22 : pos.sx + 22;
-        svg += '<text x="' + alX + '" y="' + pos.sy + '" text-anchor="middle" font-family="Inter,sans-serif" font-size="8.5" fill="#FF6B00" font-weight="700" font-style="italic">AL</text>';
-      }
+      var alX = pos.sx < 170 ? pos.sx + 16 : (pos.sx > 170 ? pos.sx - 16 : pos.sx + 22);
+      svg += '<text x="' + alX + '" y="' + pos.sy + '" text-anchor="middle" font-family="Inter,sans-serif" font-size="8.5" fill="#FF6B00" font-weight="700" font-style="italic">AL</text>';
     }
     svg += renderPlanetGroup(c.planets[h], pos, id, h);
   }
