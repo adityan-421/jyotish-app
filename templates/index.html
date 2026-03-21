@@ -3171,21 +3171,32 @@ function loadMyCharts() {
         document.getElementById("panelBody").innerHTML = '<div class="panel-empty">No saved charts yet. Generate a chart and click "Save Chart" to save it.</div>';
         return;
       }
+      // Sort: own chart first, then rest in original order
+      var charts = data.charts.slice().sort(function(a, b) {
+        if (a.is_own_chart && !b.is_own_chart) return -1;
+        if (!a.is_own_chart && b.is_own_chart) return 1;
+        return 0;
+      });
       var html = '';
-      data.charts.forEach(function(c) {
-        var ownLabel = c.is_own ? '<span style="color:#FF6B00;font-size:0.85rem;margin-left:0.4rem;" title="My birth chart">&#9733;</span>' : '';
-        var ownBtn = c.is_own
-          ? '<button class="btn-own active" onclick="clearOwnChart()" title="Remove as my chart" style="color:#FF6B00;font-weight:700;">&#9733; My Chart</button>'
+      charts.forEach(function(c) {
+        var ownBanner = c.is_own_chart
+          ? '<div style="background:#FF6B00;color:#fff;font-size:0.75rem;font-weight:600;padding:4px 12px;letter-spacing:0.02em;">&#9733;&nbsp; My Chart &mdash; Used for Daily Predictions</div>'
+          : '';
+        var ownBtn = c.is_own_chart
+          ? '<button class="btn-own active" onclick="setOwnChart(' + c.id + ')" title="Remove as my chart" style="color:#FF6B00;font-weight:700;">&#9733; My Chart</button>'
           : '<button class="btn-own" onclick="setOwnChart(' + c.id + ')" title="Set as my birth chart" style="color:#999;">&#9734; Set as Mine</button>';
-        html += '<div class="saved-chart-item">' +
-          '<div class="saved-chart-name">' + escHtml(c.name) + ownLabel + '</div>' +
+        var nameStyle = c.is_own_chart ? ' style="color:#FF6B00;"' : '';
+        html += '<div class="saved-chart-item" style="overflow:hidden;">' +
+          ownBanner +
+          '<div style="padding:10px 12px;">' +
+          '<div class="saved-chart-name"' + nameStyle + '>' + escHtml(c.name) + '</div>' +
           '<div class="saved-chart-meta">' + escHtml(c.place || "Unknown place") + ' &middot; ' + escHtml(c.date || "") + '</div>' +
           '<div class="saved-chart-actions">' +
             ownBtn +
             '<button class="btn-load" onclick="loadSavedChart(' + c.id + ')">Load</button>' +
             '<button class="btn-edit" onclick="editSavedChart(' + c.id + ',\'' + escAttr(c.name) + '\')">Edit</button>' +
             '<button class="btn-delete" onclick="deleteSavedChart(' + c.id + ',\'' + escAttr(c.name) + '\')">Delete</button>' +
-          '</div></div>';
+          '</div></div></div>';
       });
       document.getElementById("panelBody").innerHTML = html;
     })
@@ -3294,17 +3305,7 @@ function setOwnChart(id) {
       if (data.error) { alert(data.error); return; }
       loadMyCharts();
     })
-    .catch(function(err) { alert("Failed to set: " + err.message); });
-}
-
-function clearOwnChart() {
-  fetch("/api/charts/clear-own", { method: "PUT" })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.error) { alert(data.error); return; }
-      loadMyCharts();
-    })
-    .catch(function(err) { alert("Failed to clear: " + err.message); });
+    .catch(function(err) { alert("Failed to update: " + err.message); });
 }
 
 // ═══════════════════════════════════════════════════════════════════
