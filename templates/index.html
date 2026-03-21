@@ -429,6 +429,35 @@ footer strong { color: #FF6B00; }
 
 #chartContent { display: none; }
 
+#chartNav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0 0.25rem;
+}
+#homeBtn {
+  background: none;
+  border: 1px solid #FF6B00;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #FF6B00;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.3rem 0.75rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+#homeBtn:hover { background: rgba(255,107,0,0.08); }
+#chartPersonName {
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #2d1a00;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Auth UI */
 .header-auth { display: flex; align-items: center; gap: 0.75rem; }
 .google-btn {
@@ -1151,7 +1180,7 @@ footer strong { color: #FF6B00; }
 <div class="container">
 
 <!-- Input Form -->
-<div class="card accent-purple">
+<div class="card accent-purple" id="inputFormCard">
   <div class="card-header"><h2>Birth Data Input</h2></div>
   <div class="card-body">
     <div class="input-form" id="inputForm">
@@ -1298,6 +1327,11 @@ footer strong { color: #FF6B00; }
 <!-- All chart content sections (hidden until data loads) -->
 <div id="chartContent">
 
+<div id="chartNav">
+  <button id="homeBtn" onclick="showHome()">&#8592; New Chart</button>
+  <span id="chartPersonName"></span>
+</div>
+
 <div class="tab-bar">
   <button class="tab-btn active" data-tab="summary" onclick="switchTab('summary')">Summary</button>
   <button class="tab-btn" data-tab="charts" onclick="switchTab('charts')">Vargas</button>
@@ -1311,7 +1345,7 @@ footer strong { color: #FF6B00; }
 <div class="tab-pane active" id="tab-summary">
 
 <div class="card accent-purple">
-  <div class="card-header"><h2>Birth Data</h2></div>
+  <div class="card-header"><h2 id="birthDataCardTitle">Birth Data</h2></div>
   <div class="card-body"><div class="kv-grid" id="birthDataGrid"></div></div>
 </div>
 
@@ -1695,6 +1729,7 @@ function fetchChart() {
       return;
     }
     chartData = data;
+    _loadedChartName = '';
     renderAll(data);
     showChartContent();
     if (currentUser) document.getElementById("saveBtn").style.display = "block";
@@ -3029,6 +3064,7 @@ var _editingChartId = null;
 var _editingChartName = '';
 var currentSavedChartId = null;
 var _cachedReadingData = null;
+var _loadedChartName = '';
 
 function checkAuth() {
   fetch("/api/me")
@@ -3280,6 +3316,7 @@ function loadSavedChart(id) {
       lastInputPayload = inp;
       currentSavedChartId = data.id;
       _cachedReadingData = data.reading || null;
+      _loadedChartName = data.name || '';
       renderAll(chartData);
       showChartContent();
       closeMyCharts();
@@ -4453,8 +4490,25 @@ function renderMonthCalendar(data, year, month) {
 function showChartContent() {
   var lp = document.getElementById("landingPage");
   var cc = document.getElementById("chartContent");
+  var ifc = document.getElementById("inputFormCard");
   if (lp) lp.style.display = "none";
+  if (ifc) ifc.style.display = "none";
   if (cc) { cc.style.display = "flex"; cc.style.flexDirection = "column"; cc.style.gap = "1.25rem"; }
+  var nameEl = document.getElementById("chartPersonName");
+  var titleEl = document.getElementById("birthDataCardTitle");
+  if (nameEl) nameEl.textContent = _loadedChartName || '';
+  if (titleEl) titleEl.textContent = _loadedChartName || 'Birth Data';
+}
+
+function showHome() {
+  var lp = document.getElementById("landingPage");
+  var cc = document.getElementById("chartContent");
+  var ifc = document.getElementById("inputFormCard");
+  if (cc) cc.style.display = "none";
+  if (ifc) ifc.style.display = "";
+  if (lp) lp.style.display = "flex";
+  _loadedChartName = '';
+  currentSavedChartId = null;
 }
 
 // Load landing data on page load
