@@ -1361,13 +1361,13 @@ footer strong { color: #FF6B00; }
   <div class="card-header"><h2>Charts</h2><span class="sub">Rashi & Navamsha</span></div>
   <div class="card-body">
     <div class="chart-legend">
-      <div class="legend-item"><span class="legend-sym">🌟</span> Exalted (Uchcha)</div>
-      <div class="legend-item"><span class="legend-sym">💔</span> Debilitated (Neecha)</div>
-      <div class="legend-item"><span class="legend-sym">💎</span> Moolatrikona</div>
-      <div class="legend-item"><span class="legend-sym">⚠️</span> Maranakarak Sthana</div>
-      <div class="legend-item"><span class="legend-sym">🔄</span> Retrograde</div>
-      <div class="legend-item"><span class="legend-sym">🔥</span> Combust</div>
-      <div class="legend-item"><span class="legend-sym">🔶</span> Vargottama</div>
+      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#2ECC40;vertical-align:middle;"></span> Exalted (Uchcha)</div>
+      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#E53935;vertical-align:middle;"></span> Debilitated (Neecha)</div>
+      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#FF6B00;vertical-align:middle;"></span> Moolatrikona</div>
+      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#FFD700;vertical-align:middle;border:1px solid #ccc;"></span> Maranakarak Sthana</div>
+      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1a1a1a;vertical-align:middle;"></span> Retrograde</div>
+      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#8B0000;vertical-align:middle;"></span> Combust</div>
+      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#9C27B0;vertical-align:middle;"></span> Vargottama</div>
       <div class="legend-item"><span style="font-weight:700;font-size:0.9rem;color:#FF6B00;">AL</span> Arudha Lagna</div>
     </div>
     <div class="charts-grid" id="summaryChartsGrid" style="grid-template-columns: repeat(2, 1fr);"></div>
@@ -1413,13 +1413,13 @@ footer strong { color: #FF6B00; }
   <div class="card-header"><h2>Charts</h2><span class="sub">North Indian Diamond &mdash; D1, D9, D2, D3, D7, D10, D12, D20, D60</span></div>
   <div class="card-body">
     <div class="chart-legend">
-      <div class="legend-item"><span class="legend-sym">🌟</span> Exalted (Uchcha)</div>
-      <div class="legend-item"><span class="legend-sym">💔</span> Debilitated (Neecha)</div>
-      <div class="legend-item"><span class="legend-sym">💎</span> Moolatrikona</div>
-      <div class="legend-item"><span class="legend-sym">⚠️</span> Maranakarak Sthana</div>
-      <div class="legend-item"><span class="legend-sym">🔄</span> Retrograde</div>
-      <div class="legend-item"><span class="legend-sym">🔥</span> Combust</div>
-      <div class="legend-item"><span class="legend-sym">🔶</span> Vargottama</div>
+      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#2ECC40;vertical-align:middle;"></span> Exalted (Uchcha)</div>
+      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#E53935;vertical-align:middle;"></span> Debilitated (Neecha)</div>
+      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#FF6B00;vertical-align:middle;"></span> Moolatrikona</div>
+      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#FFD700;vertical-align:middle;border:1px solid #ccc;"></span> Maranakarak Sthana</div>
+      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1a1a1a;vertical-align:middle;"></span> Retrograde</div>
+      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#8B0000;vertical-align:middle;"></span> Combust</div>
+      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#9C27B0;vertical-align:middle;"></span> Vargottama</div>
       <div class="legend-item"><span style="font-weight:700;font-size:0.9rem;color:#FF6B00;">AL</span> Arudha Lagna</div>
     </div>
     <div class="charts-grid" id="chartsGrid" style="grid-template-columns: repeat(2, 1fr);"></div>
@@ -2041,8 +2041,8 @@ var DIGNITY_EMOJIS = new Set(["\uD83C\uDF1F","\uD83D\uDC94","\uD83D\uDC8E","\u26
 
 // Status dot colors for pure-SVG planet labels
 var STATUS_DOT_COLORS = {
-  exalted:'#2ECC40', debilitated:'#E53935', moolatrikona:'#3366FF',
-  mks:'#FF6B00', retrograde:'#888888', combust:'#FF4500', vargottama:'#9C27B0'
+  exalted:'#2ECC40', debilitated:'#E53935', moolatrikona:'#FF6B00',
+  mks:'#FFD700', retrograde:'#1a1a1a', combust:'#8B0000', vargottama:'#9C27B0'
 };
 // Map dignity emoji → status key
 var DIGNITY_TO_STATUS = {
