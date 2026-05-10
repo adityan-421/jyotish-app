@@ -239,6 +239,28 @@ tbody tr:hover { background: var(--surface-2); }
 .drishti-tip .src-lbl { color: #fff5e0; }
 .drishti-tip .asp-lbl { color: #d4956a; }
 
+/* Planet status tooltip */
+.planet-tip {
+  position: fixed;
+  background: rgba(45,26,0,0.93);
+  color: #fff;
+  padding: 0.35rem 0.7rem;
+  border-radius: 7px;
+  font-size: 0.72rem;
+  pointer-events: none;
+  z-index: 201;
+  display: none;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.3);
+  backdrop-filter: blur(4px);
+  white-space: nowrap;
+}
+.planet-tip .pt-name { font-weight: 700; color: #ffd54f; margin-right: 0.3rem; }
+.planet-tip .pt-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  vertical-align: middle; margin-right: 3px;
+}
+.planet-tip .pt-flag { margin-right: 0.4rem; }
+
 /* Dasha */
 .dasha-info { font-size: 0.8rem; color: var(--text-2); margin-bottom: 1rem; }
 .dasha-info strong { color: #FF6B00; }
@@ -1611,6 +1633,7 @@ footer strong { color: #FF6B00; }
 
 <div class="loading-overlay" id="loadingOverlay"><div class="loading-spinner"></div></div>
 <div class="drishti-tip" id="drishtiTip"></div>
+<div class="planet-tip" id="planetTip"></div>
 
 <!-- My Charts Panel -->
 <div class="charts-overlay" id="chartsOverlay" onclick="closeMyCharts()"></div>
@@ -2092,14 +2115,10 @@ function renderPlanetSVG(planet, x, y, fs) {
   if (_currentChartCombust.indexOf(baseName) >= 0) statuses.push('combust');
   if (_currentChartVargottama.indexOf(baseName) >= 0) statuses.push('vargottama');
 
-  // Tooltip text
-  var tipParts = [baseName];
-  statuses.forEach(function(s) { tipParts.push(DIGNITY_LABEL[s]); });
-  var tipSafe = tipParts.join(' \u00b7 ')
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  // Build encoded tip string: "PlanetName:status1:status2:..."
+  var encoded = [baseName].concat(statuses).join(':');
 
-  var svg = '<g>';
-  svg += '<title>' + tipSafe + '</title>';
+  var svg = '<g onmouseenter="showPlanetTip(event,\'' + encoded + '\')" onmouseleave="hidePlanetTip()" style="cursor:default;">';
 
   // Planet abbreviation
   svg += '<text x="' + x + '" y="' + y + '" text-anchor="middle"' +
@@ -2317,6 +2336,49 @@ function hideDrishti(chartId) {
     if (lbl) lbl.setAttribute('display', 'none');
   }
   document.getElementById('drishtiTip').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PLANET STATUS TOOLTIP
+// ═══════════════════════════════════════════════════════════════════
+
+// Encoded as "PlanetName:status1:status2:..." — colon-separated
+var PT_DOT_COLORS = {
+  exalted:'#2ECC40', debilitated:'#E53935', moolatrikona:'#FF6B00',
+  mks:'#FFD700', retrograde:'#1a1a1a', combust:'#8B0000', vargottama:'#9C27B0'
+};
+var PT_LABELS = {
+  exalted:'Exalted', debilitated:'Debilitated', moolatrikona:'Moolatrikona',
+  mks:'Marana Karaka Sthana', retrograde:'Retrograde', combust:'Combust', vargottama:'Vargottama'
+};
+
+function showPlanetTip(event, encoded) {
+  var parts = encoded.split(':');
+  var name = parts[0];
+  var statuses = parts.slice(1);
+  var tip = document.getElementById('planetTip');
+  var html = '<span class="pt-name">' + name + '</span>';
+  statuses.forEach(function(s) {
+    if (!PT_LABELS[s]) return;
+    var border = s === 'retrograde' ? ' border:1px solid #555;' : '';
+    html += '<span class="pt-flag">' +
+      '<span class="pt-dot" style="background:' + PT_DOT_COLORS[s] + ';' + border + '"></span>' +
+      PT_LABELS[s] + '</span>';
+  });
+  tip.innerHTML = html;
+  tip.style.display = 'block';
+  tip.style.left = (event.clientX + 12) + 'px';
+  tip.style.top = (event.clientY - 10) + 'px';
+  // Keep within viewport
+  setTimeout(function() {
+    var r = tip.getBoundingClientRect();
+    if (r.right > window.innerWidth - 8) tip.style.left = (event.clientX - r.width - 8) + 'px';
+    if (r.bottom > window.innerHeight - 8) tip.style.top = (event.clientY - r.height - 4) + 'px';
+  }, 0);
+}
+
+function hidePlanetTip() {
+  document.getElementById('planetTip').style.display = 'none';
 }
 
 // ═══════════════════════════════════════════════════════════════════
