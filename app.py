@@ -14,7 +14,7 @@ from flask_cors import CORS
 from authlib.integrations.flask_client import OAuth
 from jyotish_engine import compute_chart, compute_btr, calculate_sadesati, compute_panchang, compute_transits, compute_transits_for_date
 from zoneinfo import ZoneInfo
-from datetime import datetime
+from datetime import datetime, timedelta
 from database import (
     init_db, reset_pool, upsert_user, save_chart, get_charts, get_chart, delete_chart,
     update_chart, update_chart_reading, count_charts, get_question_count_today, save_ai_question, get_ai_history,
@@ -25,6 +25,7 @@ from database import (
     get_users_with_own_chart, insert_user_prediction, get_pending_predictions,
     mark_predictions_submitted, get_submitted_predictions, complete_prediction,
     fail_prediction, get_user_predictions,
+    upsert_push_token, get_users_with_push_tokens_and_charts,
 )
 
 from pathlib import Path
@@ -91,34 +92,48 @@ def _run_prompt_chain(model, steps, variables, default_thinking_budget=None):
             }
 
         response = model.generate_content(prompt_text, **gen_kwargs)
+        # Build result_text from non-thinking parts only.
+        result_text = ""
         try:
-            result_text = response.text.strip()
-        except ValueError:
-            # Gemini raises ValueError when finish_reason != STOP (e.g. RECITATION, MAX_TOKENS).
-            # The content is still present in candidates — extract it directly.
-            result_text = ""
-            try:
-                for part in response.candidates[0].content.parts:
-                    if hasattr(part, "text") and part.text:
-                        result_text += part.text
-            except Exception:
-                pass
+            for part in response.candidates[0].content.parts:
+                if getattr(part, "thought", False):
+                    continue
+                if hasattr(part, "text") and part.text:
+                    result_text += part.text
             result_text = result_text.strip()
-            if not result_text:
+        except Exception:
+            pass
+        if not result_text:
+            try:
+                result_text = response.text.strip()
+            except ValueError:
                 raise
+
+        logger.info("PROMPT_CHAIN step=%s response_len=%d result_text_preview=%r",
+                    step.get("name"), len(result_text), result_text[:300])
 
         # Process response based on type
         if step["response_type"] == "json":
-            # Strip markdown code fences if present
+            # Find the start of the first JSON object or array, then use
+            # raw_decode to parse exactly that object and ignore any trailing
+            # text (e.g. thinking output that appears after the JSON).
             cleaned = result_text
-            if cleaned.startswith("```"):
-                cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
-                if cleaned.endswith("```"):
-                    cleaned = cleaned[:-3].strip()
-            try:
-                result = json.loads(cleaned)
-            except json.JSONDecodeError:
-                result = step.get("json_fallback", {})
+            obj_start = -1
+            for i, ch in enumerate(cleaned):
+                if ch in ('{', '['):
+                    obj_start = i
+                    break
+            result = step.get("json_fallback", {})
+            if obj_start != -1:
+                try:
+                    result, _ = json.JSONDecoder().raw_decode(cleaned, obj_start)
+                except json.JSONDecodeError as je:
+                    logger.error("PROMPT_CHAIN json_decode_error step=%s err=%s preview=%r",
+                                 step.get("name"), je, cleaned[obj_start:obj_start + 300])
+                    result = step.get("json_fallback", {})
+            else:
+                logger.error("PROMPT_CHAIN no_json_found step=%s preview=%r",
+                             step.get("name"), cleaned[:300])
             variables[step["output_var"]] = result
         else:
             result = result_text
@@ -932,6 +947,116 @@ def api_get_predictions():
     })
 
 
+@app.route("/api/push-token", methods=["POST"])
+@login_required
+def api_register_push_token():
+    user = get_current_user()
+    token = (request.json or {}).get("token", "").strip()
+    if not token:
+        return jsonify({"error": "token required"}), 400
+    upsert_push_token(user["id"], token)
+    return jsonify({"ok": True})
+
+
+SIGNS_LIST = [
+    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+]
+
+
+def _generate_daily_notification(chart_data, panchang, transits):
+    """Call Gemini to produce a 3-line daily notification."""
+    lagna_sign = SIGNS_LIST[chart_data.get("lagna_sign", 1) - 1]
+
+    moon_sign = ""
+    for p in chart_data.get("planets", []):
+        if p.get("abbr") == "Mo":
+            moon_sign = p.get("sign_name", "")
+            break
+
+    dasha = chart_data.get("dasha", {})
+    maha_lord, antar_lord, _ = _find_current_dasha(dasha)
+
+    key_transits = ", ".join(
+        f"{t['planet']} in {t['sign']}"
+        for t in transits
+        if t["planet"] in ("Saturn", "Jupiter", "Mars", "Rahu")
+    )
+
+    vara = panchang.get("vara", "")
+    vara_lord = panchang.get("vara_lord", "")
+    nakshatra = panchang.get("nakshatra", "")
+    tithi = panchang.get("tithi", "")
+
+    prompt = (
+        f"You are a Vedic astrology daily guide. Give a concise personalized daily reading.\n\n"
+        f"NATAL CHART: Lagna {lagna_sign}, Moon in {moon_sign}, "
+        f"Maha Dasha {maha_lord} / Antar Dasha {antar_lord}\n"
+        f"TODAY'S PANCHANG: {vara} (lord: {vara_lord}), Nakshatra {nakshatra}, Tithi {tithi}\n"
+        f"KEY TRANSITS: {key_transits}\n\n"
+        f"Respond with EXACTLY 3 lines, nothing else:\n"
+        f"Line 1: Lucky color to wear today and a brief reason (under 10 words)\n"
+        f"Line 2: Mantra to chant with repetition count (e.g. Om Budhaya Namah — 17x)\n"
+        f"Line 3: One specific thing to be watchful about today (under 12 words)\n\n"
+        f"No line numbers, no labels, no preamble. Plain text only."
+    )
+
+    from google import genai as _genai
+    client = _genai.Client(api_key=os.environ.get("GEMINI_API_KEY", ""))
+    response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+    return response.text.strip()
+
+
+@app.route("/api/cron/daily-notifications", methods=["POST"])
+def cron_daily_notifications():
+    """Generate and send daily push notifications to all users with a personal chart."""
+    try:
+        users = get_users_with_push_tokens_and_charts()
+    except Exception as e:
+        logger.error("Failed to fetch users for notifications: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+    panchang = compute_panchang()
+    transits = compute_transits()
+
+    expo_messages = []
+    sent = errors = 0
+
+    for row in users:
+        try:
+            chart_data = json.loads(row["chart_data"]) if isinstance(row["chart_data"], str) else row["chart_data"]
+            text = _generate_daily_notification(chart_data, panchang, transits)
+            lines = [l.strip() for l in text.splitlines() if l.strip()]
+            body = "\n".join(lines[:3])
+
+            for token in (row["push_tokens"] or []):
+                if token and token.startswith("ExponentPushToken"):
+                    expo_messages.append({
+                        "to": token,
+                        "title": "Your Daily Reading \u2726",
+                        "body": body,
+                        "sound": "default",
+                        "channelId": "daily-reading",
+                    })
+            sent += 1
+        except Exception as e:
+            logger.error("Notification error for user %s: %s", row["user_id"], e)
+            errors += 1
+
+    if expo_messages:
+        try:
+            http_requests.post(
+                "https://exp.host/--/api/v2/push/send",
+                json=expo_messages,
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+                timeout=30,
+            )
+        except Exception as e:
+            logger.error("Expo push send error: %s", e)
+
+    return jsonify({"sent": sent, "errors": errors, "push_count": len(expo_messages)})
+
+
 @app.route("/api/cron/submit-predictions", methods=["POST"])
 def cron_submit_predictions():
     """Generate and submit prediction batch for all users with own chart set.
@@ -1454,9 +1579,15 @@ def api_ask():
         prompts_config = load_prompts()
 
         if initial_reading and "initial_reading_steps" in prompts_config:
-            # Queue initial reading for batch processing (50% cheaper)
-            import uuid
-            reading_id = str(uuid.uuid4())
+            # Run initial reading synchronously via Vertex AI
+            import vertexai
+            from vertexai.generative_models import GenerativeModel
+
+            project_id = os.environ.get("GCP_PROJECT", "grahalogic")
+            location = os.environ.get("GCP_LOCATION", "us-central1")
+            vertexai.init(project=project_id, location=location)
+
+            model = GenerativeModel(prompts_config.get("model", "gemini-2.5-flash"))
 
             full_chart = dict(chart_data)
             if "dasha" in full_chart and "maha" in full_chart.get("dasha", {}):
@@ -1468,18 +1599,23 @@ def api_ask():
                 "today": datetime.now().strftime("%d-%b-%Y"),
                 "chart_data": json.dumps(full_chart, indent=2),
             }
-            step = prompts_config["initial_reading_steps"][0]
-            prompt_text = _safe_substitute(step["prompt"], variables)
 
-            create_pending_reading(reading_id, user_id, chart_id, prompt_text)
-            save_ai_question(user_id, question or "Initial reading", "comprehensive", f"pending:{reading_id}")
+            raw = _run_prompt_chain(
+                model, prompts_config["initial_reading_steps"], variables,
+                prompts_config.get("default_thinking_budget")
+            )
+            reading_data = json.loads(raw) if isinstance(raw, str) else raw
+
+            save_ai_question(user_id, question or "Initial reading", "comprehensive",
+                             json.dumps(reading_data) if isinstance(reading_data, dict) else str(reading_data))
+            if chart_id:
+                try:
+                    update_chart_reading(chart_id, user_id, reading_data)
+                except Exception as e:
+                    logger.warning("Failed to cache reading for chart %s: %s", chart_id, e)
 
             remaining = 25 - get_question_count_today(user_id)
-            return jsonify({
-                "status": "queued",
-                "reading_id": reading_id,
-                "remaining": remaining,
-            })
+            return jsonify({"reading_data": reading_data, "remaining": remaining})
         else:
             # Follow-up / normal question — real-time via Vertex AI
             import vertexai

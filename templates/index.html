@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Graha Logic</title>
+<link rel="icon" type="image/png" href="/static/favicon.ico">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@800&family=Inter:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -62,9 +63,8 @@ header {
 
 .brand { display: flex; align-items: center; gap: 0.85rem; }
 .brand-logo {
-  width: 44px; height: 44px; flex-shrink: 0;
+  height: 88px; width: auto; flex-shrink: 0;
   object-fit: contain;
-  filter: drop-shadow(0 0 8px rgba(255,255,255,0.3));
 }
 .brand-text { display: flex; flex-direction: column; gap: 0.1rem; }
 .brand h1 {
@@ -885,7 +885,7 @@ footer strong { color: #FF6B00; }
 
   .header-inner { flex-direction: column; gap: 0.5rem; padding: 0.7rem 1rem; }
   .brand { flex-direction: row; align-items: center; gap: 0.6rem; justify-content: center; }
-  .brand-logo { width: 36px; height: 36px; }
+  .brand-logo { height: 70px; width: auto; }
   .brand-text { align-items: center; }
   .brand h1 { font-size: 1.4rem; }
   .brand span { font-size: 0.7rem; }
@@ -1026,7 +1026,7 @@ footer strong { color: #FF6B00; }
 @media (max-width: 600px) {
   .input-form { grid-template-columns: 1fr; }
   .tab-btn { font-size: 0.62rem; padding: 0.35rem 0.3rem; }
-  .brand-logo { width: 26px; height: 26px; }
+  .brand-logo { height: 52px; width: auto; }
   .brand h1 { font-size: 1rem; }
   .card-header h2 { font-size: 0.8rem; }
   .card-header { padding: 0.45rem 0.6rem; }
@@ -1213,10 +1213,6 @@ footer strong { color: #FF6B00; }
         <label class="btn-label">&nbsp;</label>
         <button class="generate-btn" id="generateBtn" onclick="fetchChart()">Generate Chart</button>
       </div>
-      <div class="form-group btn-group">
-        <label class="btn-label">&nbsp;</label>
-        <button class="save-btn" id="saveBtn" onclick="openSaveModal()">Save Chart</button>
-      </div>
     </div>
   </div>
 </div>
@@ -1225,8 +1221,7 @@ footer strong { color: #FF6B00; }
 
 <!-- Edit mode banner -->
 <div class="edit-banner" id="editBanner">
-  <div class="edit-banner-label">✏️ Editing: <span id="editBannerName"></span></div>
-  <button class="btn-update" onclick="updateEditedChart()">Update Chart</button>
+  <div class="edit-banner-label">✏️ Editing: <span id="editBannerName"></span> &mdash; change the fields below and click <strong>Recalculate &amp; Save</strong></div>
   <button class="btn-cancel-edit" onclick="cancelEdit()" title="Cancel edit">✕</button>
 </div>
 
@@ -1330,6 +1325,8 @@ footer strong { color: #FF6B00; }
 <div id="chartNav">
   <button id="homeBtn" onclick="showHome()">&#8592; New Chart</button>
   <span id="chartPersonName"></span>
+  <span style="flex:1"></span>
+  <button class="save-btn" id="saveBtn" onclick="openSaveModal()">Save Chart</button>
 </div>
 
 <div class="tab-bar">
@@ -1733,6 +1730,10 @@ function fetchChart() {
     renderAll(data);
     showChartContent();
     if (currentUser) document.getElementById("saveBtn").style.display = "block";
+    // Auto-save when in edit mode — no need for a separate "Update Chart" click
+    if (_editingChartId) {
+      updateEditedChart();
+    }
   })
   .catch(function(err) {
     document.getElementById("loadingOverlay").classList.remove("active");
@@ -1908,17 +1909,101 @@ var HPOLY = {
 var HC = {
    1: {sx:170, sy: 30,  cx:170, cy: 90},
    2: {sx: 30, sy: 16,  cx: 75, cy: 54},
-   3: {sx: 14, sy: 20,  cx: 32, cy: 88},
+   3: {sx: 14, sy: 20,  cx: 46, cy: 88},
    4: {sx: 14, sy:174,  cx: 92, cy:170},
-   5: {sx: 14, sy:328,  cx: 32, cy:228},
+   5: {sx: 14, sy:328,  cx: 46, cy:248},
    6: {sx: 87, sy:333,  cx: 87, cy:295},
    7: {sx:170, sy:328,  cx:170, cy:256},
    8: {sx:252, sy:333,  cx:252, cy:295},
-   9: {sx:326, sy:328,  cx:308, cy:252},
+   9: {sx:326, sy:328,  cx:294, cy:252},
   10: {sx:326, sy:174,  cx:248, cy:170},
-  11: {sx:326, sy: 20,  cx:308, cy: 88},
+  11: {sx:326, sy: 20,  cx:294, cy: 88},
   12: {sx:310, sy: 16,  cx:265, cy: 54}
 };
+
+var HOUSE_TYPE = {
+  1:'diamond',  2:'wide-top',  3:'narrow',   4:'diamond',
+  5:'narrow',   6:'narrow-top',7:'diamond',  8:'narrow-top',
+  9:'narrow',  10:'diamond',  11:'narrow',  12:'wide-top'
+};
+
+var HOUSE_COL_GAP = {
+   1:30,  2:26,  3:0,  4:30,
+   5: 0,  6:30,  7:30, 8:30,
+   9: 0, 10:30, 11: 0,12:26
+};
+
+function getDistribution(n, house) {
+  var type = HOUSE_TYPE[house];
+  if (n === 0) return [];
+  switch(type) {
+    case 'diamond':
+      if (n===1) return [1];
+      if (n===2) return [2];
+      if (n===3) return [1,2];
+      if (n===4) return [1,2,1];
+      if (n===5) return [1,2,2];
+      if (n===6) return [2,2,2];
+      return [2,3,2];
+    case 'wide-top':
+      if (n===1) return [1];
+      if (n===2) return [2];
+      if (n===3) return [3];
+      if (n===4) return [3,1];
+      if (n===5) return [3,2];
+      if (n===6) return [3,2,1];
+      return [3,2,2];
+    case 'narrow-top':
+      if (n===1) return [1];
+      if (n===2) return [2];
+      if (n===3) return [3];
+      if (n===4) return [1,3];
+      if (n===5) return [2,3];
+      if (n===6) return [1,2,3];
+      return [2,2,3];
+    default:
+      var arr = []; for(var i=0;i<n;i++) arr.push(1); return arr;
+  }
+}
+
+function getRowXPositions(count, cx, gap) {
+  if (count===1) return [cx];
+  if (count===2) return [cx-gap, cx+gap];
+  if (count===3) return [cx-2*gap, cx, cx+2*gap];
+  return [cx];
+}
+
+// Returns [xMin, xMax] of house polygon at given y by ray-casting each edge.
+function getHouseXRange(house, y) {
+  var poly = HPOLY[house].split(' ');
+  var pts = poly.map(function(p) { var xy = p.split(','); return {x:parseFloat(xy[0]), y:parseFloat(xy[1])}; });
+  var n = pts.length, xs = [];
+  for (var i = 0; i < n; i++) {
+    var a = pts[i], b = pts[(i+1) % n];
+    if (Math.abs(a.y - b.y) < 0.001) continue;
+    var lo = Math.min(a.y, b.y), hi = Math.max(a.y, b.y);
+    if (y < lo || y > hi) continue;
+    xs.push(a.x + (y - a.y) / (b.y - a.y) * (b.x - a.x));
+  }
+  if (xs.length < 2) return null;
+  return [Math.min.apply(null, xs), Math.max.apply(null, xs)];
+}
+
+// Distribute `count` planets using slot-center layout within [xMin, xMax].
+// Each planet sits at the center of an equal-width slot, so the label
+// (width = slotSize - 2*PAD) is guaranteed to stay inside the polygon.
+function getSlotPositions(count, xMin, xMax) {
+  var slotSize = (xMax - xMin) / count;
+  var positions = [];
+  for (var i = 0; i < count; i++) {
+    positions.push(xMin + (i + 0.5) * slotSize);
+  }
+  return positions;
+}
+function getSlotWidth(count, xMin, xMax) {
+  var PAD = 8;
+  return Math.max(Math.floor((xMax - xMin) / count) - PAD, 16);
+}
 
 // Vgap: distance (px) between sign label and planet center for each house
 var HOUSE_VGAP = {
@@ -1954,6 +2039,23 @@ var ARROW_COLORS = {
 // emoji sets for SVG dignity indicators
 var DIGNITY_EMOJIS = new Set(["\uD83C\uDF1F","\uD83D\uDC94","\uD83D\uDC8E","\u26A0\uFE0F","\u2191","\u2193","\u25B3","\u2297"]);
 
+// Status dot colors for pure-SVG planet labels
+var STATUS_DOT_COLORS = {
+  exalted:'#2ECC40', debilitated:'#E53935', moolatrikona:'#3366FF',
+  mks:'#FF6B00', retrograde:'#888888', combust:'#FF4500', vargottama:'#9C27B0'
+};
+// Map dignity emoji → status key
+var DIGNITY_TO_STATUS = {
+  "\uD83C\uDF1F":'exalted',  "\uD83D\uDC94":'debilitated',
+  "\uD83D\uDC8E":'moolatrikona', "\u26A0\uFE0F":'mks',
+  "\u2191":'exalted', "\u2193":'debilitated', "\u25B3":'moolatrikona', "\u2297":'mks'
+};
+// Human-readable tooltip labels
+var DIGNITY_LABEL = {
+  exalted:'Exalted', debilitated:'Debilitated', moolatrikona:'Moolatrikona',
+  mks:'Marana Karaka Sthana', retrograde:'Retrograde', combust:'Combust', vargottama:'Vargottama'
+};
+
 var ASPECT_RULES = {
   Su:[7], Mo:[7], Ma:[4,7,8], Me:[7], Ju:[5,7,9],
   Ve:[7], Sa:[3,7,10], Ra:[5,7,9], Ke:[7]
@@ -1970,59 +2072,81 @@ var _currentChartVargottama = [];
 var _currentChartDegs = {};
 var _currentChartFs = 9;
 
-function buildTextLine(items, x, y, fs) {
-  var parts = [];
-  items.forEach(function(p, i) {
-    // All planet abbreviations are exactly 2 chars; rest is the dignity emoji
-    var chars = [...p];
-    var baseName = chars.slice(0, 2).join('');
-    var arrow = chars.slice(2).join('');
-    // Convert old symbols to new emojis
-    if (arrow && OLD_TO_NEW_DIGNITY[arrow]) arrow = OLD_TO_NEW_DIGNITY[arrow];
-    var html = '';
-    if (i > 0) html += ' ';
-    var degRaw = _currentChartDegs[baseName] || '';
-    var degStr = degRaw ? String(parseInt(degRaw, 10)) : '';
-    var degFs = Math.max(Math.round(fs * 0.55), 6);
-    var degHtml = degStr ? '<sup style="font-size:' + degFs + 'px;color:#7a6a5a;vertical-align:super;line-height:0;">' + degStr + '°</sup>' : '';
-    var planetColor = PLANET_COLORS[baseName] || '#2a1f14';
-    var nameStyle = 'color:' + planetColor + ';font-weight:800;font-family:Cinzel,serif;';
-    if (arrow && ARROW_COLORS[arrow]) {
-      html += '<span style="' + nameStyle + '">' + baseName + '</span>' + degHtml + '<span style="font-size:' + Math.round(fs * 0.85) + 'px;">' + arrow + '</span>';
-    } else {
-      html += '<span style="' + nameStyle + '">' + baseName + '</span>' + degHtml;
-    }
-    // Add retrograde indicator
-    if (_currentChartRetro.indexOf(baseName) >= 0) {
-      html += '<span style="font-size:' + Math.round(fs * 0.85) + 'px;">🔄</span>';
-    }
-    // Add combust indicator
-    if (_currentChartCombust.indexOf(baseName) >= 0) {
-      html += '<span style="font-size:' + Math.round(fs * 0.85) + 'px;">🔥</span>';
-    }
-    // Add vargottama indicator
-    if (_currentChartVargottama.indexOf(baseName) >= 0) {
-      html += '<span style="font-size:' + Math.round(fs * 0.85) + 'px;">🔶</span>';
-    }
-    parts.push(html);
-  });
-  var hasDegs = Object.keys(_currentChartDegs).length > 0;
-  var w = hasDegs ? 100 : 90;
-  var h = Math.round(fs + (hasDegs ? 12 : 8));
-  return '<foreignObject x="' + (x - w / 2) + '" y="' + (y - fs - (hasDegs ? 2 : 0)) + '" width="' + w + '" height="' + h + '" style="overflow:visible;">' +
-    '<div xmlns="http://www.w3.org/1999/xhtml" style="text-align:center;font-family:Inter,sans-serif;font-size:' + fs + 'px;line-height:1.2;white-space:nowrap;overflow:hidden;width:' + w + 'px;">' +
-    parts.join('') + '</div></foreignObject>';
+// Pure-SVG planet label — avoids foreignObject/clipPath clipping bug.
+// Renders: planet name (Cinzel bold, colored) + degree superscript + status dots.
+// status dots are 2px circles below the name; hovering over any dot shows a <title> tooltip.
+function renderPlanetSVG(planet, x, y, fs) {
+  var chars = [...planet];
+  var baseName = chars.slice(0, 2).join('');
+  var dignityRaw = chars.slice(2).join('');
+  if (dignityRaw && OLD_TO_NEW_DIGNITY[dignityRaw]) dignityRaw = OLD_TO_NEW_DIGNITY[dignityRaw];
+
+  var planetColor = PLANET_COLORS[baseName] || '#2a1f14';
+  var degRaw = _currentChartDegs[baseName] || '';
+  var degStr = degRaw ? String(parseInt(degRaw, 10)) + '\u00b0' : '';
+
+  // Collect status flags
+  var statuses = [];
+  if (dignityRaw && DIGNITY_TO_STATUS[dignityRaw]) statuses.push(DIGNITY_TO_STATUS[dignityRaw]);
+  if (_currentChartRetro.indexOf(baseName) >= 0) statuses.push('retrograde');
+  if (_currentChartCombust.indexOf(baseName) >= 0) statuses.push('combust');
+  if (_currentChartVargottama.indexOf(baseName) >= 0) statuses.push('vargottama');
+
+  // Tooltip text
+  var tipParts = [baseName];
+  statuses.forEach(function(s) { tipParts.push(DIGNITY_LABEL[s]); });
+  var tipSafe = tipParts.join(' \u00b7 ')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  var svg = '<g>';
+  svg += '<title>' + tipSafe + '</title>';
+
+  // Planet abbreviation
+  svg += '<text x="' + x + '" y="' + y + '" text-anchor="middle"' +
+    ' font-family="Cinzel,serif" font-size="' + fs + '" font-weight="800"' +
+    ' fill="' + planetColor + '">' +
+    baseName.replace(/&/g,'&amp;') + '</text>';
+
+  // Degree — positioned right of and above the name
+  if (degStr) {
+    var degFs = Math.max(Math.round(fs * 0.62), 5);
+    // Approx half-width of 2-char Cinzel bold: ~0.75*fs; degree sits just past right edge
+    var degX = x + Math.round(fs * 0.78);
+    var degY = y - Math.round(fs * 0.44);
+    svg += '<text x="' + degX + '" y="' + degY + '" text-anchor="start"' +
+      ' font-family="Inter,sans-serif" font-size="' + degFs + '" fill="#9a7b52">' +
+      degStr + '</text>';
+  }
+
+  // Status dots (2px radius, row below name)
+  if (statuses.length > 0) {
+    var dotR = 2;
+    var dotGap = 3;
+    var dotsTotal = statuses.length * (dotR * 2) + (statuses.length - 1) * dotGap;
+    var dotStartX = x - dotsTotal / 2 + dotR;
+    var dotY = y + dotR + 2;
+    statuses.forEach(function(s, i) {
+      var dotX = dotStartX + i * (dotR * 2 + dotGap);
+      svg += '<circle cx="' + dotX + '" cy="' + dotY + '" r="' + dotR +
+        '" fill="' + STATUS_DOT_COLORS[s] + '" opacity="0.9"/>';
+    });
+  }
+
+  svg += '</g>';
+  return svg;
 }
 
 function computeHouseFs(count, house, hasDegs) {
   if (count === 0) return _currentChartFs || 9;
-  var vgap = HOUSE_VGAP[house] || 60;
+  var dist = getDistribution(count, house);
+  var numRows = dist.length;
   var fs = _currentChartFs || 9;
-  var lh = fs + (hasDegs ? 12 : 4);
+  var lh = fs + 8;  // 8px gap accounts for status dots below name
+  var vgap = HOUSE_VGAP[house] || 60;
   var minFs = 7;
-  while (count * lh > 2 * (vgap - 6) && fs > minFs) {
+  while (numRows * lh > vgap * 1.6 && fs > minFs) {
     fs--;
-    lh = fs + (hasDegs ? 12 : 4);
+    lh = fs + 8;
   }
   return fs;
 }
@@ -2032,16 +2156,34 @@ function renderPlanetGroup(planets, pos, chartId, house) {
   var count = planets.length;
   var hasDegs = Object.keys(_currentChartDegs).length > 0;
   var fs = computeHouseFs(count, house, hasDegs);
-  var lh = fs + (hasDegs ? 12 : 4);
-  var rows = [];
-  for (var i = 0; i < count; i++) rows.push(planets.slice(i, i + 1));
-  var totalH = rows.length * lh;
-  var startY = pos.cy - totalH / 2 + fs * 0.4;
+  var lh = fs + 8;  // includes space for status dots
+  var dist = getDistribution(count, house);
+  var numRows = dist.length;
+  var totalH = numRows * lh;
+  var startY = pos.cy - totalH / 2 + fs * 0.5;
+  var gap = HOUSE_COL_GAP[house];
+
+  // clip-path ensures pure SVG text stays inside triangle/diamond
   var svg = '<g clip-path="url(#cp-' + chartId + '-' + house + ')">';
   svg += '<g onmouseenter="showDrishti(event,\'' + chartId + '\',' + house + ')" onmouseleave="hideDrishti(\'' + chartId + '\')" style="cursor:pointer;">';
-  rows.forEach(function(row, ri) {
-    svg += buildTextLine(row, pos.cx, startY + ri * lh, fs);
-  });
+
+  var pIdx = 0;
+  for (var ri = 0; ri < dist.length; ri++) {
+    var rowCount = dist[ri];
+    var rowY = startY + ri * lh;
+    var xRange = getHouseXRange(house, rowY);
+    var xPositions;
+    if (xRange) {
+      xPositions = getSlotPositions(rowCount, xRange[0], xRange[1]);
+    } else {
+      xPositions = getRowXPositions(rowCount, pos.cx, gap);
+    }
+    for (var col = 0; col < rowCount && pIdx < planets.length; col++) {
+      svg += renderPlanetSVG(planets[pIdx], xPositions[col], rowY, fs);
+      pIdx++;
+    }
+  }
+
   svg += '</g></g>';
   return svg;
 }
@@ -2206,16 +2348,32 @@ function getRashiDrishti(sign) {
 function renderPlanetGroupStatic(planets, pos, chartId, house) {
   if (!planets || planets.length === 0) return "";
   var count = planets.length;
-  var fs = count > 5 ? 9 : count > 3 ? 10.5 : 13;
-  var lh = fs + 3;
-  var rows = [];
-  for (var i = 0; i < count; i += 2) rows.push(planets.slice(i, i + 2));
-  var totalH = rows.length * lh;
-  var startY = pos.cy - totalH / 2 + fs * 0.4;
+  var hasDegs = Object.keys(_currentChartDegs).length > 0;
+  var fs = computeHouseFs(count, house, hasDegs);
+  var lh = fs + 8;  // includes space for status dots
+  var dist = getDistribution(count, house);
+  var numRows = dist.length;
+  var totalH = numRows * lh;
+  var startY = pos.cy - totalH / 2 + fs * 0.5;
+  var gap = HOUSE_COL_GAP[house];
+
   var svg = '<g clip-path="url(#cp-' + chartId + '-' + house + ')" style="pointer-events:none;">';
-  rows.forEach(function(row, ri) {
-    svg += buildTextLine(row, pos.cx, startY + ri * lh, fs);
-  });
+  var pIdx = 0;
+  for (var ri = 0; ri < dist.length; ri++) {
+    var rowCount = dist[ri];
+    var rowY = startY + ri * lh;
+    var xRange = getHouseXRange(house, rowY);
+    var xPositions;
+    if (xRange) {
+      xPositions = getSlotPositions(rowCount, xRange[0], xRange[1]);
+    } else {
+      xPositions = getRowXPositions(rowCount, pos.cx, gap);
+    }
+    for (var col = 0; col < rowCount && pIdx < planets.length; col++) {
+      svg += renderPlanetSVG(planets[pIdx], xPositions[col], rowY, fs);
+      pIdx++;
+    }
+  }
   svg += '</g>';
   return svg;
 }
@@ -3169,8 +3327,10 @@ function editSavedChart(id, name) {
       _editingChartName = name;
       document.getElementById("editBannerName").textContent = name;
       document.getElementById("editBanner").classList.add("active");
+      document.getElementById("generateBtn").textContent = "Recalculate & Save";
       closeMyCharts();
-      var inputCard = document.querySelector('.card.accent-purple');
+      showHome();
+      var inputCard = document.getElementById("inputFormCard");
       if (inputCard) inputCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
     })
     .catch(function(err) { alert("Failed to load chart: " + err.message); });
@@ -3180,6 +3340,7 @@ function cancelEdit() {
   _editingChartId = null;
   _editingChartName = '';
   document.getElementById("editBanner").classList.remove("active");
+  document.getElementById("generateBtn").textContent = "Generate Chart";
 }
 
 function updateEditedChart() {
@@ -3926,8 +4087,10 @@ renderAll = function(data) {
     document.getElementById("aiHelper").textContent = "Daily limit reached (0 of 25 remaining)";
     if (generatePrompt) generatePrompt.style.display = "none";
     if (inputRow) inputRow.style.display = "none";
-  } else if (currentUser && chartData && _cachedReadingData && (_cachedReadingData.categories || _cachedReadingData.general)) {
-    // Display cached reading
+  } else if (currentUser && chartData && _cachedReadingData &&
+             (_cachedReadingData.categories && _cachedReadingData.categories.length > 0 &&
+              _cachedReadingData.categories[0].reading !== 'Unable to generate reading. Please try again.')) {
+    // Display cached reading (only if it has real category data, not a fallback error)
     renderReadingGrid(_cachedReadingData);
     var summaryParts = [];
     if (_cachedReadingData.general) summaryParts.push("General: " + _cachedReadingData.general);
@@ -4184,6 +4347,7 @@ function autoGenerateReading() {
       errorEl.classList.add("active");
       if (generatePrompt) generatePrompt.style.display = "block";
       if (genBtn) genBtn.disabled = false;
+      _aiReadingRequested = false;
       if (resp.status === 429 && resp.data.error.indexOf("Daily limit") >= 0) {
         aiLimitReached = true;
         document.getElementById("aiHelper").textContent = "Daily limit reached";
@@ -4244,9 +4408,9 @@ function autoGenerateReading() {
     if (tabBtn) tabBtn.classList.remove("loading");
     errorEl.textContent = "Network error: " + err.message;
     errorEl.classList.add("active");
-    // Show generate button again so user can retry
     if (generatePrompt) generatePrompt.style.display = "block";
     if (genBtn) genBtn.disabled = false;
+    _aiReadingRequested = false;
   });
 }
 

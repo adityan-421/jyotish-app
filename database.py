@@ -157,6 +157,19 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_user_predictions_status
                 ON user_predictions(status);
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_push_tokens (
+                    id SERIAL PRIMARY KEY,
+                    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    token TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, token)
+                );
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_push_tokens_user_id
+                ON user_push_tokens(user_id);
+            """)
             conn.commit()
             cur.close()
         _db_initialized = True
@@ -657,3 +670,34 @@ def get_user_predictions(user_id, week_start_str, month_start_str):
         rows = cur.fetchall()
         cur.close()
     return {r["type"]: r["prediction_text"] for r in rows}
+
+
+def upsert_push_token(user_id, token):
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO user_push_tokens (user_id, token)
+               VALUES (%s, %s)
+               ON CONFLICT (user_id, token) DO NOTHING""",
+            (user_id, token),
+        )
+        cur.close()
+        conn.commit()
+
+
+def get_users_with_push_tokens_and_charts():
+    """Return rows with user_id, chart_data, and their push tokens for users who have an own chart."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            """SELECT u.id AS user_id, sc.chart_data,
+                      array_agg(pt.token) AS push_tokens
+               FROM users u
+               JOIN saved_charts sc ON sc.id = u.own_chart_id
+               JOIN user_push_tokens pt ON pt.user_id = u.id
+               WHERE u.own_chart_id IS NOT NULL
+               GROUP BY u.id, sc.chart_data"""
+        )
+        rows = cur.fetchall()
+        cur.close()
+    return rows
