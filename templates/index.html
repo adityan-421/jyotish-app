@@ -2159,8 +2159,10 @@ function computeHouseFs(count, house, hasDegs) {
   if (count === 0) return _currentChartFs || 9;
   var dist = getDistribution(count, house);
   var numRows = dist.length;
-  var fs = _currentChartFs || 9;
-  var lh = fs + 8;  // 8px gap accounts for status dots below name
+  // Start larger for sparse houses; shrink loop below handles overflow
+  var baseFs = count <= 1 ? 13 : count <= 2 ? 12 : count <= 3 ? 11 : (_currentChartFs || 9);
+  var fs = Math.max(baseFs, _currentChartFs || 9);
+  var lh = fs + 8;
   var vgap = HOUSE_VGAP[house] || 60;
   var minFs = 7;
   while (numRows * lh > vgap * 1.6 && fs > minFs) {
