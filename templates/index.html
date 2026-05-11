@@ -1930,17 +1930,17 @@ var HPOLY = {
 };
 
 var HC = {
-   1: {sx:170, sy: 30,  cx:170, cy: 90},
-   2: {sx: 30, sy: 16,  cx: 75, cy: 54},
-   3: {sx: 14, sy: 20,  cx: 46, cy: 88},
-   4: {sx: 14, sy:174,  cx: 92, cy:170},
-   5: {sx: 14, sy:328,  cx: 46, cy:248},
-   6: {sx: 87, sy:333,  cx: 87, cy:295},
-   7: {sx:170, sy:328,  cx:170, cy:256},
-   8: {sx:252, sy:333,  cx:252, cy:295},
-   9: {sx:326, sy:328,  cx:294, cy:252},
-  10: {sx:326, sy:174,  cx:248, cy:170},
-  11: {sx:326, sy: 20,  cx:294, cy: 88},
+   1: {sx:170, sy: 30,  cx:170, cy: 90},   // top diamond — unchanged
+   2: {sx: 30, sy: 16,  cx: 75, cy: 54},   // wide-top left — unchanged
+   3: {sx: 17, sy: 30,  cx: 46, cy: 88},   // narrow left tip — moved inward from (14,20)
+   4: {sx: 20, sy:174,  cx: 92, cy:170},   // left diamond tip — nudged right from (14,174)
+   5: {sx: 18, sy:306,  cx: 46, cy:248},   // narrow btm-left tip — moved inward from (14,328)
+   6: {sx: 87, sy:333,  cx: 87, cy:295},   // wide-btm left — unchanged
+   7: {sx:170, sy:316,  cx:170, cy:256},   // btm diamond — moved up from (170,328)
+   8: {sx:252, sy:333,  cx:252, cy:295},   // wide-btm right — unchanged
+   9: {sx:322, sy:306,  cx:294, cy:252},   // narrow btm-right tip — moved inward from (326,328)
+  10: {sx:320, sy:174,  cx:248, cy:170},   // right diamond tip — nudged left from (326,174)
+  11: {sx:323, sy: 30,  cx:294, cy: 88},   // narrow right tip — moved inward from (326,20)
   12: {sx:310, sy: 16,  cx:265, cy: 54}
 };
 
