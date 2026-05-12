@@ -2120,22 +2120,21 @@ function renderPlanetSVG(planet, x, y, fs) {
 
   var svg = '<g onmouseenter="showPlanetTip(event,\'' + encoded + '\')" onmouseleave="hidePlanetTip()" style="cursor:default;">';
 
-  // Planet abbreviation
+  // Planet name + degree as a single <text> so clipPath treats them as one unit.
+  // Degree is a <tspan> superscript — avoids Safari's anchor-point-only clip test
+  // that lets separate <text> elements escape the polygon if glyphs cross the edge.
   svg += '<text x="' + x + '" y="' + y + '" text-anchor="middle"' +
     ' font-family="Cinzel,serif" font-size="' + fs + '" font-weight="800"' +
     ' fill="' + planetColor + '">' +
-    baseName.replace(/&/g,'&amp;') + '</text>';
-
-  // Degree — positioned right of and above the name
+    baseName.replace(/&/g,'&amp;');
   if (degStr) {
     var degFs = Math.max(Math.round(fs * 0.62), 5);
-    // Approx half-width of 2-char Cinzel bold: ~0.75*fs; degree sits just past right edge
-    var degX = x + Math.round(fs * 0.78);
-    var degY = y - Math.round(fs * 0.44);
-    svg += '<text x="' + degX + '" y="' + degY + '" text-anchor="start"' +
-      ' font-family="Inter,sans-serif" font-size="' + degFs + '" fill="#9a7b52">' +
-      degStr + '</text>';
+    var degDy = -Math.round(fs * 0.42);
+    svg += '<tspan dx="1" dy="' + degDy + '"' +
+      ' font-family="Inter,sans-serif" font-size="' + degFs + '" fill="#9a7b52"' +
+      ' font-weight="400">' + degStr + '</tspan>';
   }
+  svg += '</text>';
 
   // Status dots (2px radius, row below name)
   if (statuses.length > 0) {
