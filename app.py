@@ -512,6 +512,94 @@ def api_set_own_chart(chart_id):
     return jsonify({"message": "Own chart set", "own_chart_id": chart_id})
 
 
+@app.route("/api/charts/compare", methods=["POST"])
+@login_required
+def api_charts_compare():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON body provided"}), 400
+
+    id1 = data.get("chart_id_1")
+    id2 = data.get("chart_id_2")
+    if id1 is None or id2 is None:
+        return jsonify({"error": "chart_id_1 and chart_id_2 are required"}), 400
+    try:
+        id1, id2 = int(id1), int(id2)
+    except (TypeError, ValueError):
+        return jsonify({"error": "chart_id_1 and chart_id_2 must be integers"}), 400
+    if id1 == id2:
+        return jsonify({"error": "Cannot compare a chart with itself"}), 400
+
+    user_id = session["user"]["id"]
+
+    chart1 = get_chart(id1, user_id)
+    if not chart1:
+        return jsonify({"error": "Chart 1 not found"}), 404
+    chart2 = get_chart(id2, user_id)
+    if not chart2:
+        return jsonify({"error": "Chart 2 not found"}), 404
+
+    if get_question_count_today(user_id) >= 25:
+        return jsonify({"error": "Daily limit reached. You can ask 25 questions per day."}), 429
+
+    try:
+        import vertexai
+        from vertexai.generative_models import GenerativeModel
+
+        project_id = os.environ.get("GCP_PROJECT", "grahalogic")
+        location = os.environ.get("GCP_LOCATION", "us-central1")
+        vertexai.init(project=project_id, location=location)
+
+        prompts_config = load_prompts()
+        model = GenerativeModel(prompts_config.get("model", "gemini-2.5-flash"))
+
+        slim1 = extract_synastry_data(chart1["chart_data"])
+        slim2 = extract_synastry_data(chart2["chart_data"])
+
+        try:
+            transits_now = compute_transits()
+            transit_str = _format_transits_for_ai(transits_now)
+        except Exception as te:
+            logger.warning("Could not compute transits for compare: %s", te)
+            transit_str = "(transit data unavailable)"
+
+        variables = {
+            "chart_a_name": chart1["name"],
+            "chart_b_name": chart2["name"],
+            "chart_a_data": json.dumps(slim1, indent=2),
+            "chart_b_data": json.dumps(slim2, indent=2),
+            "today": datetime.now().strftime("%d-%b-%Y"),
+            "transit_data": transit_str,
+        }
+
+        steps = prompts_config.get("compatibility_steps", [])
+        if not steps:
+            return jsonify({"error": "Compatibility prompts not configured"}), 500
+
+        raw = _run_prompt_chain(model, steps, variables, prompts_config.get("default_thinking_budget"))
+        result = json.loads(raw) if isinstance(raw, str) else raw
+
+        # Apply score label if not set correctly by AI
+        score_map = [(90, "Exceptional"), (76, "Strong"), (61, "Good"), (41, "Moderate"), (0, "Challenging")]
+        if isinstance(result, dict) and "score" in result:
+            score = result.get("score", 0)
+            for threshold, label in score_map:
+                if score >= threshold:
+                    result["score_label"] = label
+                    break
+
+        save_ai_question(user_id, f"Compare: {chart1['name']} & {chart2['name']}", "compatibility",
+                         json.dumps(result) if isinstance(result, dict) else str(result))
+
+        remaining = 25 - get_question_count_today(user_id)
+        return jsonify({"compatibility": result, "remaining": remaining})
+
+    except Exception as e:
+        error_type = type(e).__name__
+        logger.error("Compare AI error (%s): %s", error_type, str(e))
+        return jsonify({"error": "Failed to generate compatibility reading. Please try again later."}), 500
+
+
 @app.route("/api/ai-history")
 @login_required
 def api_ai_history():
@@ -837,6 +925,24 @@ def _format_transit_compact(transits):
         r = "(R)" if t.get("retrograde") and t["planet"] not in ("Rahu", "Ketu") else ""
         parts.append(f"{t['planet']}:{t['sign']}{r}")
     return " | ".join(parts)
+
+
+def _format_transits_for_ai(transits, natal_lagna_sign=None):
+    """Format current transits for AI prompt — sign, degree, nakshatra, house from natal lagna."""
+    lines = []
+    for t in transits:
+        retro = " (R)" if t.get("retrograde") and t["planet"] not in ("Rahu", "Ketu") else ""
+        deg = f"{t.get('deg_in_sign', 0):.1f}"
+        nak = t.get("nakshatra", "")
+        pada = t.get("nakshatra_pada", "")
+        nak_str = f" | {nak} P{pada}" if nak else ""
+        house_str = ""
+        if natal_lagna_sign:
+            # sign_idx is 0-based; natal_lagna_sign is 1-based
+            house = ((t.get("sign_idx", 0) - (natal_lagna_sign - 1)) % 12) + 1
+            house_str = f" → H{house}"
+        lines.append(f"  {t['planet']}: {t['sign']} {deg}°{retro}{nak_str}{house_str}")
+    return "\n".join(lines)
 
 
 def _build_daily_week_prompt(natal_summary, week_dates, prompts_config):
@@ -1514,6 +1620,35 @@ def extract_relevant_chart_data(chart_data, category):
     return result
 
 
+def extract_synastry_data(chart_data):
+    """Filter chart JSON to only the fields relevant for Vedic synastry analysis."""
+    result = {}
+    for key in ("birth", "lagna", "planets"):
+        if key in chart_data:
+            result[key] = chart_data[key]
+
+    if "charts" in chart_data:
+        result["charts"] = {k: v for k, v in chart_data["charts"].items() if k in ("D1", "D9")}
+
+    if "dignities" in chart_data:
+        result["dignities"] = {k: v for k, v in chart_data["dignities"].items() if k in ("D1", "D9")}
+
+    if "bhava" in chart_data:
+        result["bhava"] = [b for b in chart_data["bhava"] if b.get("house") in (1, 5, 7, 8, 11, 12)]
+
+    for key in ("karakas", "aspects", "ashtakavarga", "yogas"):
+        if key in chart_data:
+            result[key] = chart_data[key]
+
+    if "dasha" in chart_data:
+        dasha = dict(chart_data["dasha"])
+        if "maha" in dasha:
+            dasha["maha"] = _relevant_maha_periods(dasha["maha"])
+        result["dasha"] = dasha
+
+    return result
+
+
 def _relevant_maha_periods(maha_list):
     """Return the current maha dasha period plus its neighbours."""
     from datetime import datetime
@@ -1595,9 +1730,18 @@ def api_ask():
                 full_chart["dasha"]["maha"] = _relevant_maha_periods(full_chart["dasha"]["maha"])
             full_chart["current_date"] = datetime.now().strftime("%d-%b-%Y")
 
+            try:
+                transits_now = compute_transits()
+                natal_lagna_sign = chart_data.get("lagna_sign") or (chart_data.get("lagna") or {}).get("sign")
+                transit_str = _format_transits_for_ai(transits_now, natal_lagna_sign)
+            except Exception as te:
+                logger.warning("Could not compute transits for initial reading: %s", te)
+                transit_str = "(transit data unavailable)"
+
             variables = {
                 "today": datetime.now().strftime("%d-%b-%Y"),
                 "chart_data": json.dumps(full_chart, indent=2),
+                "transit_data": transit_str,
             }
 
             raw = _run_prompt_chain(
@@ -1633,12 +1777,21 @@ def api_ask():
                 full_chart["dasha"]["maha"] = _relevant_maha_periods(full_chart["dasha"]["maha"])
             full_chart["current_date"] = datetime.now().strftime("%d-%b-%Y")
 
+            try:
+                transits_now = compute_transits()
+                natal_lagna_sign = chart_data.get("lagna_sign") or (chart_data.get("lagna") or {}).get("sign")
+                transit_str = _format_transits_for_ai(transits_now, natal_lagna_sign)
+            except Exception as te:
+                logger.warning("Could not compute transits for ask: %s", te)
+                transit_str = "(transit data unavailable)"
+
             variables = {
                 "question": question,
                 "categories": ", ".join(LIFE_CATEGORIES),
                 "today": datetime.now().strftime("%d-%b-%Y"),
                 "conversation": build_conv_context(conversation),
                 "raw_chart_data": chart_data,
+                "transit_data": transit_str,
             }
 
             # For follow-ups (has conversation), skip full chart_data — let

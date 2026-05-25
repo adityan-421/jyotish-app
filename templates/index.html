@@ -579,6 +579,34 @@ footer strong { color: #FF6B00; }
   z-index: 301; transition: right 0.3s ease; display: flex; flex-direction: column;
 }
 .history-panel.open { right: 0; }
+
+/* Compare Charts Panel */
+.compare-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 300;
+}
+.compare-overlay.open { display: block; }
+.compare-panel {
+  position: fixed; top: 0; right: -560px; width: 540px; max-width: 90vw;
+  height: 100vh; background: var(--surface); box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+  z-index: 301; transition: right 0.3s ease; display: flex; flex-direction: column;
+}
+.compare-panel.open { right: 0; }
+.compat-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; margin: 0.75rem 0;
+}
+.compat-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 1rem 1.1rem; transition: border-color 0.15s;
+}
+.compat-card:hover { border-color: var(--pink); }
+.compat-card-title { font-size: 0.82rem; font-weight: 700; color: var(--pink); }
+.compat-card-body { font-size: 0.78rem; color: var(--text-2); line-height: 1.7; }
+.compat-card-body p { margin: 0.3rem 0; }
+.compat-remedy-card {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 0.85rem 1rem; margin-bottom: 0.6rem;
+}
 .history-date-group {
   font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
   color: var(--text-3); padding: 0.6rem 0 0.3rem; margin-top: 0.5rem;
@@ -1029,6 +1057,8 @@ footer strong { color: #FF6B00; }
   /* Charts panel */
   .charts-panel { width: 100%; max-width: 100vw; right: -100%; }
   .history-panel { width: 100%; max-width: 100vw; right: -100%; }
+  .compare-panel { width: 100%; max-width: 100vw; right: -100%; }
+  .compat-grid { grid-template-columns: 1fr; }
   .panel-header { padding: 1rem; }
   .panel-body { padding: 0.75rem; }
 
@@ -1380,11 +1410,11 @@ footer strong { color: #FF6B00; }
     <div class="chart-legend">
       <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#2ECC40;vertical-align:middle;"></span> Exalted (Uchcha)</div>
       <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#E53935;vertical-align:middle;"></span> Debilitated (Neecha)</div>
-      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#FF6B00;vertical-align:middle;"></span> Moolatrikona</div>
-      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#FFD700;vertical-align:middle;border:1px solid #ccc;"></span> Maranakarak Sthana</div>
-      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1a1a1a;vertical-align:middle;"></span> Retrograde</div>
-      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#8B0000;vertical-align:middle;"></span> Combust</div>
-      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#9C27B0;vertical-align:middle;"></span> Vargottama</div>
+      <div class="legend-item"><span class="legend-sym"><svg width="10" height="10" viewBox="0 0 10 10" style="vertical-align:middle;"><polygon points="5,0.5 0.5,9.5 9.5,9.5" fill="#FF6B00"/></svg></span> Moolatrikona</div>
+      <div class="legend-item"><span class="legend-sym"><svg width="10" height="10" viewBox="0 0 10 10" style="vertical-align:middle;"><polygon points="5,9.5 0.5,0.5 9.5,0.5" fill="#FFD700"/></svg></span> Maranakarak Sthana</div>
+      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;line-height:10px;text-align:center;font-size:12px;vertical-align:middle;color:#1a1a1a;">&#x21BA;</span> Retrograde</div>
+      <div class="legend-item"><span class="legend-sym" style="font-size:9px;vertical-align:middle;">&#x1F525;</span> Combust</div>
+      <div class="legend-item"><span class="legend-sym"><svg width="10" height="10" viewBox="0 0 10 10" style="vertical-align:middle;"><polygon points="5,0 10,5 5,10 0,5" fill="#9C27B0"/></svg></span> Vargottama</div>
       <div class="legend-item"><span style="font-weight:700;font-size:0.9rem;color:#FF6B00;">AL</span> Arudha Lagna</div>
     </div>
     <div class="charts-grid" id="summaryChartsGrid" style="grid-template-columns: repeat(2, 1fr);"></div>
@@ -1432,11 +1462,11 @@ footer strong { color: #FF6B00; }
     <div class="chart-legend">
       <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#2ECC40;vertical-align:middle;"></span> Exalted (Uchcha)</div>
       <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#E53935;vertical-align:middle;"></span> Debilitated (Neecha)</div>
-      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#FF6B00;vertical-align:middle;"></span> Moolatrikona</div>
-      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#FFD700;vertical-align:middle;border:1px solid #ccc;"></span> Maranakarak Sthana</div>
-      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1a1a1a;vertical-align:middle;"></span> Retrograde</div>
-      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#8B0000;vertical-align:middle;"></span> Combust</div>
-      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#9C27B0;vertical-align:middle;"></span> Vargottama</div>
+      <div class="legend-item"><span class="legend-sym"><svg width="10" height="10" viewBox="0 0 10 10" style="vertical-align:middle;"><polygon points="5,0.5 0.5,9.5 9.5,9.5" fill="#FF6B00"/></svg></span> Moolatrikona</div>
+      <div class="legend-item"><span class="legend-sym"><svg width="10" height="10" viewBox="0 0 10 10" style="vertical-align:middle;"><polygon points="5,9.5 0.5,0.5 9.5,0.5" fill="#FFD700"/></svg></span> Maranakarak Sthana</div>
+      <div class="legend-item"><span class="legend-sym" style="display:inline-block;width:10px;height:10px;line-height:10px;text-align:center;font-size:12px;vertical-align:middle;color:#1a1a1a;">&#x21BA;</span> Retrograde</div>
+      <div class="legend-item"><span class="legend-sym" style="font-size:9px;vertical-align:middle;">&#x1F525;</span> Combust</div>
+      <div class="legend-item"><span class="legend-sym"><svg width="10" height="10" viewBox="0 0 10 10" style="vertical-align:middle;"><polygon points="5,0 10,5 5,10 0,5" fill="#9C27B0"/></svg></span> Vargottama</div>
       <div class="legend-item"><span style="font-weight:700;font-size:0.9rem;color:#FF6B00;">AL</span> Arudha Lagna</div>
     </div>
     <div class="charts-grid" id="chartsGrid" style="grid-template-columns: repeat(2, 1fr);"></div>
@@ -1651,6 +1681,52 @@ footer strong { color: #FF6B00; }
   </div>
   <div class="panel-body" id="historyBody">
     <div class="panel-empty">Loading...</div>
+  </div>
+</div>
+
+<!-- Compare Charts Panel -->
+<div class="compare-overlay" id="compareOverlay" onclick="closeComparePanel()"></div>
+<div class="compare-panel" id="comparePanel">
+  <div class="panel-header">
+    <div><h2>Chart Comparison</h2><span class="panel-count">Relationship &amp; Marriage Compatibility</span></div>
+    <button class="panel-close" onclick="closeComparePanel()">&times;</button>
+  </div>
+  <div class="panel-body" id="comparePanelBody">
+
+    <!-- Step 1: Chart selector -->
+    <div id="compareSelectorSection">
+      <p style="font-size:0.82rem;color:var(--text-3);margin-bottom:1.25rem;">Select two saved charts to analyze their relationship compatibility using Vedic synastry.</p>
+      <div style="margin-bottom:1rem;">
+        <label style="font-size:0.72rem;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:0.4rem;">Person A</label>
+        <select id="compareChartA" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;color:var(--text);background:var(--surface);outline:none;"></select>
+      </div>
+      <div style="margin-bottom:1.25rem;">
+        <label style="font-size:0.72rem;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:0.4rem;">Person B</label>
+        <select id="compareChartB" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;color:var(--text);background:var(--surface);outline:none;"></select>
+      </div>
+      <div id="compareError" style="display:none;padding:0.65rem 1rem;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:var(--red);font-size:0.82rem;margin-bottom:1rem;"></div>
+      <button id="compareRunBtn" onclick="runChartComparison()" style="width:100%;padding:0.65rem;background:var(--pink);color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:0.9rem;font-weight:600;cursor:pointer;transition:opacity 0.15s;">Compare Charts</button>
+      <p style="font-size:0.72rem;color:var(--text-3);margin-top:0.6rem;text-align:center;">Uses 1 of your 25 daily AI questions</p>
+    </div>
+
+    <!-- Step 2: Loading -->
+    <div id="compareLoadingSection" style="display:none;text-align:center;padding:3rem 1rem;">
+      <div class="ai-spinner" style="margin:0 auto 1rem;"></div>
+      <div style="font-size:0.88rem;color:var(--text-3);">Analyzing astrological compatibility...</div>
+    </div>
+
+    <!-- Step 3: Results -->
+    <div id="compareResultsSection" style="display:none;">
+      <button onclick="resetComparePanel()" style="background:none;border:none;color:var(--accent);font-size:0.82rem;cursor:pointer;padding:0 0 1rem 0;font-family:inherit;">&#8592; Compare different charts</button>
+      <div id="compatScoreBlock" style="text-align:center;margin-bottom:1.5rem;"></div>
+      <div id="compatSummary" class="ai-reading-section" style="margin-bottom:1rem;"></div>
+      <div id="compatStrengths" style="margin-bottom:1rem;"></div>
+      <div id="compatChallenges" style="margin-bottom:1rem;"></div>
+      <div id="compatGrid" class="compat-grid" style="margin-bottom:1rem;"></div>
+      <div id="compatTiming" class="ai-reading-section" style="margin-bottom:1rem;"></div>
+      <div id="compatRemedies" style="margin-bottom:1rem;"></div>
+    </div>
+
   </div>
 </div>
 
@@ -2060,7 +2136,7 @@ var DIGNITY_EMOJIS = new Set(["\uD83C\uDF1F","\uD83D\uDC94","\uD83D\uDC8E","\u26
 // Status dot colors for pure-SVG planet labels
 var STATUS_DOT_COLORS = {
   exalted:'#2ECC40', debilitated:'#E53935', moolatrikona:'#FF6B00',
-  mks:'#FFD700', retrograde:'#1a1a1a', combust:'#8B0000', vargottama:'#9C27B0'
+  mks:'#FFD700', retrograde:'#1a1a1a', combust:'#1a1a1a', vargottama:'#9C27B0'
 };
 // Map dignity emoji → status key
 var DIGNITY_TO_STATUS = {
@@ -2131,17 +2207,43 @@ function renderPlanetSVG(planet, x, y, fs) {
   }
   svg += '</text>';
 
-  // Status dots (2px radius, row below name)
+  // Status symbols (row below name): circles for most, shapes for retro/mkt/varg
   if (statuses.length > 0) {
     var dotR = 2;
     var dotGap = 3;
-    var dotsTotal = statuses.length * (dotR * 2) + (statuses.length - 1) * dotGap;
+    var symW = dotR * 2;  // slot width per symbol
+    var dotsTotal = statuses.length * symW + (statuses.length - 1) * dotGap;
     var dotStartX = x - dotsTotal / 2 + dotR;
     var dotY = y + dotR + 2;
     statuses.forEach(function(s, i) {
-      var dotX = dotStartX + i * (dotR * 2 + dotGap);
-      svg += '<circle cx="' + dotX + '" cy="' + dotY + '" r="' + dotR +
-        '" fill="' + STATUS_DOT_COLORS[s] + '" opacity="0.9"/>';
+      var dotX = dotStartX + i * (symW + dotGap);
+      if (s === 'retrograde') {
+        // U-turn arrow ↺
+        svg += '<text x="' + dotX + '" y="' + (dotY + 2.5) + '" text-anchor="middle"' +
+          ' font-size="7" fill="#1a1a1a" opacity="0.95">\u21BA</text>';
+      } else if (s === 'moolatrikona') {
+        // Orange upward triangle
+        var tx = dotX, ty = dotY;
+        svg += '<polygon points="' + tx + ',' + (ty - 2.5) + ' ' + (tx - 2.5) + ',' + (ty + 2) + ' ' + (tx + 2.5) + ',' + (ty + 2) + '"' +
+          ' fill="#FF6B00" opacity="0.9"/>';
+      } else if (s === 'mks') {
+        // Yellow downward (inverse) triangle
+        var mx = dotX, my = dotY;
+        svg += '<polygon points="' + mx + ',' + (my + 2.5) + ' ' + (mx - 2.5) + ',' + (my - 2) + ' ' + (mx + 2.5) + ',' + (my - 2) + '"' +
+          ' fill="#FFD700" opacity="0.9"/>';
+      } else if (s === 'vargottama') {
+        // Purple diamond
+        var vx = dotX, vy = dotY;
+        svg += '<polygon points="' + vx + ',' + (vy - 3) + ' ' + (vx + 2.5) + ',' + vy + ' ' + vx + ',' + (vy + 3) + ' ' + (vx - 2.5) + ',' + vy + '"' +
+          ' fill="#9C27B0" opacity="0.9"/>';
+      } else if (s === 'combust') {
+        // Fire emoji
+        svg += '<text x="' + dotX + '" y="' + (dotY + 2.5) + '" text-anchor="middle"' +
+          ' font-size="7" opacity="0.95">\uD83D\uDD25</text>';
+      } else {
+        svg += '<circle cx="' + dotX + '" cy="' + dotY + '" r="' + dotR +
+          '" fill="' + STATUS_DOT_COLORS[s] + '" opacity="0.9"/>';
+      }
     });
   }
 
@@ -2341,7 +2443,7 @@ function hideDrishti(chartId) {
 // Encoded as "PlanetName:status1:status2:..." — colon-separated
 var PT_DOT_COLORS = {
   exalted:'#2ECC40', debilitated:'#E53935', moolatrikona:'#FF6B00',
-  mks:'#FFD700', retrograde:'#1a1a1a', combust:'#8B0000', vargottama:'#9C27B0'
+  mks:'#FFD700', retrograde:'#1a1a1a', combust:'#1a1a1a', vargottama:'#9C27B0'
 };
 var PT_LABELS = {
   exalted:'Exalted', debilitated:'Debilitated', moolatrikona:'Moolatrikona',
@@ -2356,10 +2458,24 @@ function showPlanetTip(event, encoded) {
   var html = '<span class="pt-name">' + name + '</span>';
   statuses.forEach(function(s) {
     if (!PT_LABELS[s]) return;
-    var border = s === 'retrograde' ? ' border:1px solid #555;' : '';
-    html += '<span class="pt-flag">' +
-      '<span class="pt-dot" style="background:' + PT_DOT_COLORS[s] + ';' + border + '"></span>' +
-      PT_LABELS[s] + '</span>';
+    var sym;
+    if (s === 'retrograde') {
+      sym = '<span class="pt-dot" style="background:none;color:#ddd;font-size:11px;line-height:8px;">\u21BA</span>';
+    } else if (s === 'moolatrikona') {
+      sym = '<svg width="8" height="8" viewBox="0 0 8 8" style="vertical-align:middle;margin-right:3px;display:inline-block;">' +
+        '<polygon points="4,0.5 0.5,7.5 7.5,7.5" fill="#FF6B00"/></svg>';
+    } else if (s === 'mks') {
+      sym = '<svg width="8" height="8" viewBox="0 0 8 8" style="vertical-align:middle;margin-right:3px;display:inline-block;">' +
+        '<polygon points="4,7.5 0.5,0.5 7.5,0.5" fill="#FFD700"/></svg>';
+    } else if (s === 'vargottama') {
+      sym = '<svg width="8" height="8" viewBox="0 0 8 8" style="vertical-align:middle;margin-right:3px;display:inline-block;">' +
+        '<polygon points="4,0 8,4 4,8 0,4" fill="#9C27B0"/></svg>';
+    } else if (s === 'combust') {
+      sym = '<span style="font-size:10px;vertical-align:middle;margin-right:3px;">\uD83D\uDD25</span>';
+    } else {
+      sym = '<span class="pt-dot" style="background:' + PT_DOT_COLORS[s] + ';"></span>';
+    }
+    html += '<span class="pt-flag">' + sym + PT_LABELS[s] + '</span>';
   });
   tip.innerHTML = html;
   tip.style.display = 'block';
@@ -3325,6 +3441,7 @@ function updateAuthUI() {
         '<span class="user-name">' + escHtml(currentUser.name || currentUser.email) + '</span>' +
       '</div>' +
       '<a class="header-link" href="#" onclick="openMyCharts();return false;">My Charts</a>' +
+      '<a class="header-link" href="#" onclick="openComparePanel();return false;">Compare Charts</a>' +
       '<a class="header-link" href="#" onclick="openAIHistory();return false;">Chat History</a>' +
       '<a class="header-link" href="/auth/logout">Sign Out</a>';
     document.getElementById("saveBtn").style.display = chartData ? "block" : "none";
@@ -3530,6 +3647,217 @@ function loadAIHistory() {
 
 function toggleHistoryItem(el) {
   el.classList.toggle("expanded");
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CHART COMPARISON / SYNASTRY
+// ═══════════════════════════════════════════════════════════════
+
+var _compareChartsCache = null;
+
+function openComparePanel() {
+  if (!currentUser) { alert("Please sign in to use chart comparison."); return; }
+  document.getElementById("compareOverlay").classList.add("open");
+  document.getElementById("comparePanel").classList.add("open");
+  loadCompareChartList();
+}
+
+function closeComparePanel() {
+  document.getElementById("compareOverlay").classList.remove("open");
+  document.getElementById("comparePanel").classList.remove("open");
+}
+
+function loadCompareChartList() {
+  fetch("/api/charts")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) { showCompareError(data.error); return; }
+      _compareChartsCache = data.charts;
+      var charts = data.charts;
+      if (charts.length < 2) {
+        document.getElementById("compareSelectorSection").innerHTML =
+          '<div class="panel-empty" style="text-align:center;padding:2rem 1rem;">' +
+          '<div style="font-size:2rem;margin-bottom:0.75rem;">&#128202;</div>' +
+          '<p style="color:var(--text-3);font-size:0.85rem;">You need at least 2 saved charts to use comparison.</p>' +
+          '<p style="color:var(--text-3);font-size:0.82rem;margin-top:0.5rem;">Save charts using the &ldquo;Save Chart&rdquo; button after generating a chart.</p>' +
+          '</div>';
+        return;
+      }
+      charts = charts.slice().sort(function(a, b) {
+        if (a.is_own_chart && !b.is_own_chart) return -1;
+        if (!a.is_own_chart && b.is_own_chart) return 1;
+        return a.name.localeCompare(b.name);
+      });
+      var optionsHtml = '<option value="">— Select a chart —</option>';
+      charts.forEach(function(c) {
+        var label = escHtml(c.name) + (c.is_own_chart ? ' \u2605' : '') + (c.date ? ' (' + escHtml(c.date) + ')' : '');
+        optionsHtml += '<option value="' + c.id + '">' + label + '</option>';
+      });
+      document.getElementById("compareChartA").innerHTML = optionsHtml;
+      document.getElementById("compareChartB").innerHTML = optionsHtml;
+    })
+    .catch(function() { showCompareError("Failed to load charts."); });
+}
+
+function showCompareError(msg) {
+  var el = document.getElementById("compareError");
+  el.textContent = msg;
+  el.style.display = "block";
+}
+
+function hideCompareError() {
+  document.getElementById("compareError").style.display = "none";
+}
+
+function runChartComparison() {
+  hideCompareError();
+  var idA = document.getElementById("compareChartA").value;
+  var idB = document.getElementById("compareChartB").value;
+  if (!idA) { showCompareError("Please select Person A."); return; }
+  if (!idB) { showCompareError("Please select Person B."); return; }
+  if (idA === idB) { showCompareError("Please select two different charts to compare."); return; }
+  if (aiLimitReached) { showCompareError("Daily question limit reached. Please try again tomorrow."); return; }
+
+  document.getElementById("compareSelectorSection").style.display = "none";
+  document.getElementById("compareResultsSection").style.display = "none";
+  document.getElementById("compareLoadingSection").style.display = "block";
+  document.getElementById("compareRunBtn").disabled = true;
+
+  fetch("/api/charts/compare", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({chart_id_1: parseInt(idA), chart_id_2: parseInt(idB)})
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      document.getElementById("compareLoadingSection").style.display = "none";
+      if (data.error) {
+        document.getElementById("compareSelectorSection").style.display = "block";
+        document.getElementById("compareRunBtn").disabled = false;
+        showCompareError(data.error);
+        if (data.error.indexOf("Daily limit") !== -1) { aiLimitReached = true; }
+        return;
+      }
+      if (data.remaining !== undefined) {
+        aiRemainingCount = data.remaining;
+        aiLimitReached = aiRemainingCount <= 0;
+      }
+      renderCompatibilityResults(data.compatibility, idA, idB);
+    })
+    .catch(function() {
+      document.getElementById("compareLoadingSection").style.display = "none";
+      document.getElementById("compareSelectorSection").style.display = "block";
+      document.getElementById("compareRunBtn").disabled = false;
+      showCompareError("Request failed. Please check your connection and try again.");
+    });
+}
+
+function resetComparePanel() {
+  document.getElementById("compareResultsSection").style.display = "none";
+  document.getElementById("compareLoadingSection").style.display = "none";
+  document.getElementById("compareRunBtn").disabled = false;
+  document.getElementById("compareSelectorSection").style.display = "block";
+  hideCompareError();
+}
+
+function renderCompatibilityResults(compat, idA, idB) {
+  var nameA = "Person A", nameB = "Person B";
+  if (_compareChartsCache) {
+    _compareChartsCache.forEach(function(c) {
+      if (String(c.id) === String(idA)) nameA = c.name;
+      if (String(c.id) === String(idB)) nameB = c.name;
+    });
+  }
+
+  // Score gauge
+  var score = compat.score || 0;
+  var label = compat.score_label || "";
+  var scoreColor = score >= 76 ? "var(--green)" : score >= 61 ? "var(--teal)" : score >= 41 ? "var(--amber)" : "var(--red)";
+  var circumference = 2 * Math.PI * 40;
+  var offset = circumference * (1 - score / 100);
+  document.getElementById("compatScoreBlock").innerHTML =
+    '<div style="display:flex;flex-direction:column;align-items:center;gap:0.5rem;">' +
+    '<div style="font-size:0.82rem;color:var(--text-3);font-weight:500;">' + escHtml(nameA) + ' \u2194 ' + escHtml(nameB) + '</div>' +
+    '<svg width="100" height="100" viewBox="0 0 100 100">' +
+      '<circle cx="50" cy="50" r="40" fill="none" stroke="var(--border)" stroke-width="8"/>' +
+      '<circle cx="50" cy="50" r="40" fill="none" stroke="' + scoreColor + '" stroke-width="8" ' +
+        'stroke-dasharray="' + circumference.toFixed(1) + '" ' +
+        'stroke-dashoffset="' + offset.toFixed(1) + '" ' +
+        'stroke-linecap="round" transform="rotate(-90 50 50)"/>' +
+      '<text x="50" y="46" text-anchor="middle" font-size="18" font-weight="700" fill="' + scoreColor + '">' + score + '</text>' +
+      '<text x="50" y="62" text-anchor="middle" font-size="8" fill="var(--text-3)">/ 100</text>' +
+    '</svg>' +
+    '<div style="font-size:1rem;font-weight:700;color:' + scoreColor + ';">' + escHtml(label) + '</div>' +
+    '</div>';
+
+  // Overall summary
+  document.getElementById("compatSummary").innerHTML =
+    '<div class="ai-reading-section-header">' +
+      '<span class="ai-reading-section-icon">\uD83D\uDD2E</span>' +
+      '<span class="ai-reading-section-title" style="color:var(--pink);">Compatibility Overview</span>' +
+    '</div>' +
+    '<div class="ai-reading-section-body">' + marked.parse(compat.overall_summary || '') + '</div>';
+
+  // Strengths
+  var strengths = compat.strengths || [];
+  if (strengths.length > 0) {
+    var sHtml = '<div style="margin-bottom:0.5rem;font-size:0.82rem;font-weight:600;color:var(--green);">Strengths</div><ul style="list-style:none;padding:0;margin:0;">';
+    strengths.forEach(function(s) {
+      sHtml += '<li style="padding:0.4rem 0;border-bottom:1px solid var(--border-light);font-size:0.82rem;color:var(--text-2);">\u2714&nbsp;' + escHtml(s) + '</li>';
+    });
+    document.getElementById("compatStrengths").innerHTML = sHtml + '</ul>';
+  }
+
+  // Challenges
+  var challenges = compat.challenges || [];
+  if (challenges.length > 0) {
+    var cHtml = '<div style="margin-bottom:0.5rem;font-size:0.82rem;font-weight:600;color:var(--red);">Challenges</div><ul style="list-style:none;padding:0;margin:0;">';
+    challenges.forEach(function(c) {
+      cHtml += '<li style="padding:0.4rem 0;border-bottom:1px solid var(--border-light);font-size:0.82rem;color:var(--text-2);">\u26A0&nbsp;' + escHtml(c) + '</li>';
+    });
+    document.getElementById("compatChallenges").innerHTML = cHtml + '</ul>';
+  }
+
+  // Category tiles
+  var details = compat.category_details || [];
+  var gridEl = document.getElementById("compatGrid");
+  gridEl.innerHTML = "";
+  details.forEach(function(cat) {
+    var card = document.createElement("div");
+    card.className = "compat-card";
+    card.innerHTML =
+      '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;padding-bottom:0.45rem;border-bottom:1px solid var(--border-light);">' +
+        '<span style="font-size:1.1rem;">' + (cat.icon || '') + '</span>' +
+        '<span class="compat-card-title">' + escHtml(cat.title || '') + '</span>' +
+      '</div>' +
+      '<div class="compat-card-body">' + marked.parse(cat.reading || '') + '</div>';
+    gridEl.appendChild(card);
+  });
+
+  // Timing advice
+  if (compat.timing_advice) {
+    document.getElementById("compatTiming").innerHTML =
+      '<div class="ai-reading-section-header">' +
+        '<span class="ai-reading-section-icon">\uD83D\uDCC5</span>' +
+        '<span class="ai-reading-section-title" style="color:var(--pink);">Favorable Timing</span>' +
+      '</div>' +
+      '<div class="ai-reading-section-body">' + marked.parse(compat.timing_advice) + '</div>';
+  }
+
+  // Remedies
+  var remedies = compat.remedies || [];
+  if (remedies.length > 0) {
+    var rHtml = '<div style="margin-bottom:0.75rem;font-size:0.82rem;font-weight:600;color:var(--text);">Recommended Remedies</div>';
+    remedies.forEach(function(rem) {
+      rHtml += '<div class="compat-remedy-card">' +
+        '<div style="font-size:0.85rem;font-weight:600;color:var(--text);margin-bottom:0.35rem;">' + escHtml(rem.title || '') + '</div>' +
+        '<div style="font-size:0.82rem;color:var(--text-2);line-height:1.65;">' + marked.parse(rem.description || '') + '</div>' +
+        '</div>';
+    });
+    document.getElementById("compatRemedies").innerHTML = rHtml;
+  }
+
+  document.getElementById("compareResultsSection").style.display = "block";
 }
 
 function loadSavedChart(id) {
