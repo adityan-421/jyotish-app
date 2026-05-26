@@ -16,7 +16,7 @@ DB_NAME = os.environ.get("DB_NAME", "postgres")
 DB_USER = os.environ.get("DB_USER", "postgres")
 DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
 MAX_CHARTS = 20
-UNLIMITED_CHART_EMAILS = {"adityan@gmail.com"}
+UNLIMITED_CHART_EMAILS = {"adityan@gmail.com", "anu.namjoshi@gmail.com"}
 
 logger = logging.getLogger(__name__)
 
@@ -820,7 +820,7 @@ def get_users_with_push_tokens_and_charts():
 # ── GrahaGems ─────────────────────────────────────────────────────────────
 
 GEMS_PER_MONTH = 10
-UNLIMITED_GEM_EMAILS = {"adityan@gmail.com"}
+UNLIMITED_GEM_EMAILS = {"adityan@gmail.com", "anu.namjoshi@gmail.com"}
 
 
 def get_gem_balance(user_id, user_email=None):
