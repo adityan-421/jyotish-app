@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unsubscribe — GrahaLogic</title>
+<style>
+  :root { --bg:#0f1117; --surface:#1a1d27; --border:#2e3248; --text:#e8eaf0; --text2:#9aa0b8; --text3:#6b7194; --teal:#00c9b1; --amber:#f59e0b; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:system-ui,sans-serif; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:2rem; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:2.5rem 2rem; max-width:440px; width:100%; text-align:center; }
+  .icon { font-size:2.5rem; margin-bottom:1rem; }
+  h1 { font-size:1.3rem; font-weight:700; margin-bottom:0.75rem; }
+  p { font-size:0.9rem; color:var(--text2); line-height:1.6; margin-bottom:1.25rem; }
+  a { color:var(--teal); text-decoration:none; font-size:0.88rem; }
+  a:hover { text-decoration:underline; }
+  .sub { font-size:0.8rem; color:var(--text3); margin-top:1rem; }
+</style>
+</head>
+<body>
+<div class="card">
+  {% if success %}
+    <div class="icon">✓</div>
+    <h1 style="color:var(--teal);">Unsubscribed</h1>
+    <p>You won't receive weekly Jyotish emails from GrahaLogic anymore.</p>
+    <a href="/">← Back to GrahaLogic</a>
+  {% else %}
+    <div class="icon">⚠</div>
+    <h1 style="color:var(--amber);">Link Invalid or Expired</h1>
+    <p>{{ reason or 'This unsubscribe link is no longer valid.' }}<br>Please use the link from a more recent email.</p>
+    <a href="/">← Back to GrahaLogic</a>
+    <p class="sub">If you continue receiving emails after clicking unsubscribe, contact support.</p>
+  {% endif %}
+</div>
+</body>
+</html>

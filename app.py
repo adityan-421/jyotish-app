@@ -26,6 +26,10 @@ from database import (
     mark_predictions_submitted, get_submitted_predictions, complete_prediction,
     fail_prediction, get_user_predictions,
     upsert_push_token, get_users_with_push_tokens_and_charts,
+    get_app_setting, set_app_setting,
+    get_users_for_weekly_email, insert_weekly_email, mark_weekly_emails_submitted,
+    get_submitted_weekly_emails, complete_weekly_email, get_ai_ready_weekly_emails,
+    mark_weekly_email_sent, fail_weekly_email, unsubscribe_user,
 )
 
 from pathlib import Path
@@ -269,7 +273,23 @@ def admin_page():
     if not user or user.get("email") != ADMIN_EMAIL:
         return "Access denied", 403
     stats = get_admin_stats()
-    return render_template("admin.html", stats=stats)
+    settings = {
+        "weekly_email_enabled": get_app_setting("weekly_email_enabled", "false"),
+    }
+    return render_template("admin.html", stats=stats, settings=settings)
+
+
+@app.route("/admin/settings", methods=["POST"])
+def admin_settings():
+    user = session.get("user")
+    if not user or user.get("email") != ADMIN_EMAIL:
+        return "Access denied", 403
+    key = request.form.get("key", "").strip()
+    value = request.form.get("value", "").strip()
+    allowed_keys = {"weekly_email_enabled"}
+    if key in allowed_keys:
+        set_app_setting(key, value)
+    return redirect("/admin")
 
 
 @app.route("/auth/google")
@@ -1055,6 +1075,106 @@ def _build_monthly_prompt(natal_summary, month_start_str, prompts_config):
     )
 
 
+# ── Weekly email helpers ───────────────────────────────────────────────────
+
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "")
+
+_DAY_LORD_COLORS = {
+    "Sun":     "Red / Orange",
+    "Moon":    "White / Silver",
+    "Mars":    "Red / Coral",
+    "Mercury": "Green",
+    "Jupiter": "Yellow / Gold",
+    "Venus":   "White / Pink",
+    "Saturn":  "Blue / Black",
+}
+# Mon=0→Moon, Tue=1→Mars, Wed=2→Mercury, Thu=3→Jupiter, Fri=4→Venus, Sat=5→Saturn, Sun=6→Sun
+_WEEKDAY_LORDS = ["Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Sun"]
+
+
+def _get_email_serializer():
+    """Return an itsdangerous serializer scoped to email unsubscribe tokens."""
+    return URLSafeTimedSerializer(app.secret_key, salt="email-unsub")
+
+
+def _build_lucky_colors_raw(week_dates):
+    """Return (prompt_text, list_of_dicts) for 7 days based on day-lord rules."""
+    rows = []
+    for d_str in week_dates:
+        d = datetime.strptime(d_str, "%Y-%m-%d")
+        lord = _WEEKDAY_LORDS[d.weekday()]
+        color = _DAY_LORD_COLORS[lord]
+        rows.append({"date": d_str, "day": d.strftime("%A"), "ruler": lord, "color": color})
+    text = "\n".join(f'{r["day"]} {r["date"]}: {r["ruler"]} — {r["color"]}' for r in rows)
+    return text, rows
+
+
+def _build_weekly_transit_table(week_dates):
+    """Build a compact 7-row transit table string for the weekly email prompt."""
+    lines = []
+    for d_str in week_dates:
+        try:
+            transits = compute_transits_for_date(d_str)
+            panchang = compute_panchang(d_str, "UTC")
+        except Exception:
+            transits, panchang = [], {}
+        dt = datetime.strptime(d_str, "%Y-%m-%d")
+        transit_str = _format_transit_compact(transits)
+        yoga = panchang.get("yoga", "?")
+        vara = panchang.get("vara", "?")
+        lines.append(f"{dt.strftime('%A')} {d_str} | {transit_str} | Yoga:{yoga} | Vara:{vara}")
+    return "\n".join(lines)
+
+
+def _build_weekly_email_prompt(natal_summary, week_dates, prompts_config):
+    """Build the weekly email AI prompt for one user."""
+    template = prompts_config.get("weekly_email", "")
+    if not template:
+        return ""
+    transit_table = _build_weekly_transit_table(week_dates)
+    lucky_colors_raw, _ = _build_lucky_colors_raw(week_dates)
+    week_range = f"{week_dates[0]} (Mon) to {week_dates[6]} (Sun)"
+    return _safe_substitute(template, {
+        "natal_summary": natal_summary,
+        "week_range": week_range,
+        "transit_table": transit_table,
+        "lucky_colors_raw": lucky_colors_raw,
+    })
+
+
+def _send_weekly_email(to_email, name, ai_content, week_label, user_id):
+    """Render and send the weekly email via SendGrid. Returns True on success."""
+    try:
+        import sendgrid
+        from sendgrid.helpers.mail import Mail
+    except ImportError:
+        logger.error("sendgrid package not installed")
+        return False
+
+    try:
+        unsub_token = _get_email_serializer().dumps(user_id)
+        unsub_url = f"{APP_BASE_URL}/unsubscribe?token={unsub_token}"
+        html_body = render_template(
+            "weekly_email.html",
+            name=name or "there",
+            week_label=week_label,
+            content=ai_content,
+            unsubscribe_url=unsub_url,
+        )
+        msg = Mail(
+            from_email=("noreply@grahalogic.com", "GrahaLogic"),
+            to_emails=to_email,
+            subject=f"Your Weekly Jyotish Reading — {week_label}",
+            html_content=html_body,
+        )
+        sg = sendgrid.SendGridAPIClient(os.environ.get("SENDGRID_API_KEY", ""))
+        resp = sg.send(msg)
+        return resp.status_code < 300
+    except Exception as e:
+        logger.error("SendGrid error for %s: %s", to_email, e)
+        return False
+
+
 # ── Prediction API endpoints ──────────────────────────────────────────────
 
 @app.route("/api/predictions")
@@ -1496,6 +1616,203 @@ def cron_check_readings():
     return jsonify({"checked": len(submitted), "completed": completed_count, "failed": failed_count})
 
 
+@app.route("/api/cron/submit-weekly-emails", methods=["POST"])
+def cron_submit_weekly_emails():
+    """Build and submit weekly email AI prompts as a Gemini batch job.
+
+    Query params:
+      test=1  — only process admin account (adityan@gmail.com) for testing
+    """
+    secret = request.headers.get("X-Cron-Secret", "")
+    if secret != os.environ.get("CRON_SECRET", os.environ.get("BACKFILL_SECRET", "")):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    if get_app_setting("weekly_email_enabled", "false") != "true":
+        return jsonify({"skipped": "weekly email disabled"}), 200
+
+    is_test = request.args.get("test") == "1"
+    test_email = ADMIN_EMAIL if is_test else None
+
+    now = datetime.now()
+    week_start = _get_week_start(now)
+    week_dates = [
+        (datetime.strptime(week_start, "%Y-%m-%d") + timedelta(days=i)).strftime("%Y-%m-%d")
+        for i in range(7)
+    ]
+
+    users = get_users_for_weekly_email(week_start, test_email=test_email)
+    if not users:
+        return jsonify({"submitted": 0, "message": "No eligible users"})
+
+    prompts_config = load_prompts()
+    # Pre-compute transit table once — same for all users
+    transit_table = _build_weekly_transit_table(week_dates)
+    lucky_colors_raw, _ = _build_lucky_colors_raw(week_dates)
+    week_range = f"{week_dates[0]} (Mon) to {week_dates[6]} (Sun)"
+    template = prompts_config.get("weekly_email", "")
+
+    pending_rows = []  # list of (db_id, prompt_text, user_email, user_name)
+    for u in users:
+        db_id = insert_weekly_email(u["user_id"], week_start)
+        if db_id is None:
+            continue
+        natal_summary = _build_natal_summary(u["chart_data"])
+        prompt = _safe_substitute(template, {
+            "natal_summary": natal_summary,
+            "week_range": week_range,
+            "transit_table": transit_table,
+            "lucky_colors_raw": lucky_colors_raw,
+        })
+        pending_rows.append((db_id, prompt, u["email"], u["name"]))
+
+    if not pending_rows:
+        return jsonify({"submitted": 0, "message": "All already generated for this week"})
+
+    from google import genai
+    from google.genai.types import HttpOptions
+
+    client = genai.Client(
+        api_key=os.environ.get("GEMINI_API_KEY"),
+        http_options=HttpOptions(timeout=60_000),
+    )
+    model_name = prompts_config.get("batch_model", prompts_config.get("model", "gemini-2.5-flash"))
+
+    inline_requests = [
+        {"contents": [{"parts": [{"text": prompt}], "role": "user"}]}
+        for _, prompt, _, _ in pending_rows
+    ]
+    db_ids = [db_id for db_id, _, _, _ in pending_rows]
+
+    try:
+        tag = "test-" if is_test else ""
+        batch_job = client.batches.create(
+            model=model_name,
+            src=inline_requests,
+            config={"display_name": f"weekly-email-{tag}{now.strftime('%Y%m%d-%H%M%S')}"},
+        )
+        id_index_pairs = [(db_id, idx) for idx, db_id in enumerate(db_ids)]
+        mark_weekly_emails_submitted(id_index_pairs, batch_job.name)
+    except Exception as e:
+        logger.error("Weekly email batch submit failed: %s", e)
+        for db_id in db_ids:
+            fail_weekly_email(db_id, str(e))
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify({"submitted": len(pending_rows), "week_start": week_start, "test": is_test})
+
+
+@app.route("/api/cron/send-weekly-emails", methods=["POST"])
+def cron_send_weekly_emails():
+    """Poll completed weekly email batches and send emails via SendGrid."""
+    secret = request.headers.get("X-Cron-Secret", "")
+    if secret != os.environ.get("CRON_SECRET", os.environ.get("BACKFILL_SECRET", "")):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    submitted = get_submitted_weekly_emails()
+    if not submitted:
+        # Also check for any ai_ready rows that weren't sent yet
+        pass
+
+    from google import genai
+    from google.genai.types import HttpOptions
+
+    client = genai.Client(
+        api_key=os.environ.get("GEMINI_API_KEY"),
+        http_options=HttpOptions(timeout=60_000),
+    )
+
+    # Group by batch_name
+    batches = {}
+    for r in submitted:
+        if r.get("batch_name"):
+            batches.setdefault(r["batch_name"], []).append(r)
+
+    completed_count = failed_count = 0
+
+    for batch_name, rows in batches.items():
+        try:
+            batch_job = client.batches.get(name=batch_name)
+        except Exception as e:
+            logger.error("Failed to fetch weekly email batch %s: %s", batch_name, e)
+            continue
+
+        state = batch_job.state.name if hasattr(batch_job.state, "name") else str(batch_job.state)
+        if state not in ("JOB_STATE_SUCCEEDED", "SUCCEEDED"):
+            if state in ("JOB_STATE_FAILED", "FAILED"):
+                for r in rows:
+                    fail_weekly_email(r["id"], "Batch job failed")
+                    failed_count += 1
+            continue
+
+        responses = batch_job.dest.inlined_responses if batch_job.dest else []
+        rows_sorted = sorted(rows, key=lambda r: r.get("batch_index") or 0)
+
+        for i, r in enumerate(rows_sorted):
+            try:
+                resp = responses[i] if i < len(responses) else None
+                if not resp or not resp.response:
+                    fail_weekly_email(r["id"], "No response from batch")
+                    failed_count += 1
+                    continue
+
+                result_text = resp.response.text.strip()
+                if result_text.startswith("```"):
+                    result_text = result_text.split("\n", 1)[1] if "\n" in result_text else result_text[3:]
+                    if result_text.endswith("```"):
+                        result_text = result_text[:-3].strip()
+
+                ai_content = json.loads(result_text)
+                complete_weekly_email(r["id"], result_text)
+                completed_count += 1
+            except Exception as e:
+                logger.error("Failed to process weekly email %s: %s", r["id"], e)
+                fail_weekly_email(r["id"], str(e))
+                failed_count += 1
+
+    # Now send all ai_ready rows
+    ai_ready_rows = get_ai_ready_weekly_emails()
+    sent_count = send_failed_count = 0
+
+    for r in ai_ready_rows:
+        try:
+            ai_content = json.loads(r["ai_content"])
+            week_start_str = r["week_start"].isoformat() if hasattr(r["week_start"], "isoformat") else str(r["week_start"])
+            week_label = f"Week of {datetime.strptime(week_start_str, '%Y-%m-%d').strftime('%d %b %Y')}"
+            ok = _send_weekly_email(r["email"], r["name"], ai_content, week_label, r["user_id"])
+            if ok:
+                mark_weekly_email_sent(r["id"])
+                sent_count += 1
+            else:
+                fail_weekly_email(r["id"], "SendGrid returned non-2xx")
+                send_failed_count += 1
+        except Exception as e:
+            logger.error("Failed to send weekly email to %s: %s", r.get("email"), e)
+            fail_weekly_email(r["id"], str(e))
+            send_failed_count += 1
+
+    return jsonify({
+        "batch_completed": completed_count,
+        "batch_failed": failed_count,
+        "emails_sent": sent_count,
+        "emails_failed": send_failed_count,
+    })
+
+
+@app.route("/unsubscribe")
+def unsubscribe_email():
+    """Handle one-click unsubscribe from weekly emails."""
+    token = request.args.get("token", "")
+    try:
+        user_id = _get_email_serializer().loads(token, max_age=90 * 86400)
+        unsubscribe_user(user_id)
+        return render_template("unsubscribe.html", success=True)
+    except (BadSignature, SignatureExpired):
+        return render_template("unsubscribe.html", success=False, reason="Link expired or invalid")
+    except Exception as e:
+        logger.error("Unsubscribe error: %s", e)
+        return render_template("unsubscribe.html", success=False, reason="An error occurred")
+
+
 @app.route("/api/stats", methods=["POST"])
 def api_stats():
     """Return aggregate usage stats (protected by backfill secret)."""
@@ -1567,131 +1884,43 @@ def api_timezone():
 
 def extract_relevant_chart_data(chart_data, category):
     """Filter chart JSON to only include data relevant to the category."""
-    result = {}
-
-    # Always include birth info, lagna, and planets
-    for key in ("birth", "lagna", "planets"):
-        if key in chart_data:
-            result[key] = chart_data[key]
-
     cat = category.lower()
 
-    # Determine which divisional charts to include
-    charts_to_include = ["D1", "D60"]
-    if cat in ("spouse", "relationship"):
-        charts_to_include.append("D9")
-    elif cat in ("career", "business"):
-        charts_to_include.append("D10")
+    # Category → extra divisional charts beyond the D1+D9 default
+    extra_charts = []
+    if cat in ("career", "business"):
+        extra_charts = ["D10"]
     elif cat == "finance":
-        charts_to_include.append("D2")
+        extra_charts = ["D2"]
     elif cat == "children":
-        charts_to_include.append("D7")
+        extra_charts = ["D7"]
     elif cat == "siblings":
-        charts_to_include.append("D3")
+        extra_charts = ["D3"]
+    elif cat in ("spirituality", "other"):
+        extra_charts = ["D60"]
 
-    if "charts" in chart_data:
-        result["charts"] = {k: v for k, v in chart_data["charts"].items() if k in charts_to_include}
+    result = _strip_chart_for_ai(chart_data, extra_charts=extra_charts)
 
-    # Determine which houses are most relevant
-    house_map = {
-        "health": [1, 6, 8],
-        "relationship": [5, 7, 11],
-        "spouse": [5, 7, 11],
-        "finance": [2, 11],
-        "career": [2, 6, 7, 10, 11],
-        "business": [2, 6, 7, 10, 11],
-        "children": [5, 9],
-        "siblings": [3, 11],
-        "education": [4, 5, 9],
-        "spirituality": [5, 9, 12],
-        "travel": [3, 9, 12],
-        "property": [4],
-        "legal": [6, 8, 12],
-        "gains/profits": [2, 11],
-        "friends": [11],
-    }
+    # Ashtakavarga only for finance/career
+    if cat not in ("finance", "gains/profits", "career", "business"):
+        result.pop("ashtakavarga", None)
 
-    # Include dignities for selected charts
-    if "dignities" in chart_data:
-        result["dignities"] = {k: v for k, v in chart_data["dignities"].items() if k in charts_to_include}
-
-    # Always include these if present
-    for key in ("karakas", "panchang", "arudha_lagna"):
-        if key in chart_data:
-            result[key] = chart_data[key]
-
-    # Include aspects
-    if "aspects" in chart_data:
-        result["aspects"] = chart_data["aspects"]
-
-    # Include yogas for most categories
-    if "yogas" in chart_data:
-        result["yogas"] = chart_data["yogas"]
-
-    # Include bhava
-    if "bhava" in chart_data:
-        relevant_houses = house_map.get(cat)
-        if relevant_houses:
-            result["bhava"] = [b for b in chart_data["bhava"] if b.get("house") in relevant_houses]
-        else:
-            result["bhava"] = chart_data["bhava"]
-
-    # Include ashtakavarga for finance-related queries
-    if cat in ("finance", "gains/profits", "career", "business") and "ashtakavarga" in chart_data:
-        result["ashtakavarga"] = chart_data["ashtakavarga"]
-
-    # Include dasha — send current maha period and neighbours for context
-    if "dasha" in chart_data:
-        dasha = dict(chart_data["dasha"])
-        if "maha" in dasha:
-            dasha["maha"] = _relevant_maha_periods(dasha["maha"])
-        result["dasha"] = dasha
-
-    # Fallback: for "other", send everything with D1
-    if cat == "other":
-        result = dict(chart_data)
-        if "dasha" in result and "maha" in result["dasha"]:
-            result["dasha"] = dict(result["dasha"])
-            result["dasha"]["maha"] = _relevant_maha_periods(result["dasha"]["maha"])
-
-    # Always include today's date so AI knows what's current
     result["current_date"] = datetime.now().strftime("%d-%b-%Y")
-
     return result
 
 
 def extract_synastry_data(chart_data):
     """Filter chart JSON to only the fields relevant for Vedic synastry analysis."""
-    result = {}
-    for key in ("birth", "lagna", "planets"):
-        if key in chart_data:
-            result[key] = chart_data[key]
-
-    if "charts" in chart_data:
-        result["charts"] = {k: v for k, v in chart_data["charts"].items() if k in ("D1", "D9")}
-
-    if "dignities" in chart_data:
-        result["dignities"] = {k: v for k, v in chart_data["dignities"].items() if k in ("D1", "D9")}
-
-    if "bhava" in chart_data:
-        result["bhava"] = [b for b in chart_data["bhava"] if b.get("house") in (1, 5, 7, 8, 11, 12)]
-
-    for key in ("karakas", "aspects", "ashtakavarga", "yogas", "kuta_profile"):
-        if key in chart_data:
-            result[key] = chart_data[key]
-
-    if "dasha" in chart_data:
-        dasha = dict(chart_data["dasha"])
-        if "maha" in dasha:
-            dasha["maha"] = _relevant_maha_periods(dasha["maha"])
-        result["dasha"] = dasha
-
+    # D9 is always critical for synastry; strip everything else
+    result = _strip_chart_for_ai(chart_data, extra_charts=["D9"])
+    # Synastry doesn't need ashtakavarga or doshas
+    result.pop("ashtakavarga", None)
+    result.pop("doshas", None)
     return result
 
 
 def _relevant_maha_periods(maha_list):
     """Return the current maha dasha period plus its neighbours."""
-    from datetime import datetime
     now = datetime.now()
     current_idx = None
     for i, m in enumerate(maha_list):
@@ -1707,8 +1936,176 @@ def _relevant_maha_periods(maha_list):
         lo = max(0, current_idx - 1)
         hi = min(len(maha_list), current_idx + 2)
         return maha_list[lo:hi]
-    # Fallback: return last 3 if current not found
     return maha_list[-3:]
+
+
+def _parse_date_safe(s):
+    try:
+        return datetime.strptime(s, "%d-%b-%Y")
+    except Exception:
+        return None
+
+
+def _trim_dasha(dasha):
+    """
+    Trim dasha for AI consumption:
+    - maha: current + 1 before + 2 after (existing behaviour)
+    - antar: only the 3 relevant maha lords (not all 9)
+    - pratyantar: only the current maha lord's 9 antar entries (covers next ~20 yrs
+      of sub-sub periods; further-future pratyantar is too granular to be useful)
+    """
+    if not dasha:
+        return dasha
+    dasha = dict(dasha)
+
+    trimmed_maha = _relevant_maha_periods(dasha.get("maha", []))
+    dasha["maha"] = trimmed_maha
+    relevant_lords = {m["lord"] for m in trimmed_maha}
+
+    # Find current maha lord for pratyantar trimming
+    now = datetime.now()
+    current_maha_lord = None
+    for m in trimmed_maha:
+        try:
+            if datetime.strptime(m["start"], "%d-%b-%Y") <= now <= datetime.strptime(m["end"], "%d-%b-%Y"):
+                current_maha_lord = m["lord"]
+                break
+        except Exception:
+            pass
+
+    if "antar" in dasha:
+        dasha["antar"] = {k: v for k, v in dasha["antar"].items() if k in relevant_lords}
+
+    if "pratyantar" in dasha:
+        if current_maha_lord and current_maha_lord in dasha["pratyantar"]:
+            dasha["pratyantar"] = {current_maha_lord: dasha["pratyantar"][current_maha_lord]}
+        else:
+            dasha.pop("pratyantar", None)
+
+    return dasha
+
+
+def _slim_sadesati(ss):
+    """Keep only current_status, moon_sign, and the active/nearest future cycle."""
+    if not ss:
+        return ss
+    now = datetime.now()
+    result = {k: ss[k] for k in ("moon_sign", "active", "current_status") if k in ss}
+
+    # Keep only the active or next upcoming sade sati cycle
+    kept = None
+    for cycle in ss.get("cycles", []):
+        end = _parse_date_safe(cycle.get("end", ""))
+        if end and end >= now:
+            kept = cycle
+            break
+    if kept:
+        result["cycles"] = [kept]
+
+    # Dhaiya periods within the next 5 years
+    cutoff = datetime(now.year + 5, now.month, now.day)
+    result["dhaiya"] = [
+        d for d in ss.get("dhaiya", [])
+        if _parse_date_safe(d.get("end", "")) and _parse_date_safe(d.get("end", "")) >= now
+        and _parse_date_safe(d.get("start", "")) and _parse_date_safe(d.get("start", "")) <= cutoff
+    ]
+    return result
+
+
+# Sign lords indexed 0=Aries … 11=Pisces (mirrors jyotish_engine.SIGN_LORDS)
+_SIGN_LORDS_LIST = [
+    "Mars", "Venus", "Mercury", "Moon", "Sun", "Mercury",
+    "Venus", "Mars", "Jupiter", "Saturn", "Saturn", "Jupiter",
+]
+
+
+def _strip_chart_for_ai(chart_data, extra_charts=None):
+    """
+    Return a cleaned copy of chart_data suitable for AI prompts:
+    - Strips computational/redundant fields (raw lons, speed, abbrs, jd, ayanamsa)
+    - Keeps D1 + D9 always; adds extra_charts; drops D12, D20 always
+    - Replaces verbose bhava array with compact house_lords dict
+    - Trims dasha (maha/antar/pratyantar) and sadesati
+    - Strips panchang display-only strings and karaka abbreviations
+    """
+    result = {}
+    keep_charts = ({"D1", "D9"} | set(extra_charts or [])) - {"D12", "D20"}
+
+    # birth — strip computation artifacts
+    if "birth" in chart_data:
+        b = dict(chart_data["birth"])
+        b.pop("jd", None)
+        b.pop("ayanamsa", None)
+        result["birth"] = b
+
+    # lagna — strip raw longitudes
+    if "lagna" in chart_data:
+        l = dict(chart_data["lagna"])
+        l.pop("lon", None)
+        l.pop("lon_fmt", None)
+        result["lagna"] = l
+
+    # planets — strip lon, full_lon, speed, abbr
+    if "planets" in chart_data:
+        result["planets"] = [
+            {k: v for k, v in p.items() if k not in ("lon", "full_lon", "speed", "abbr")}
+            for p in chart_data["planets"]
+        ]
+
+    # charts — keep only relevant, strip planet_degs from D1
+    if "charts" in chart_data:
+        filtered = {}
+        for k, v in chart_data["charts"].items():
+            if k not in keep_charts:
+                continue
+            if k == "D1":
+                v = {ck: cv for ck, cv in v.items() if ck != "planet_degs"}
+            filtered[k] = v
+        result["charts"] = filtered
+
+    # dignities — same chart filter
+    if "dignities" in chart_data:
+        result["dignities"] = {k: v for k, v in chart_data["dignities"].items() if k in keep_charts}
+
+    # house_lords — compact replacement for bhava (12 entries vs ~400 tokens)
+    lagna_sign = (chart_data.get("lagna") or {}).get("sign")
+    if lagna_sign:
+        idx = int(lagna_sign) - 1
+        result["house_lords"] = {
+            str(h): _SIGN_LORDS_LIST[(idx + h - 1) % 12]
+            for h in range(1, 13)
+        }
+
+    # karakas — strip abbreviation fields
+    if "karakas" in chart_data:
+        result["karakas"] = [
+            {k: v for k, v in kar.items() if k not in ("karaka_abbr", "planet_abbr")}
+            for kar in chart_data["karakas"]
+        ]
+
+    # panchang — strip display-only strings (duplicates of structured fields)
+    if "panchang" in chart_data:
+        result["panchang"] = {
+            lk: ({k: v for k, v in lv.items() if k != "display"} if isinstance(lv, dict) else lv)
+            for lk, lv in chart_data["panchang"].items()
+        }
+
+    # dasha — trim maha/antar/pratyantar
+    if "dasha" in chart_data:
+        result["dasha"] = _trim_dasha(dict(chart_data["dasha"]))
+
+    # sadesati — slim to current cycle only
+    if "sadesati" in chart_data:
+        result["sadesati"] = _slim_sadesati(chart_data["sadesati"])
+
+    # pass-through fields (no stripping needed)
+    for key in ("yogas", "doshas", "aspects", "ashtakavarga",
+                "arudha_lagna", "combust_planets", "vargottama_planets",
+                "kuta_profile", "current_date"):
+        if key in chart_data:
+            result[key] = chart_data[key]
+
+    return result
 
 
 LIFE_CATEGORIES = [
@@ -1764,10 +2161,10 @@ def api_ask():
 
             model = GenerativeModel(prompts_config.get("model", "gemini-2.5-flash"))
 
-            full_chart = dict(chart_data)
-            if "dasha" in full_chart and "maha" in full_chart.get("dasha", {}):
-                full_chart["dasha"] = dict(full_chart["dasha"])
-                full_chart["dasha"]["maha"] = _relevant_maha_periods(full_chart["dasha"]["maha"])
+            # Initial reading needs all major divisional charts
+            full_chart = _strip_chart_for_ai(
+                chart_data, extra_charts=["D2", "D7", "D10"]
+            )
             full_chart["current_date"] = datetime.now().strftime("%d-%b-%Y")
 
             try:
@@ -1811,10 +2208,7 @@ def api_ask():
 
             model = GenerativeModel(prompts_config.get("model", "gemini-2.5-flash"))
 
-            full_chart = dict(chart_data)
-            if "dasha" in full_chart and "maha" in full_chart.get("dasha", {}):
-                full_chart["dasha"] = dict(full_chart["dasha"])
-                full_chart["dasha"]["maha"] = _relevant_maha_periods(full_chart["dasha"]["maha"])
+            full_chart = _strip_chart_for_ai(chart_data)
             full_chart["current_date"] = datetime.now().strftime("%d-%b-%Y")
 
             try:

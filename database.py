@@ -171,6 +171,42 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_push_tokens_user_id
                 ON user_push_tokens(user_id);
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cur.execute("""
+                INSERT INTO app_settings (key, value) VALUES ('weekly_email_enabled', 'false')
+                ON CONFLICT (key) DO NOTHING;
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS weekly_emails (
+                    id SERIAL PRIMARY KEY,
+                    user_id TEXT NOT NULL REFERENCES users(id),
+                    week_start DATE NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    batch_name TEXT,
+                    batch_index INTEGER,
+                    ai_content TEXT,
+                    sent_at TIMESTAMP,
+                    error TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, week_start)
+                );
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_weekly_emails_status
+                ON weekly_emails(status);
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS email_unsubscribes (
+                    user_id TEXT PRIMARY KEY REFERENCES users(id),
+                    unsubscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
             conn.commit()
             cur.close()
         _db_initialized = True
@@ -771,3 +807,191 @@ def get_users_with_push_tokens_and_charts():
         rows = cur.fetchall()
         cur.close()
     return rows
+
+
+# ── App Settings ───────────────────────────────────────────────────────────
+
+def get_app_setting(key, default=None):
+    """Return an app setting value by key, or default if not found."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT value FROM app_settings WHERE key = %s", (key,))
+        row = cur.fetchone()
+        cur.close()
+    return row["value"] if row else default
+
+
+def set_app_setting(key, value):
+    """Upsert an app setting."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO app_settings (key, value, updated_at)
+               VALUES (%s, %s, CURRENT_TIMESTAMP)
+               ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP""",
+            (key, value),
+        )
+        conn.commit()
+        cur.close()
+
+
+# ── Weekly Emails ──────────────────────────────────────────────────────────
+
+def get_users_for_weekly_email(week_start_str, test_email=None):
+    """Return users with own_chart_id set, not unsubscribed, no row yet for this week.
+
+    If test_email is given, only return that user (for test runs).
+    Returns list of {user_id, email, name, chart_data}.
+    """
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        if test_email:
+            cur.execute("""
+                SELECT u.id AS user_id, u.email, u.name, sc.chart_data
+                FROM users u
+                JOIN saved_charts sc ON sc.id = u.own_chart_id
+                WHERE u.email = %s
+                  AND u.email IS NOT NULL
+                  AND NOT EXISTS (SELECT 1 FROM email_unsubscribes eu WHERE eu.user_id = u.id)
+                  AND NOT EXISTS (
+                    SELECT 1 FROM weekly_emails we
+                    WHERE we.user_id = u.id AND we.week_start = %s
+                  )
+            """, (test_email, week_start_str))
+        else:
+            cur.execute("""
+                SELECT u.id AS user_id, u.email, u.name, sc.chart_data
+                FROM users u
+                JOIN saved_charts sc ON sc.id = u.own_chart_id
+                WHERE u.email IS NOT NULL
+                  AND NOT EXISTS (SELECT 1 FROM email_unsubscribes eu WHERE eu.user_id = u.id)
+                  AND NOT EXISTS (
+                    SELECT 1 FROM weekly_emails we
+                    WHERE we.user_id = u.id AND we.week_start = %s
+                  )
+            """, (week_start_str,))
+        rows = cur.fetchall()
+        cur.close()
+    return [
+        {
+            "user_id": r["user_id"],
+            "email": r["email"],
+            "name": r["name"],
+            "chart_data": json.loads(r["chart_data"]) if isinstance(r["chart_data"], str) else r["chart_data"],
+        }
+        for r in rows
+    ]
+
+
+def insert_weekly_email(user_id, week_start):
+    """Insert a pending weekly_email row. Returns new id or None if already exists."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO weekly_emails (user_id, week_start)
+               VALUES (%s, %s)
+               ON CONFLICT (user_id, week_start) DO NOTHING
+               RETURNING id""",
+            (user_id, week_start),
+        )
+        row = cur.fetchone()
+        conn.commit()
+        cur.close()
+    return row[0] if row else None
+
+
+def mark_weekly_emails_submitted(id_index_pairs, batch_name):
+    """Update weekly_email rows to submitted status with batch tracking info.
+    id_index_pairs: list of (email_id, batch_index) tuples.
+    """
+    with get_db() as conn:
+        cur = conn.cursor()
+        for email_id, batch_index in id_index_pairs:
+            cur.execute(
+                """UPDATE weekly_emails
+                   SET status='submitted', batch_name=%s, batch_index=%s
+                   WHERE id=%s""",
+                (batch_name, batch_index, email_id),
+            )
+        conn.commit()
+        cur.close()
+
+
+def get_submitted_weekly_emails():
+    """Return all weekly_email rows with status='submitted'."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            """SELECT id, user_id, week_start, batch_name, batch_index
+               FROM weekly_emails WHERE status = 'submitted' ORDER BY id"""
+        )
+        rows = cur.fetchall()
+        cur.close()
+    return rows
+
+
+def complete_weekly_email(email_id, ai_content_json):
+    """Store AI result and mark as ai_ready."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE weekly_emails SET status='ai_ready', ai_content=%s WHERE id=%s",
+            (ai_content_json, email_id),
+        )
+        conn.commit()
+        cur.close()
+
+
+def get_ai_ready_weekly_emails():
+    """Return all weekly_email rows with status='ai_ready', including user info."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("""
+            SELECT we.id, we.user_id, we.week_start, we.ai_content,
+                   u.email, u.name
+            FROM weekly_emails we
+            JOIN users u ON u.id = we.user_id
+            WHERE we.status = 'ai_ready'
+            ORDER BY we.id
+        """)
+        rows = cur.fetchall()
+        cur.close()
+    return rows
+
+
+def mark_weekly_email_sent(email_id):
+    """Mark a weekly_email as sent."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE weekly_emails SET status='sent', sent_at=CURRENT_TIMESTAMP WHERE id=%s",
+            (email_id,),
+        )
+        conn.commit()
+        cur.close()
+
+
+def fail_weekly_email(email_id, error_msg):
+    """Mark a weekly_email as failed."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE weekly_emails SET status='failed', error=%s WHERE id=%s",
+            (error_msg, email_id),
+        )
+        conn.commit()
+        cur.close()
+
+
+def unsubscribe_user(user_id):
+    """Add user to email_unsubscribes. Safe to call multiple times."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO email_unsubscribes (user_id)
+               VALUES (%s)
+               ON CONFLICT (user_id) DO NOTHING""",
+            (user_id,),
+        )
+        conn.commit()
+        cur.close()

@@ -45,6 +45,14 @@
   .month-row { display: flex; justify-content: space-between; font-size: 0.82rem; margin-top: 0.2rem; }
   .month-row span:first-child { color: var(--text3); }
   .month-row strong { color: var(--text); }
+
+  /* Service toggles */
+  .settings-row { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.5rem; margin-bottom: 2.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .settings-label { font-size: 0.88rem; color: var(--text); font-weight: 500; }
+  .settings-sub { font-size: 0.75rem; color: var(--text3); margin-top: 0.15rem; }
+  .toggle-btn { border: none; cursor: pointer; padding: 0.35rem 0.9rem; border-radius: 8px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.05em; }
+  .toggle-on { background: rgba(0,201,177,0.15); color: var(--teal); }
+  .toggle-off { background: rgba(245,158,11,0.15); color: var(--amber); }
 </style>
 </head>
 <body>
@@ -74,6 +82,25 @@
       <div class="card-value">{{ stats.total_compares }}</div>
       <div class="card-sub">compatibility analyses</div>
     </div>
+  </div>
+
+  <!-- Service Toggles -->
+  <h2>Service Controls</h2>
+  <div class="settings-row">
+    <div>
+      <div class="settings-label">Weekly Email Service</div>
+      <div class="settings-sub">Send personalized weekly Jyotish emails to all users with a saved chart</div>
+    </div>
+    <form method="POST" action="/admin/settings">
+      <input type="hidden" name="key" value="weekly_email_enabled">
+      {% if settings.weekly_email_enabled == 'true' %}
+        <input type="hidden" name="value" value="false">
+        <button type="submit" class="toggle-btn toggle-on">ON &mdash; click to disable</button>
+      {% else %}
+        <input type="hidden" name="value" value="true">
+        <button type="submit" class="toggle-btn toggle-off">OFF &mdash; click to enable</button>
+      {% endif %}
+    </form>
   </div>
 
   <!-- Monthly trend -->

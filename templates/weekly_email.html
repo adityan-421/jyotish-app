@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your Weekly Jyotish Reading</title>
+</head>
+<body style="margin:0;padding:0;background:#0f1117;font-family:system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.6;color:#e8eaf0;">
+
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0f1117;">
+  <tr>
+    <td align="center" style="padding:24px 16px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:#1a1d27;border:1px solid #2e3248;border-radius:12px;padding:28px 32px;text-align:center;margin-bottom:0;">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#00c9b1;margin-bottom:6px;">GrahaLogic</div>
+            <div style="font-size:22px;font-weight:700;color:#e8eaf0;margin-bottom:4px;">Your Weekly Jyotish Reading</div>
+            <div style="font-size:13px;color:#9aa0b8;">{{ week_label }}</div>
+          </td>
+        </tr>
+
+        <tr><td style="height:16px;"></td></tr>
+
+        <!-- Planetary Weather -->
+        <tr>
+          <td style="background:#1a1d27;border:1px solid #2e3248;border-radius:12px;padding:24px 32px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#00c9b1;margin-bottom:10px;">This Week's Planetary Weather</div>
+            <div style="color:#e8eaf0;font-size:14px;">{{ content.weekly_overview }}</div>
+          </td>
+        </tr>
+
+        <tr><td style="height:16px;"></td></tr>
+
+        <!-- Personal Forecast -->
+        <tr>
+          <td style="background:#1a1d27;border:1px solid #2e3248;border-radius:12px;padding:24px 32px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#a78bfa;margin-bottom:10px;">Your Personal Forecast, {{ name }}</div>
+            <div style="color:#e8eaf0;font-size:14px;">{{ content.personal_forecast }}</div>
+          </td>
+        </tr>
+
+        <tr><td style="height:16px;"></td></tr>
+
+        <!-- Themes & Cautions -->
+        <tr>
+          <td style="background:#1a1d27;border:1px solid #2e3248;border-radius:12px;padding:24px 32px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td width="50%" valign="top" style="padding-right:12px;">
+                  <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#00c9b1;margin-bottom:10px;">Key Themes</div>
+                  {% for theme in content.key_themes %}
+                  <div style="display:flex;margin-bottom:6px;">
+                    <span style="color:#00c9b1;margin-right:8px;">•</span>
+                    <span style="color:#e8eaf0;font-size:13px;">{{ theme }}</span>
+                  </div>
+                  {% endfor %}
+                </td>
+                <td width="50%" valign="top" style="padding-left:12px;border-left:1px solid #2e3248;">
+                  <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#f59e0b;margin-bottom:10px;">Cautions</div>
+                  {% for caution in content.cautions %}
+                  <div style="display:flex;margin-bottom:6px;">
+                    <span style="color:#f59e0b;margin-right:8px;">⚠</span>
+                    <span style="color:#e8eaf0;font-size:13px;">{{ caution }}</span>
+                  </div>
+                  {% endfor %}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr><td style="height:16px;"></td></tr>
+
+        <!-- Lucky Colors Table -->
+        <tr>
+          <td style="background:#1a1d27;border:1px solid #2e3248;border-radius:12px;padding:24px 32px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#f59e0b;margin-bottom:14px;">Lucky Colors This Week</div>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr style="border-bottom:1px solid #2e3248;">
+                <th align="left" style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:#6b7194;padding:0 0 8px 0;font-weight:600;width:24%;">Day</th>
+                <th align="left" style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:#6b7194;padding:0 0 8px 0;font-weight:600;width:18%;">Ruler</th>
+                <th align="left" style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:#6b7194;padding:0 0 8px 0;font-weight:600;width:22%;">Color</th>
+                <th align="left" style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:#6b7194;padding:0 0 8px 0;font-weight:600;">Tip for You</th>
+              </tr>
+              {% for row in content.lucky_colors %}
+              <tr>
+                <td style="padding:8px 0;font-size:13px;color:#e8eaf0;border-bottom:1px solid #22263a;">
+                  <strong>{{ row.day }}</strong>
+                  <div style="font-size:11px;color:#6b7194;">{{ row.date }}</div>
+                </td>
+                <td style="padding:8px 0;font-size:13px;color:#9aa0b8;border-bottom:1px solid #22263a;">{{ row.ruler }}</td>
+                <td style="padding:8px 0;font-size:13px;color:#00c9b1;border-bottom:1px solid #22263a;font-weight:600;">{{ row.color }}</td>
+                <td style="padding:8px 0;font-size:12px;color:#9aa0b8;border-bottom:1px solid #22263a;">{{ row.tip }}</td>
+              </tr>
+              {% endfor %}
+            </table>
+          </td>
+        </tr>
+
+        <!-- Notable Days (only if any) -->
+        {% if content.auspicious_days or content.inauspicious_days %}
+        <tr><td style="height:16px;"></td></tr>
+        <tr>
+          <td style="background:#1a1d27;border:1px solid #2e3248;border-radius:12px;padding:24px 32px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#9aa0b8;margin-bottom:14px;">Notable Days</div>
+            {% for day in content.auspicious_days %}
+            <div style="display:flex;align-items:flex-start;margin-bottom:10px;">
+              <span style="color:#00c9b1;font-size:16px;margin-right:10px;line-height:1.4;">●</span>
+              <div>
+                <span style="color:#00c9b1;font-weight:600;font-size:13px;">{{ day.day }}{% if day.date %} ({{ day.date }}){% endif %}</span>
+                <span style="color:#6b7194;font-size:11px;margin-left:6px;">Auspicious</span>
+                <div style="color:#9aa0b8;font-size:12px;margin-top:2px;">{{ day.reason }}</div>
+              </div>
+            </div>
+            {% endfor %}
+            {% for day in content.inauspicious_days %}
+            <div style="display:flex;align-items:flex-start;margin-bottom:10px;">
+              <span style="color:#f59e0b;font-size:16px;margin-right:10px;line-height:1.4;">●</span>
+              <div>
+                <span style="color:#f59e0b;font-weight:600;font-size:13px;">{{ day.day }}{% if day.date %} ({{ day.date }}){% endif %}</span>
+                <span style="color:#6b7194;font-size:11px;margin-left:6px;">Exercise Caution</span>
+                <div style="color:#9aa0b8;font-size:12px;margin-top:2px;">{{ day.reason }}</div>
+              </div>
+            </div>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endif %}
+
+        <tr><td style="height:24px;"></td></tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="text-align:center;padding:0 16px;">
+            <div style="font-size:12px;color:#6b7194;margin-bottom:8px;">
+              You received this because you saved a birth chart on
+              <a href="https://grahalogic.ai" style="color:#9aa0b8;text-decoration:none;">GrahaLogic</a>.
+            </div>
+            <div style="font-size:12px;">
+              <a href="{{ unsubscribe_url }}" style="color:#6b7194;text-decoration:underline;">Unsubscribe</a>
+            </div>
+          </td>
+        </tr>
+
+        <tr><td style="height:24px;"></td></tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>
