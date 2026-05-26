@@ -3477,7 +3477,7 @@ function escAttr(s) { return s.replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
 
 var currentUser = null;
 var lastInputPayload = null;
-var aiRemainingCount = 25;
+var aiRemainingCount = 10;
 var _editingChartId = null;
 var _editingChartName = '';
 var currentSavedChartId = null;
@@ -3489,10 +3489,7 @@ function checkAuth() {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       currentUser = data.user;
-      if (data.ai_remaining !== undefined) {
-        aiRemainingCount = data.ai_remaining;
-        aiLimitReached = aiRemainingCount <= 0;
-      }
+      // gem balance fetched separately via /api/gems when chart loads
       updateAuthUI();
     })
     .catch(function() { currentUser = null; updateAuthUI(); });
@@ -3782,7 +3779,7 @@ function runChartComparison() {
   if (!idA) { showCompareError("Please select Person A."); return; }
   if (!idB) { showCompareError("Please select Person B."); return; }
   if (idA === idB) { showCompareError("Please select two different charts to compare."); return; }
-  if (aiLimitReached) { showCompareError("Daily question limit reached. Please try again tomorrow."); return; }
+  // gem check happens server-side
 
   document.getElementById("compareSelectorSection").style.display = "none";
   document.getElementById("compareResultsSection").style.display = "none";
@@ -3805,10 +3802,7 @@ function runChartComparison() {
         if (data.gems_exhausted) { updateGemBadge(0); }
         return;
       }
-      if (data.remaining !== undefined) {
-        aiRemainingCount = data.remaining;
-        aiLimitReached = aiRemainingCount <= 0;
-      }
+      fetchGemBalance();
       renderCompatibilityResults(data.compatibility, idA, idB);
     })
     .catch(function() {
@@ -4534,13 +4528,7 @@ renderAll = function(data) {
   document.getElementById("aiLoading").classList.remove("active");
   var generatePrompt = document.getElementById("aiGeneratePrompt");
   var inputRow = document.getElementById("aiInputRow");
-  if (aiLimitReached) {
-    document.getElementById("aiAskBtn").disabled = true;
-    document.getElementById("aiQuestion").disabled = true;
-    document.getElementById("aiHelper").textContent = "Daily limit reached (0 of 25 remaining)";
-    if (generatePrompt) generatePrompt.style.display = "none";
-    if (inputRow) inputRow.style.display = "none";
-  } else if (currentUser && chartData && _cachedReadingData &&
+  if (currentUser && chartData && _cachedReadingData &&
              (_cachedReadingData.categories && _cachedReadingData.categories.length > 0 &&
               _cachedReadingData.categories[0].reading !== 'Unable to generate reading. Please try again.')) {
     // Display cached reading (only if it has real category data, not a fallback error)
@@ -4557,12 +4545,12 @@ renderAll = function(data) {
     if (inputRow) inputRow.style.display = "flex";
     document.getElementById("aiAskBtn").disabled = false;
     document.getElementById("aiQuestion").disabled = false;
-    document.getElementById("aiHelper").textContent = aiRemainingCount + " of 25 questions remaining today";
+    document.getElementById("aiHelper").textContent = "";
   } else {
     // Show generate button
     if (generatePrompt) generatePrompt.style.display = "block";
     if (inputRow) inputRow.style.display = "none";
-    document.getElementById("aiHelper").textContent = aiRemainingCount + " of 25 questions remaining today";
+    document.getElementById("aiHelper").textContent = "";
   }
   // Reset BTR state and auto-fetch boundaries
   btrData = null;
@@ -4817,10 +4805,6 @@ function autoGenerateReading() {
     // Batch mode: reading queued for async processing
     if (resp.data.status === "queued" && resp.data.reading_id) {
       document.getElementById("aiStep").textContent = "Your reading is being prepared...";
-      if (resp.data.remaining !== undefined) {
-        aiRemainingCount = resp.data.remaining;
-        document.getElementById("aiHelper").textContent = aiRemainingCount + " of 25 questions remaining today";
-      }
       pollReadingStatus(resp.data.reading_id, stepTimer, loading, tabBtn, errorEl,
                          generatePrompt, genBtn, inputRow, btn, input, defaultQuestion);
       return;
@@ -4849,12 +4833,7 @@ function autoGenerateReading() {
       aiConversation.push({role: "assistant", text: reading});
     }
 
-    if (resp.data.remaining !== undefined) {
-      aiRemainingCount = resp.data.remaining;
-      aiLimitReached = aiRemainingCount <= 0;
-      document.getElementById("aiHelper").textContent = aiRemainingCount + " of 25 questions remaining today";
-    }
-
+    fetchGemBalance();
     if (inputRow) inputRow.style.display = "flex";
     btn.disabled = false;
     input.disabled = false;
@@ -4939,12 +4918,7 @@ function askAI() {
     appendChatMsg("assistant", reading, category);
     aiConversation.push({role: "assistant", text: reading});
 
-    if (resp.data.remaining !== undefined) {
-      aiRemainingCount = resp.data.remaining;
-      aiLimitReached = aiRemainingCount <= 0;
-      document.getElementById("aiHelper").textContent = aiRemainingCount + " of 25 questions remaining today";
-    }
-
+    fetchGemBalance();
     btn.disabled = false;
     input.disabled = false;
     input.focus();

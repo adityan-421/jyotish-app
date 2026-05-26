@@ -448,14 +448,10 @@ def api_me():
     user = get_current_user()
     if user:
         try:
-            remaining = 25 - get_question_count_today(user["id"])
-        except Exception:
-            remaining = 25  # Assume full quota if DB is unreachable
-        try:
             own_chart_id = get_own_chart_id(user["id"])
         except Exception:
             own_chart_id = None
-        return jsonify({"user": user, "ai_remaining": max(remaining, 0), "own_chart_id": own_chart_id})
+        return jsonify({"user": user, "own_chart_id": own_chart_id})
     return jsonify({"user": None})
 
 
@@ -585,9 +581,6 @@ def api_charts_compare():
     if not chart2:
         return jsonify({"error": "Chart 2 not found"}), 404
 
-    if get_question_count_today(user_id) >= 25:
-        return jsonify({"error": "Daily limit reached. You can ask 25 questions per day."}), 429
-
     # GrahaGem check — comparisons cost 1 gem
     user_email = session["user"].get("email", "")
     if not use_gem(user_id, user_email):
@@ -664,8 +657,7 @@ def api_charts_compare():
         save_ai_question(user_id, f"Compare: {chart1['name']} & {chart2['name']}", "compatibility",
                          json.dumps(result) if isinstance(result, dict) else str(result))
 
-        remaining = 25 - get_question_count_today(user_id)
-        return jsonify({"compatibility": result, "remaining": remaining})
+        return jsonify({"compatibility": result})
 
     except Exception as e:
         error_type = type(e).__name__
@@ -2161,10 +2153,6 @@ def api_ask():
     user = session["user"]
     user_id = user["id"]
 
-    # Rate limit: 25 questions per day
-    if get_question_count_today(user_id) >= 25:
-        return jsonify({"error": "Daily limit reached. You can ask 25 questions per day."}), 429
-
     # GrahaGem check — initial readings are free; follow-up questions cost 1 gem
     user_email = user.get("email", "")
     if not initial_reading:
@@ -2238,8 +2226,7 @@ def api_ask():
                 except Exception as e:
                     logger.warning("Failed to cache reading for chart %s: %s", chart_id, e)
 
-            remaining = 25 - get_question_count_today(user_id)
-            return jsonify({"reading_data": reading_data, "remaining": remaining})
+            return jsonify({"reading_data": reading_data})
         else:
             # Follow-up / normal question — real-time via Vertex AI
             import vertexai
@@ -2286,8 +2273,7 @@ def api_ask():
         # Save to DB
         save_ai_question(user_id, question, category, reading)
 
-        remaining = 25 - get_question_count_today(user_id)
-        return jsonify({"category": category, "reading": reading, "remaining": remaining})
+        return jsonify({"category": category, "reading": reading})
 
     except Exception as e:
         error_type = type(e).__name__
