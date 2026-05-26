@@ -12,13 +12,13 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_cors import CORS
 from authlib.integrations.flask_client import OAuth
-from jyotish_engine import compute_chart, compute_btr, calculate_sadesati, compute_panchang, compute_transits, compute_transits_for_date
+from jyotish_engine import compute_chart, compute_btr, calculate_sadesati, compute_panchang, compute_transits, compute_transits_for_date, compute_ashta_kuta_scores, format_kuta_scores_for_ai
 from zoneinfo import ZoneInfo
 from datetime import datetime, timedelta
 from database import (
     init_db, reset_pool, upsert_user, save_chart, get_charts, get_chart, delete_chart,
     update_chart, update_chart_reading, count_charts, get_question_count_today, save_ai_question, get_ai_history,
-    get_all_charts_for_backfill, bulk_update_chart_data, get_cached_value, set_cached_value, get_stats,
+    get_all_charts_for_backfill, bulk_update_chart_data, get_cached_value, set_cached_value, get_stats, get_admin_stats,
     create_pending_reading, get_pending_readings_by_status, mark_readings_submitted,
     complete_reading, fail_reading, get_reading_status,
     set_own_chart, get_own_chart_id,
@@ -108,6 +108,17 @@ def _run_prompt_chain(model, steps, variables, default_thinking_budget=None):
                 result_text = response.text.strip()
             except ValueError:
                 raise
+
+        # Log token usage for cost tracking
+        try:
+            um = response.usage_metadata
+            in_tok    = getattr(um, "prompt_token_count", 0)
+            out_tok   = getattr(um, "candidates_token_count", 0)
+            think_tok = getattr(um, "thoughts_token_count", 0)
+            cost = (in_tok * 0.075 + out_tok * 0.30 + think_tok * 3.50) / 1_000_000
+            print(f"TOKEN_USAGE step={step.get('name')} in={in_tok} out={out_tok} thinking={think_tok} est_cost=${cost:.5f}", flush=True)
+        except Exception:
+            pass
 
         logger.info("PROMPT_CHAIN step=%s response_len=%d result_text_preview=%r",
                     step.get("name"), len(result_text), result_text[:300])
@@ -248,6 +259,17 @@ def login_required(f):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+ADMIN_EMAIL = "adityan@gmail.com"
+
+@app.route("/admin")
+def admin_page():
+    user = session.get("user")
+    if not user or user.get("email") != ADMIN_EMAIL:
+        return "Access denied", 403
+    stats = get_admin_stats()
+    return render_template("admin.html", stats=stats)
 
 
 @app.route("/auth/google")
@@ -437,7 +459,7 @@ def api_save_chart():
     user = session["user"]
     user_id = user["id"]
     upsert_user(user_id, user.get("email", ""), user.get("name", ""), user.get("picture", ""))
-    chart_id, error = save_chart(user_id, name, input_data, chart_data)
+    chart_id, error = save_chart(user_id, name, input_data, chart_data, user_email=user.get("email", ""))
     if error:
         return jsonify({"error": error}), 400
 
@@ -453,7 +475,10 @@ def api_list_charts():
     user_id = session["user"]["id"]
     charts = get_charts(user_id)
     total = count_charts(user_id)
-    return jsonify({"charts": charts, "count": total, "limit": 20})
+    user_email = session["user"].get("email", "")
+    from database import UNLIMITED_CHART_EMAILS
+    chart_limit = None if user_email in UNLIMITED_CHART_EMAILS else 20
+    return jsonify({"charts": charts, "count": total, "limit": chart_limit})
 
 
 @app.route("/api/charts/<int:chart_id>")
@@ -563,6 +588,15 @@ def api_charts_compare():
             logger.warning("Could not compute transits for compare: %s", te)
             transit_str = "(transit data unavailable)"
 
+        kp1 = chart1["chart_data"].get("kuta_profile", {})
+        kp2 = chart2["chart_data"].get("kuta_profile", {})
+        try:
+            kuta = compute_ashta_kuta_scores(kp1, kp2)
+            kuta_str = format_kuta_scores_for_ai(kuta)
+        except Exception as ke:
+            logger.warning("Could not compute kuta scores: %s", ke)
+            kuta_str = "(kuta scores unavailable)"
+
         variables = {
             "chart_a_name": chart1["name"],
             "chart_b_name": chart2["name"],
@@ -570,6 +604,7 @@ def api_charts_compare():
             "chart_b_data": json.dumps(slim2, indent=2),
             "today": datetime.now().strftime("%d-%b-%Y"),
             "transit_data": transit_str,
+            "kuta_scores": kuta_str,
         }
 
         steps = prompts_config.get("compatibility_steps", [])
@@ -578,6 +613,11 @@ def api_charts_compare():
 
         raw = _run_prompt_chain(model, steps, variables, prompts_config.get("default_thinking_budget"))
         result = json.loads(raw) if isinstance(raw, str) else raw
+
+        # Attach authoritative Ashta Kuta scores (engine-computed, not AI-inferred)
+        if isinstance(result, dict) and kuta_str != "(kuta scores unavailable)":
+            result["kuta_detail"] = kuta["scores"]
+            result["kuta_total"] = kuta["total"]
 
         # Apply score label if not set correctly by AI
         score_map = [(90, "Exceptional"), (76, "Strong"), (61, "Good"), (41, "Moderate"), (0, "Challenging")]
@@ -1636,7 +1676,7 @@ def extract_synastry_data(chart_data):
     if "bhava" in chart_data:
         result["bhava"] = [b for b in chart_data["bhava"] if b.get("house") in (1, 5, 7, 8, 11, 12)]
 
-    for key in ("karakas", "aspects", "ashtakavarga", "yogas"):
+    for key in ("karakas", "aspects", "ashtakavarga", "yogas", "kuta_profile"):
         if key in chart_data:
             result[key] = chart_data[key]
 

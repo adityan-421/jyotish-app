@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GrahaLogic Admin</title>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a;
+    --border: #2e3248; --text: #e8eaf0; --text2: #9aa0b8; --text3: #6b7194;
+    --teal: #00c9b1; --amber: #f59e0b; --red: #ef4444; --purple: #a78bfa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
+  .page { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
+  h1 { font-size: 1.6rem; font-weight: 700; color: var(--teal); margin-bottom: 0.25rem; }
+  .sub { color: var(--text3); font-size: 0.85rem; margin-bottom: 2rem; }
+
+  /* Summary cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2.5rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem 1.5rem; }
+  .card-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 0.4rem; }
+  .card-value { font-size: 2rem; font-weight: 700; color: var(--teal); }
+  .card-sub { font-size: 0.75rem; color: var(--text3); margin-top: 0.2rem; }
+
+  /* Section headers */
+  h2 { font-size: 1rem; font-weight: 600; color: var(--text2); margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; margin-bottom: 2.5rem; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text3); padding: 0.6rem 1rem; background: var(--surface); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 0.7rem 1rem; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+  tr:hover td { background: var(--surface2); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .dim { color: var(--text3); }
+  .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 6px; font-size: 0.72rem; font-weight: 600; }
+  .badge-teal { background: rgba(0,201,177,0.12); color: var(--teal); }
+  .badge-amber { background: rgba(245,158,11,0.12); color: var(--amber); }
+
+  /* Monthly trend */
+  .monthly-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 2.5rem; }
+  .month-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem; }
+  .month-label { font-size: 0.72rem; color: var(--text3); margin-bottom: 0.4rem; }
+  .month-row { display: flex; justify-content: space-between; font-size: 0.82rem; margin-top: 0.2rem; }
+  .month-row span:first-child { color: var(--text3); }
+  .month-row strong { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>GrahaLogic Admin</h1>
+  <p class="sub">Live stats from the database &mdash; visible only to you</p>
+
+  <!-- Summary cards -->
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">Total Users</div>
+      <div class="card-value">{{ stats.total_users }}</div>
+      <div class="card-sub">registered accounts</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Charts Saved</div>
+      <div class="card-value">{{ stats.total_charts }}</div>
+      <div class="card-sub">across all users</div>
+    </div>
+    <div class="card">
+      <div class="card-label">AI Queries</div>
+      <div class="card-value">{{ stats.total_queries }}</div>
+      <div class="card-sub">readings &amp; questions</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chart Compares</div>
+      <div class="card-value">{{ stats.total_compares }}</div>
+      <div class="card-sub">compatibility analyses</div>
+    </div>
+  </div>
+
+  <!-- Monthly trend -->
+  {% if stats.monthly %}
+  <h2>Monthly Activity (last 6 months)</h2>
+  <div class="monthly-grid">
+    {% for m in stats.monthly %}
+    <div class="month-card">
+      <div class="month-label">{{ m.month }}</div>
+      <div class="month-row"><span>AI Queries</span><strong>{{ m.queries }}</strong></div>
+      <div class="month-row"><span>Compares</span><strong>{{ m.compares }}</strong></div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Per-user table -->
+  <h2>Users ({{ stats.total_users }})</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Joined</th>
+          <th class="num">Charts</th>
+          <th class="num">AI Queries</th>
+          <th class="num">Avg/Month</th>
+          <th class="num">Compares</th>
+          <th class="num">Avg/Month</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in stats.users %}
+        <tr>
+          <td>{{ u.name or '—' }}</td>
+          <td class="dim">{{ u.email }}</td>
+          <td class="dim">{{ u.joined }}</td>
+          <td class="num">
+            {% if u.charts > 0 %}
+              <span class="badge badge-teal">{{ u.charts }}</span>
+            {% else %}
+              <span class="dim">0</span>
+            {% endif %}
+          </td>
+          <td class="num">{{ u.ai_queries }}</td>
+          <td class="num dim">{{ u.ai_per_month }}</td>
+          <td class="num">
+            {% if u.compares > 0 %}
+              <span class="badge badge-amber">{{ u.compares }}</span>
+            {% else %}
+              <span class="dim">0</span>
+            {% endif %}
+          </td>
+          <td class="num dim">{{ u.compares_per_month }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+</body>
+</html>

@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-HY12WEBTCT"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-HY12WEBTCT');
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Graha Logic</title>
@@ -173,6 +181,9 @@ header {
 }
 
 .lagna-rashi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+.gana-deva    { color: var(--teal); }
+.gana-manava  { color: var(--amber); }
+.gana-rakshasa{ color: var(--red); }
 .pill-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .pill {
   background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
@@ -1404,6 +1415,8 @@ footer strong { color: #FF6B00; }
 </div>
 </div>
 
+<div id="kutaProfileCard" style="display:none;"></div>
+
 <div class="card accent-amber">
   <div class="card-header"><h2>Charts</h2><span class="sub">Rashi & Navamsha</span></div>
   <div class="card-body">
@@ -1851,6 +1864,7 @@ function renderAll(data) {
   renderBirthData(data);
   renderLagna(data);
   renderPanchang(data);
+  renderKutaProfile(data);
   renderKarakas(data);
   renderPlanets(data);
   buildAllCharts(data);
@@ -1932,6 +1946,55 @@ function renderPanchang(data) {
     html += '<tr><td class="bold">' + r[0] + '</td><td>' + r[1] + '</td><td class="dim">' + r[2] + '</td></tr>';
   });
   document.getElementById("panchangBody").innerHTML = html;
+}
+
+function renderKutaProfile(data) {
+  var el = document.getElementById("kutaProfileCard");
+  if (!el) return;
+  var kp = data.kuta_profile;
+  if (!kp) { el.style.display = "none"; return; }
+
+  var ganaClass = kp.gana === "Deva" ? "gana-deva"
+                : kp.gana === "Manava" ? "gana-manava" : "gana-rakshasa";
+  var ganaSub = kp.gana === "Deva" ? "Divine Temperament"
+              : kp.gana === "Manava" ? "Human Temperament" : "Fierce Temperament";
+
+  var nadiSub = kp.nadi === "Adya" ? "Vata \u2014 Air"
+              : kp.nadi === "Madhya" ? "Pitta \u2014 Fire" : "Kapha \u2014 Water";
+
+  var varnaSub = { Brahmin: "Spiritual / Scholarly", Kshatriya: "Warrior / Leader",
+                   Vaishya: "Merchant / Creative", Shudra: "Service / Practical" }[kp.varna] || "";
+
+  var vashyaSub = { Chatushpada: "Quadruped", Dwipada: "Biped / Human",
+                    Jalachara: "Water Dweller", Vanachara: "Forest Dweller",
+                    Keeta: "Insect / Reptile" }[kp.vashya] || "";
+
+  var yoniVal = kp.yoni + (kp.yoni_gender ? " (" + kp.yoni_gender + ")" : "");
+
+  var cells = [
+    { k: "Gana",   v: kp.gana,   s: ganaSub,   cls: ganaClass },
+    { k: "Nadi",   v: kp.nadi,   s: nadiSub,   cls: "" },
+    { k: "Yoni",   v: yoniVal,   s: "Animal Symbol", cls: "" },
+    { k: "Varna",  v: kp.varna,  s: varnaSub,  cls: "" },
+    { k: "Vashya", v: kp.vashya, s: vashyaSub, cls: "" },
+  ];
+
+  var html = '<div class="card accent-amber" style="margin-top:0;">' +
+    '<div class="card-header"><h2>Jyotish Profile</h2>' +
+    '<span class="sub">Moon-based characteristics</span></div>' +
+    '<div class="card-body"><div class="panchang-grid">';
+
+  cells.forEach(function(c) {
+    html += '<div class="panch-cell">' +
+      '<div class="pk">' + c.k + '</div>' +
+      '<div class="pv' + (c.cls ? ' ' + c.cls : '') + '">' + escHtml(c.v) + '</div>' +
+      '<div class="ps">' + escHtml(c.s) + '</div>' +
+      '</div>';
+  });
+
+  html += '</div></div></div>';
+  el.innerHTML = html;
+  el.style.display = "block";
 }
 
 function renderKarakas(data) {

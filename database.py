@@ -16,6 +16,7 @@ DB_NAME = os.environ.get("DB_NAME", "postgres")
 DB_USER = os.environ.get("DB_USER", "postgres")
 DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
 MAX_CHARTS = 20
+UNLIMITED_CHART_EMAILS = {"adityan@gmail.com"}
 
 logger = logging.getLogger(__name__)
 
@@ -200,8 +201,8 @@ def count_charts(user_id):
         return row["cnt"]
 
 
-def save_chart(user_id, name, input_data, chart_data):
-    if count_charts(user_id) >= MAX_CHARTS:
+def save_chart(user_id, name, input_data, chart_data, user_email=None):
+    if user_email not in UNLIMITED_CHART_EMAILS and count_charts(user_id) >= MAX_CHARTS:
         return None, f"Limit reached: you can save up to {MAX_CHARTS} charts."
     with get_db() as conn:
         cur = conn.cursor()
@@ -408,6 +409,75 @@ def get_stats():
         "total_charts": total_charts,
         "users_with_charts": users_with_charts,
         "per_user": per_user,
+    }
+
+
+def get_admin_stats():
+    """Full admin stats: per-user breakdown of charts, AI queries, and comparisons."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # Per-user rollup
+        cur.execute("""
+            SELECT
+                u.id, u.name, u.email, u.created_at,
+                COUNT(DISTINCT sc.id) AS chart_count,
+                COUNT(DISTINCT CASE WHEN aq.category != 'compatibility' THEN aq.id END) AS ai_count,
+                COUNT(DISTINCT CASE WHEN aq.category = 'compatibility'  THEN aq.id END) AS compare_count,
+                GREATEST(1.0, EXTRACT(EPOCH FROM (NOW() - u.created_at)) / 2592000.0) AS months_active
+            FROM users u
+            LEFT JOIN saved_charts sc ON sc.user_id = u.id
+            LEFT JOIN ai_questions aq ON aq.user_id = u.id
+            GROUP BY u.id, u.name, u.email, u.created_at
+            ORDER BY u.created_at
+        """)
+        rows = cur.fetchall()
+
+        users = []
+        for r in rows:
+            m = float(r["months_active"])
+            users.append({
+                "name":               r["name"] or "",
+                "email":              r["email"],
+                "joined":             r["created_at"].strftime("%d %b %Y") if r["created_at"] else "—",
+                "charts":             int(r["chart_count"]),
+                "ai_queries":         int(r["ai_count"]),
+                "ai_per_month":       round(r["ai_count"] / m, 1),
+                "compares":           int(r["compare_count"]),
+                "compares_per_month": round(r["compare_count"] / m, 1),
+            })
+
+        # Totals
+        cur.execute("SELECT COUNT(*) AS cnt FROM users")
+        total_users = cur.fetchone()["cnt"]
+        cur.execute("SELECT COUNT(*) AS cnt FROM saved_charts")
+        total_charts = cur.fetchone()["cnt"]
+        cur.execute("SELECT COUNT(*) AS cnt FROM ai_questions WHERE category != 'compatibility'")
+        total_queries = cur.fetchone()["cnt"]
+        cur.execute("SELECT COUNT(*) AS cnt FROM ai_questions WHERE category = 'compatibility'")
+        total_compares = cur.fetchone()["cnt"]
+
+        # Monthly trend — queries per calendar month (last 6 months)
+        cur.execute("""
+            SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'Mon YYYY') AS month,
+                   COUNT(*) FILTER (WHERE category != 'compatibility') AS queries,
+                   COUNT(*) FILTER (WHERE category  = 'compatibility') AS compares
+            FROM ai_questions
+            WHERE created_at >= NOW() - INTERVAL '6 months'
+            GROUP BY DATE_TRUNC('month', created_at)
+            ORDER BY DATE_TRUNC('month', created_at)
+        """)
+        monthly = [dict(r) for r in cur.fetchall()]
+
+        cur.close()
+
+    return {
+        "users":          users,
+        "total_users":    total_users,
+        "total_charts":   total_charts,
+        "total_queries":  total_queries,
+        "total_compares": total_compares,
+        "monthly":        monthly,
     }
 
 

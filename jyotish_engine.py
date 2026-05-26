@@ -35,6 +35,139 @@ NAKSHATRA_LORDS = [
     "Jupiter", "Saturn", "Mercury"
 ]
 
+# ── Kuta Compatibility Tables (indexed by nakshatra 0-26 or sign 0-11) ──────
+
+# Gana: temperament of each nakshatra
+NAKSHATRA_GANA = [
+    "Deva",     # 0  Ashwini
+    "Manava",   # 1  Bharani
+    "Rakshasa", # 2  Krittika
+    "Manava",   # 3  Rohini
+    "Deva",     # 4  Mrigashira
+    "Manava",   # 5  Ardra
+    "Deva",     # 6  Punarvasu
+    "Deva",     # 7  Pushya
+    "Rakshasa", # 8  Ashlesha
+    "Rakshasa", # 9  Magha
+    "Manava",   # 10 Purva Phalguni
+    "Manava",   # 11 Uttara Phalguni
+    "Deva",     # 12 Hasta
+    "Rakshasa", # 13 Chitra
+    "Deva",     # 14 Swati
+    "Rakshasa", # 15 Vishakha
+    "Deva",     # 16 Anuradha
+    "Rakshasa", # 17 Jyeshtha
+    "Rakshasa", # 18 Mula
+    "Manava",   # 19 Purva Ashadha
+    "Manava",   # 20 Uttara Ashadha
+    "Deva",     # 21 Shravana
+    "Rakshasa", # 22 Dhanishta
+    "Manava",   # 23 Shatabhisha
+    "Manava",   # 24 Purva Bhadrapada
+    "Deva",     # 25 Uttara Bhadrapada
+    "Deva",     # 26 Revati
+]
+
+# Nadi: Adya (Vata) / Madhya (Pitta) / Antya (Kapha) — sequential cycle of 3
+NAKSHATRA_NADI = [
+    "Adya",   # 0  Ashwini
+    "Madhya", # 1  Bharani
+    "Antya",  # 2  Krittika
+    "Adya",   # 3  Rohini
+    "Madhya", # 4  Mrigashira
+    "Antya",  # 5  Ardra
+    "Adya",   # 6  Punarvasu
+    "Madhya", # 7  Pushya
+    "Antya",  # 8  Ashlesha
+    "Adya",   # 9  Magha
+    "Madhya", # 10 Purva Phalguni
+    "Antya",  # 11 Uttara Phalguni
+    "Adya",   # 12 Hasta
+    "Madhya", # 13 Chitra
+    "Antya",  # 14 Swati
+    "Adya",   # 15 Vishakha
+    "Madhya", # 16 Anuradha
+    "Antya",  # 17 Jyeshtha
+    "Adya",   # 18 Mula
+    "Madhya", # 19 Purva Ashadha
+    "Antya",  # 20 Uttara Ashadha
+    "Adya",   # 21 Shravana
+    "Madhya", # 22 Dhanishta
+    "Antya",  # 23 Shatabhisha
+    "Adya",   # 24 Purva Bhadrapada
+    "Madhya", # 25 Uttara Bhadrapada
+    "Antya",  # 26 Revati
+]
+
+# Yoni: animal symbol and gender for each nakshatra
+NAKSHATRA_YONI = [
+    "Horse",    # 0  Ashwini     (M)
+    "Elephant", # 1  Bharani     (M)
+    "Sheep",    # 2  Krittika    (F)
+    "Serpent",  # 3  Rohini      (M)
+    "Serpent",  # 4  Mrigashira  (F)
+    "Dog",      # 5  Ardra       (F)
+    "Cat",      # 6  Punarvasu   (F)
+    "Sheep",    # 7  Pushya      (M)
+    "Cat",      # 8  Ashlesha    (M)
+    "Rat",      # 9  Magha       (M)
+    "Rat",      # 10 Purva Phalguni  (F)
+    "Cow",      # 11 Uttara Phalguni (M)
+    "Buffalo",  # 12 Hasta       (F)
+    "Tiger",    # 13 Chitra      (F)
+    "Buffalo",  # 14 Swati       (M)
+    "Tiger",    # 15 Vishakha    (M)
+    "Deer",     # 16 Anuradha    (F)
+    "Deer",     # 17 Jyeshtha    (M)
+    "Dog",      # 18 Mula        (M)
+    "Monkey",   # 19 Purva Ashadha  (M)
+    "Mongoose", # 20 Uttara Ashadha (M)
+    "Monkey",   # 21 Shravana    (F)
+    "Lion",     # 22 Dhanishta   (F)
+    "Horse",    # 23 Shatabhisha (F)
+    "Lion",     # 24 Purva Bhadrapada (M)
+    "Cow",      # 25 Uttara Bhadrapada (F)
+    "Elephant", # 26 Revati      (F)
+]
+
+NAKSHATRA_YONI_GENDER = [
+    "M","M","F","M","F","F","F","M","M","M",
+    "F","M","F","F","M","M","F","M","M","M",
+    "M","F","F","F","M","F","F",
+]
+
+# Varna: spiritual caste by Moon sign (0=Aries … 11=Pisces)
+SIGN_VARNA = [
+    "Kshatriya", # 0  Aries
+    "Vaishya",   # 1  Taurus
+    "Shudra",    # 2  Gemini
+    "Brahmin",   # 3  Cancer
+    "Kshatriya", # 4  Leo
+    "Vaishya",   # 5  Virgo
+    "Shudra",    # 6  Libra
+    "Brahmin",   # 7  Scorpio
+    "Kshatriya", # 8  Sagittarius
+    "Vaishya",   # 9  Capricorn
+    "Shudra",    # 10 Aquarius
+    "Brahmin",   # 11 Pisces
+]
+
+# Vashya: attraction category by Moon sign
+SIGN_VASHYA = [
+    "Chatushpada", # 0  Aries
+    "Chatushpada", # 1  Taurus
+    "Dwipada",     # 2  Gemini
+    "Jalachara",   # 3  Cancer
+    "Vanachara",   # 4  Leo
+    "Dwipada",     # 5  Virgo
+    "Dwipada",     # 6  Libra
+    "Keeta",       # 7  Scorpio
+    "Chatushpada", # 8  Sagittarius
+    "Chatushpada", # 9  Capricorn
+    "Dwipada",     # 10 Aquarius
+    "Jalachara",   # 11 Pisces
+]
+
 DASHA_YEARS = {
     "Ketu": 7, "Venus": 20, "Sun": 6, "Moon": 10, "Mars": 7,
     "Rahu": 18, "Jupiter": 16, "Saturn": 19, "Mercury": 17
@@ -1200,6 +1333,203 @@ def detect_doshas(data):
     return doshas
 
 
+# ── Kuta profile builder ──────────────────────────────────────────────────
+
+def compute_kuta_profile(moon_sign_idx, moon_nak_idx):
+    """Return all Ashta Kuta attributes for one person's Moon position."""
+    return {
+        "moon_sign":           SIGNS[moon_sign_idx],
+        "moon_sign_lord":      SIGN_LORDS[moon_sign_idx],
+        "moon_nakshatra":      NAKSHATRAS[moon_nak_idx],
+        "moon_nakshatra_lord": NAKSHATRA_LORDS[moon_nak_idx],
+        "gana":                NAKSHATRA_GANA[moon_nak_idx],
+        "nadi":                NAKSHATRA_NADI[moon_nak_idx],
+        "yoni":                NAKSHATRA_YONI[moon_nak_idx],
+        "yoni_gender":         NAKSHATRA_YONI_GENDER[moon_nak_idx],
+        "varna":               SIGN_VARNA[moon_sign_idx],
+        "vashya":              SIGN_VASHYA[moon_sign_idx],
+    }
+
+
+# Yoni enemy pairs (bi-directional)
+_YONI_ENEMIES = frozenset([
+    frozenset(["Horse", "Buffalo"]),
+    frozenset(["Elephant", "Lion"]),
+    frozenset(["Sheep", "Monkey"]),
+    frozenset(["Serpent", "Mongoose"]),
+    frozenset(["Dog", "Deer"]),
+    frozenset(["Cat", "Rat"]),
+    frozenset(["Cow", "Tiger"]),
+])
+
+# Vashya dominance pairs: key dominates value (gets 1 point, not full 2)
+_VASHYA_DOMINATES = {
+    ("Chatushpada", "Dwipada"), ("Chatushpada", "Vanachara"),
+    ("Dwipada", "Chatushpada"), ("Jalachara", "Dwipada"),
+    ("Vanachara", "Chatushpada"),
+}
+
+# Natural friendship lookup using existing FRIENDS / ENEMIES dicts
+def _planet_relation(p1, p2):
+    """Return 'F', 'N', or 'E' for how p1 views p2."""
+    if p2 in FRIENDS.get(p1, set()):
+        return "F"
+    if p2 in ENEMIES.get(p1, set()):
+        return "E"
+    return "N"
+
+_TARA_NAMES = ["Janma", "Sampat", "Vipat", "Kshema", "Pratyak",
+               "Sadhaka", "Vadha", "Mitra", "Param Mitra"]
+_TARA_GOOD  = {2, 4, 6, 8, 9}   # 1-based indices of auspicious Taras
+
+_VARNA_ORDER = {"Brahmin": 4, "Kshatriya": 3, "Vaishya": 2, "Shudra": 1}
+
+_GM_SCORE = {
+    ("F", "F"): 5, ("F", "N"): 4, ("N", "F"): 4,
+    ("N", "N"): 3, ("F", "E"): 1, ("E", "F"): 1,
+    ("N", "E"): 0.5, ("E", "N"): 0.5, ("E", "E"): 0,
+}
+
+
+def compute_ashta_kuta_scores(kp_a, kp_b):
+    """
+    Compute all 8 Ashta Kuta compatibility scores from two kuta_profile dicts.
+    Returns a dict with individual scores, max values, labels, notes, and total.
+    kp_a / kp_b are the kuta_profile sub-dicts from compute_kuta_profile().
+    """
+    results = {}
+
+    # ── 1. Varna (max 1) ──────────────────────────────────────────────────
+    va = _VARNA_ORDER.get(kp_a["varna"], 0)
+    vb = _VARNA_ORDER.get(kp_b["varna"], 0)
+    results["varna"] = {
+        "score": 1 if va >= vb else 0, "max": 1,
+        "a": kp_a["varna"], "b": kp_b["varna"],
+        "note": "Compatible" if va >= vb else "Incompatible (A's Varna is lower than B's)",
+    }
+
+    # ── 2. Vashya (max 2) ──────────────────────────────────────────────────
+    va2, vb2 = kp_a["vashya"], kp_b["vashya"]
+    if va2 == vb2:
+        vashya_score, vashya_note = 2, "Same Vashya group"
+    elif (va2, vb2) in _VASHYA_DOMINATES or (vb2, va2) in _VASHYA_DOMINATES:
+        vashya_score, vashya_note = 1, "Partial — one dominates the other"
+    else:
+        vashya_score, vashya_note = 0, "Incompatible Vashya"
+    results["vashya"] = {"score": vashya_score, "max": 2, "a": va2, "b": vb2, "note": vashya_note}
+
+    # ── 3. Tara (max 3) ──────────────────────────────────────────────────
+    na = NAKSHATRAS.index(kp_a["moon_nakshatra"])
+    nb = NAKSHATRAS.index(kp_b["moon_nakshatra"])
+    count_ab = (nb - na) % 27 + 1
+    count_ba = (na - nb) % 27 + 1
+    tara_ab = ((count_ab - 1) % 9) + 1   # 1-9
+    tara_ba = ((count_ba - 1) % 9) + 1
+    good_ab = tara_ab in _TARA_GOOD
+    good_ba = tara_ba in _TARA_GOOD
+    tara_score = 3 if (good_ab and good_ba) else (1.5 if (good_ab or good_ba) else 0)
+    results["tara"] = {
+        "score": tara_score, "max": 3,
+        "a_to_b": _TARA_NAMES[tara_ab - 1], "b_to_a": _TARA_NAMES[tara_ba - 1],
+        "a_to_b_good": good_ab, "b_to_a_good": good_ba,
+        "note": f"A→B: {_TARA_NAMES[tara_ab-1]} ({'✓' if good_ab else '✗'}), B→A: {_TARA_NAMES[tara_ba-1]} ({'✓' if good_ba else '✗'})",
+    }
+
+    # ── 4. Yoni (max 4) ──────────────────────────────────────────────────
+    ya, ga = kp_a["yoni"], kp_a["yoni_gender"]
+    yb, gb = kp_b["yoni"], kp_b["yoni_gender"]
+    pair = frozenset([ya, yb])
+    if pair in _YONI_ENEMIES:
+        yoni_score, yoni_note = 0, f"Enemy Yoni pair ({ya} vs {yb})"
+    elif ya == yb:
+        if ga != gb:
+            yoni_score, yoni_note = 4, f"Same Yoni ({ya}), complementary genders"
+        else:
+            yoni_score, yoni_note = 3, f"Same Yoni ({ya}), same gender"
+    else:
+        yoni_score, yoni_note = 2, f"Friendly/neutral Yoni ({ya} vs {yb})"
+    results["yoni"] = {"score": yoni_score, "max": 4, "a": f"{ya}({ga})", "b": f"{yb}({gb})", "note": yoni_note}
+
+    # ── 5. Graha Maitri (max 5) ───────────────────────────────────────────
+    lord_a = kp_a["moon_sign_lord"]
+    lord_b = kp_b["moon_sign_lord"]
+    rel_ab = _planet_relation(lord_a, lord_b)
+    rel_ba = _planet_relation(lord_b, lord_a)
+    gm_score = _GM_SCORE.get((rel_ab, rel_ba), 0)
+    results["graha_maitri"] = {
+        "score": gm_score, "max": 5,
+        "lord_a": lord_a, "lord_b": lord_b,
+        "a_views_b": rel_ab, "b_views_a": rel_ba,
+        "note": f"{lord_a}→{lord_b}: {rel_ab}, {lord_b}→{lord_a}: {rel_ba}",
+    }
+
+    # ── 6. Gana (max 6) ──────────────────────────────────────────────────
+    ga2, gb2 = kp_a["gana"], kp_b["gana"]
+    if ga2 == gb2:
+        gana_score = 6
+    elif frozenset([ga2, gb2]) == frozenset(["Deva", "Manava"]):
+        gana_score = 5
+    elif frozenset([ga2, gb2]) == frozenset(["Manava", "Rakshasa"]):
+        gana_score = 1
+    else:  # Deva-Rakshasa
+        gana_score = 0
+    gana_note = ("Gana Dosha (Deva-Rakshasa) — fundamental temperament clash"
+                 if gana_score == 0 else
+                 "Partial Gana match" if gana_score < 6 else "Perfect Gana match")
+    results["gana"] = {"score": gana_score, "max": 6, "a": ga2, "b": gb2, "note": gana_note}
+
+    # ── 7. Bhakut (max 7) ─────────────────────────────────────────────────
+    sa = SIGNS.index(kp_a["moon_sign"])
+    sb = SIGNS.index(kp_b["moon_sign"])
+    rel_ab7 = (sb - sa) % 12 + 1   # position of B from A
+    rel_ba7 = (sa - sb) % 12 + 1
+    bhakut_pair = tuple(sorted([rel_ab7, rel_ba7]))
+    _BHAKUT_GOOD = {(1, 1), (3, 11), (5, 9), (7, 7)}
+    if bhakut_pair in _BHAKUT_GOOD or (rel_ab7 == rel_ba7 == 1):
+        bhakut_score = 7
+        bhakut_note = f"Favorable Bhakut ({rel_ab7}-{rel_ba7})"
+    else:
+        bhakut_score = 0
+        bhakut_label = {(2, 12): "2-12 Dosha", (6, 8): "6-8 Dosha"}.get(bhakut_pair, f"{rel_ab7}-{rel_ba7} Dosha")
+        bhakut_note = f"Bhakut Dosha — {bhakut_label} Moon positions"
+    results["bhakut"] = {
+        "score": bhakut_score, "max": 7,
+        "a_sign": kp_a["moon_sign"], "b_sign": kp_b["moon_sign"],
+        "relation": f"{rel_ab7}-{rel_ba7}", "note": bhakut_note,
+    }
+
+    # ── 8. Nadi (max 8) ──────────────────────────────────────────────────
+    na2, nb2 = kp_a["nadi"], kp_b["nadi"]
+    if na2 == nb2:
+        nadi_score, nadi_note = 0, f"Nadi Dosha — both {na2} Nadi (most serious dosha)"
+    else:
+        nadi_score, nadi_note = 8, f"Compatible ({na2} vs {nb2})"
+    results["nadi"] = {"score": nadi_score, "max": 8, "a": na2, "b": nb2, "note": nadi_note}
+
+    # ── Total ──────────────────────────────────────────────────────────────
+    total = sum(v["score"] for v in results.values())
+    return {"scores": results, "total": round(total, 1), "max": 36}
+
+
+def format_kuta_scores_for_ai(kuta):
+    """Format compute_ashta_kuta_scores() output as a readable string for AI prompts."""
+    s = kuta["scores"]
+    lines = [
+        f"PRE-COMPUTED ASHTA KUTA SCORES (authoritative — do NOT recalculate):",
+        f"  Varna   (1/1):  {s['varna']['score']}/1   — {s['varna']['a']} vs {s['varna']['b']} — {s['varna']['note']}",
+        f"  Vashya  (2/2):  {s['vashya']['score']}/2   — {s['vashya']['a']} vs {s['vashya']['b']} — {s['vashya']['note']}",
+        f"  Tara    (3/3):  {s['tara']['score']}/3   — {s['tara']['note']}",
+        f"  Yoni    (4/4):  {s['yoni']['score']}/4   — {s['yoni']['a']} vs {s['yoni']['b']} — {s['yoni']['note']}",
+        f"  G.Maitri(5/5): {s['graha_maitri']['score']}/5   — {s['graha_maitri']['note']}",
+        f"  Gana    (6/6):  {s['gana']['score']}/6   — {s['gana']['a']} vs {s['gana']['b']} — {s['gana']['note']}",
+        f"  Bhakut  (7/7):  {s['bhakut']['score']}/7   — {s['bhakut']['note']}",
+        f"  Nadi    (8/8):  {s['nadi']['score']}/8   — {s['nadi']['note']}",
+        f"  ─────────────────────────────────────",
+        f"  TOTAL:          {kuta['total']}/36",
+    ]
+    return "\n".join(lines)
+
+
 # ── Main entry point ──────────────────────────────────────────────────────
 
 def compute_chart(year, month, day, hour, minute, lat, lon, tz_offset, place=""):
@@ -1328,6 +1658,12 @@ def compute_chart(year, month, day, hour, minute, lat, lon, tz_offset, place="")
     # Chara Karakas
     karakas = calculate_karakas(data)
 
+    # Kuta compatibility profile (derived from Moon's position)
+    moon_lon = data["planets"]["Moon"]["lon"]
+    moon_sign_idx = lon_to_sign(moon_lon)
+    moon_nak_idx, _ = lon_to_nakshatra(moon_lon)
+    kuta_profile = compute_kuta_profile(moon_sign_idx, moon_nak_idx)
+
     # Format timezone string
     tz_h = int(tz_offset)
     tz_m = int((tz_offset - tz_h) * 60)
@@ -1370,7 +1706,8 @@ def compute_chart(year, month, day, hour, minute, lat, lon, tz_offset, place="")
         "aspects": aspects,
         "panchang": panchang,
         "karakas": karakas,
-        "sadesati": sadesati
+        "sadesati": sadesati,
+        "kuta_profile": kuta_profile
     }
 
 
