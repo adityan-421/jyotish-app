@@ -26,6 +26,7 @@ from database import (
     mark_predictions_submitted, get_submitted_predictions, complete_prediction,
     fail_prediction, get_user_predictions,
     upsert_push_token, get_users_with_push_tokens_and_charts,
+    get_gem_balance, use_gem,
     get_app_setting, set_app_setting,
     get_users_for_weekly_email, insert_weekly_email, mark_weekly_emails_submitted,
     get_submitted_weekly_emails, complete_weekly_email, get_ai_ready_weekly_emails,
@@ -586,6 +587,18 @@ def api_charts_compare():
 
     if get_question_count_today(user_id) >= 25:
         return jsonify({"error": "Daily limit reached. You can ask 25 questions per day."}), 429
+
+    # GrahaGem check — comparisons cost 1 gem
+    user_email = session["user"].get("email", "")
+    if not use_gem(user_id, user_email):
+        from datetime import date
+        today = date.today()
+        reset_date = date(today.year + 1, 1, 1) if today.month == 12 else date(today.year, today.month + 1, 1)
+        return jsonify({
+            "error": f"You've used all your GrahaGems for this month. Your 10 gems reset on {reset_date.strftime('1 %b %Y')}.",
+            "gems_exhausted": True,
+            "reset_date": reset_date.isoformat(),
+        }), 402
 
     try:
         import vertexai
@@ -1176,6 +1189,15 @@ def _send_weekly_email(to_email, name, ai_content, week_label, user_id):
 
 
 # ── Prediction API endpoints ──────────────────────────────────────────────
+
+@app.route("/api/gems")
+@login_required
+def api_get_gems():
+    """Return the current user's GrahaGem balance for this month."""
+    user = get_current_user()
+    balance = get_gem_balance(user["id"], user.get("email", ""))
+    return jsonify(balance)
+
 
 @app.route("/api/predictions")
 @login_required
@@ -2142,6 +2164,27 @@ def api_ask():
     # Rate limit: 25 questions per day
     if get_question_count_today(user_id) >= 25:
         return jsonify({"error": "Daily limit reached. You can ask 25 questions per day."}), 429
+
+    # GrahaGem check — initial readings are free; follow-up questions cost 1 gem
+    user_email = user.get("email", "")
+    if not initial_reading:
+        if not use_gem(user_id, user_email):
+            balance = get_gem_balance(user_id, user_email)
+            import calendar
+            from datetime import date
+            today = date.today()
+            last_day = calendar.monthrange(today.year, today.month)[1]
+            reset_date = date(today.year, today.month, last_day + 1 if last_day < 31 else 1)
+            # First day of next month
+            if today.month == 12:
+                reset_date = date(today.year + 1, 1, 1)
+            else:
+                reset_date = date(today.year, today.month + 1, 1)
+            return jsonify({
+                "error": f"You've used all your GrahaGems for this month. Your 10 gems reset on {reset_date.strftime('1 %b %Y')}.",
+                "gems_exhausted": True,
+                "reset_date": reset_date.isoformat(),
+            }), 402
 
     # Ensure user exists in DB
     upsert_user(user_id, user.get("email", ""), user.get("name", ""), user.get("picture", ""))

@@ -172,6 +172,14 @@ def init_db():
                 ON user_push_tokens(user_id);
             """)
             cur.execute("""
+                CREATE TABLE IF NOT EXISTS gem_usage (
+                    user_id TEXT NOT NULL REFERENCES users(id),
+                    month_start DATE NOT NULL,
+                    used INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (user_id, month_start)
+                );
+            """)
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS app_settings (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL,
@@ -807,6 +815,62 @@ def get_users_with_push_tokens_and_charts():
         rows = cur.fetchall()
         cur.close()
     return rows
+
+
+# ── GrahaGems ─────────────────────────────────────────────────────────────
+
+GEMS_PER_MONTH = 10
+UNLIMITED_GEM_EMAILS = {"adityan@gmail.com"}
+
+
+def get_gem_balance(user_id, user_email=None):
+    """Return {used, remaining, month_start, is_unlimited} for this month."""
+    if user_email in UNLIMITED_GEM_EMAILS:
+        return {"used": 0, "remaining": 999, "month_start": None, "is_unlimited": True}
+    from datetime import date
+    month_start = date.today().replace(day=1).isoformat()
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT used FROM gem_usage WHERE user_id = %s AND month_start = %s",
+            (user_id, month_start),
+        )
+        row = cur.fetchone()
+        cur.close()
+    used = row["used"] if row else 0
+    return {
+        "used": used,
+        "remaining": max(0, GEMS_PER_MONTH - used),
+        "month_start": month_start,
+        "is_unlimited": False,
+    }
+
+
+def use_gem(user_id, user_email=None):
+    """Attempt to deduct 1 gem. Returns True if successful, False if exhausted."""
+    if user_email in UNLIMITED_GEM_EMAILS:
+        return True
+    from datetime import date
+    month_start = date.today().replace(day=1).isoformat()
+    with get_db() as conn:
+        cur = conn.cursor()
+        # Upsert: insert row if not exists, then increment only if under limit
+        cur.execute(
+            """INSERT INTO gem_usage (user_id, month_start, used)
+               VALUES (%s, %s, 0)
+               ON CONFLICT (user_id, month_start) DO NOTHING""",
+            (user_id, month_start),
+        )
+        cur.execute(
+            """UPDATE gem_usage SET used = used + 1
+               WHERE user_id = %s AND month_start = %s AND used < %s
+               RETURNING used""",
+            (user_id, month_start, GEMS_PER_MONTH),
+        )
+        row = cur.fetchone()
+        conn.commit()
+        cur.close()
+    return row is not None  # None means limit already reached
 
 
 # ── App Settings ───────────────────────────────────────────────────────────

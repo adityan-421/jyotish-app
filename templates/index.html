@@ -1384,6 +1384,9 @@ footer strong { color: #FF6B00; }
   <button id="homeBtn" onclick="showHome()">&#8592; Back</button>
   <span id="chartPersonName"></span>
   <span style="flex:1"></span>
+  <div id="gemBadge" style="display:none;align-items:center;gap:0.35rem;background:rgba(0,201,177,0.08);border:1px solid rgba(0,201,177,0.2);border-radius:8px;padding:0.25rem 0.7rem;font-size:0.78rem;font-weight:600;color:var(--teal);cursor:default;" title="GrahaGems remaining this month">
+    <span>&#9830;</span><span id="gemCount">10</span> GrahaGems
+  </div>
   <button class="save-btn" id="saveBtn" onclick="openSaveModal()">Save Chart</button>
 </div>
 
@@ -3799,6 +3802,7 @@ function runChartComparison() {
         document.getElementById("compareRunBtn").disabled = false;
         showCompareError(data.error);
         if (data.error.indexOf("Daily limit") !== -1) { aiLimitReached = true; }
+        if (data.gems_exhausted) { updateGemBadge(0); }
         return;
       }
       if (data.remaining !== undefined) {
@@ -4801,6 +4805,11 @@ function autoGenerateReading() {
         aiLimitReached = true;
         document.getElementById("aiHelper").textContent = "Daily limit reached";
         if (generatePrompt) generatePrompt.style.display = "none";
+      } else if (resp.status === 402 && resp.data.gems_exhausted) {
+        document.getElementById("aiHelper").textContent = "No GrahaGems remaining this month";
+        updateGemBadge(0);
+        if (generatePrompt) generatePrompt.style.display = "none";
+        if (genBtn) genBtn.disabled = true;
       }
       return;
     }
@@ -4914,6 +4923,9 @@ function askAI() {
       if (resp.status === 429 && resp.data.error.indexOf("Daily limit") >= 0) {
         aiLimitReached = true;
         document.getElementById("aiHelper").textContent = "Daily limit reached";
+      } else if (resp.status === 402 && resp.data.gems_exhausted) {
+        document.getElementById("aiHelper").textContent = "No GrahaGems remaining this month";
+        updateGemBadge(0);
       } else {
         btn.disabled = false;
         input.disabled = false;
@@ -5119,6 +5131,41 @@ function renderMonthCalendar(data, year, month) {
   cal.innerHTML = html;
 }
 
+// ── GrahaGems ───────────────────────────────────────────────────────────────
+function updateGemBadge(remaining) {
+  var badge = document.getElementById("gemBadge");
+  var count = document.getElementById("gemCount");
+  if (!badge || !count) return;
+  if (remaining === null || remaining === undefined) { badge.style.display = "none"; return; }
+  count.textContent = remaining;
+  badge.style.display = "flex";
+  if (remaining === 999) {
+    badge.style.background = "rgba(167,139,250,0.1)";
+    badge.style.borderColor = "rgba(167,139,250,0.25)";
+    badge.style.color = "var(--purple, #a78bfa)";
+    count.textContent = "∞";
+  } else if (remaining <= 2) {
+    badge.style.background = "rgba(239,68,68,0.1)";
+    badge.style.borderColor = "rgba(239,68,68,0.25)";
+    badge.style.color = "#ef4444";
+  } else if (remaining <= 5) {
+    badge.style.background = "rgba(245,158,11,0.1)";
+    badge.style.borderColor = "rgba(245,158,11,0.25)";
+    badge.style.color = "var(--amber)";
+  } else {
+    badge.style.background = "rgba(0,201,177,0.08)";
+    badge.style.borderColor = "rgba(0,201,177,0.2)";
+    badge.style.color = "var(--teal)";
+  }
+}
+
+function fetchGemBalance() {
+  if (!currentUser) return;
+  fetch("/api/gems").then(function(r) { return r.json(); }).then(function(d) {
+    updateGemBadge(d.is_unlimited ? 999 : d.remaining);
+  }).catch(function() {});
+}
+
 // ── Hide landing / show chart ───────────────────────────────────────────────
 function showChartContent() {
   var lp = document.getElementById("landingPage");
@@ -5131,6 +5178,7 @@ function showChartContent() {
   var titleEl = document.getElementById("birthDataCardTitle");
   if (nameEl) nameEl.textContent = _loadedChartName || '';
   if (titleEl) titleEl.textContent = _loadedChartName || 'Birth Data';
+  fetchGemBalance();
 }
 
 function showHome() {
