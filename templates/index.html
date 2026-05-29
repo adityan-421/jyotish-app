@@ -406,6 +406,8 @@ tbody tr:hover { background: var(--surface-2); }
 .yoga-item.positive h4 { color: var(--green); }
 .yoga-item.caution { border-left: 3px solid var(--red); }
 .yoga-item.caution h4 { color: var(--red); }
+.yoga-item.neutral { border-left: 3px solid var(--amber); }
+.yoga-item.neutral h4 { color: var(--amber); }
 
 /* Doshas */
 .card.accent-red { border-top: 3px solid var(--red); }
@@ -468,6 +470,79 @@ footer strong { color: #FF6B00; }
   gap: 1rem;
   padding: 0.5rem 0 0.25rem;
 }
+/* Save nudge banner */
+#saveNudgeBanner {
+  display: none;
+  align-items: center;
+  gap: 0.75rem;
+  background: linear-gradient(90deg, rgba(0,201,177,0.12), rgba(167,139,250,0.08));
+  border: 1px solid rgba(0,201,177,0.3);
+  border-radius: 10px;
+  padding: 0.6rem 1rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-2);
+  animation: nudgePulse 2s ease-in-out 1;
+}
+@keyframes nudgePulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(0,201,177,0); }
+  50%      { box-shadow: 0 0 0 6px rgba(0,201,177,0.15); }
+}
+#saveNudgeBanner strong { color: var(--teal); }
+#saveNudgeBanner .nudge-save-btn {
+  margin-left: auto;
+  background: var(--teal);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.3rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+#saveNudgeBanner .nudge-dismiss {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0 0.2rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+/* Locked AI tab for unsaved charts */
+#aiSavePrompt { display: none; }
+.ai-locked-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  filter: blur(3px);
+  opacity: 0.4;
+  pointer-events: none;
+  user-select: none;
+}
+.ai-locked-card {
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 1rem;
+  height: 80px;
+}
+.ai-locked-card-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-2);
+  margin-bottom: 0.4rem;
+}
+.ai-locked-bar {
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  margin-bottom: 0.3rem;
+}
+.ai-locked-bar.short { width: 60%; }
 #homeBtn {
   background: none;
   border: 1px solid #FF6B00;
@@ -591,7 +666,7 @@ footer strong { color: #FF6B00; }
 }
 .history-panel.open { right: 0; }
 
-/* Compare Charts Panel */
+/* Match Making Panel */
 .compare-overlay {
   display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
   z-index: 300;
@@ -1220,7 +1295,7 @@ footer strong { color: #FF6B00; }
   .card-body { padding: 0.5rem 0.75rem; }
 }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
 </head>
 <body>
 
@@ -1670,7 +1745,16 @@ footer strong { color: #FF6B00; }
 
 </div><!-- end container -->
 
-<footer>Generated with <strong>Swiss Ephemeris</strong> &middot; Ayanamsa: <strong>Lahiri</strong> &middot; House System: <strong>Equal</strong></footer>
+<footer>
+  Generated with <strong>Swiss Ephemeris</strong> &middot; Ayanamsa: <strong>Lahiri</strong> &middot; House System: <strong>Equal</strong>
+  <span style="display:block;margin-top:0.4rem;">
+    <a href="/terms" style="color:var(--text-3);text-decoration:none;" target="_blank">Terms &amp; Conditions</a>
+    &nbsp;&middot;&nbsp;
+    <a href="/privacy" style="color:var(--text-3);text-decoration:none;" target="_blank">Privacy Policy</a>
+    &nbsp;&middot;&nbsp;
+    &copy; 2026 GrahaLogic
+  </span>
+</footer>
 
 <div class="loading-overlay" id="loadingOverlay"><div class="loading-spinner"></div></div>
 <div class="drishti-tip" id="drishtiTip"></div>
@@ -1688,52 +1772,53 @@ footer strong { color: #FF6B00; }
   </div>
 </div>
 
-<!-- AI Chat History Panel -->
-<div class="history-overlay" id="historyOverlay" onclick="closeAIHistory()"></div>
-<div class="history-panel" id="historyPanel">
-  <div class="panel-header">
-    <div><h2>Chat History</h2><span class="panel-count" id="historyCount"></span></div>
-    <button class="panel-close" onclick="closeAIHistory()">&times;</button>
-  </div>
-  <div class="panel-body" id="historyBody">
-    <div class="panel-empty">Loading...</div>
-  </div>
-</div>
-
-<!-- Compare Charts Panel -->
+<!-- Match Making Panel -->
 <div class="compare-overlay" id="compareOverlay" onclick="closeComparePanel()"></div>
 <div class="compare-panel" id="comparePanel">
   <div class="panel-header">
-    <div><h2>Chart Comparison</h2><span class="panel-count">Relationship &amp; Marriage Compatibility</span></div>
+    <div><h2>Match Making</h2><span class="panel-count">Vedic Marriage Compatibility</span></div>
     <button class="panel-close" onclick="closeComparePanel()">&times;</button>
   </div>
   <div class="panel-body" id="comparePanelBody">
+
+    <!-- Previous match makings -->
+    <div id="compareHistorySection" style="display:none;margin-bottom:1.25rem;">
+      <div style="font-size:0.72rem;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.6rem;">Previous Match Makings</div>
+      <div id="compareHistoryList"></div>
+    </div>
 
     <!-- Step 1: Chart selector -->
     <div id="compareSelectorSection">
       <p style="font-size:0.82rem;color:var(--text-3);margin-bottom:1.25rem;">Select two saved charts to analyze their relationship compatibility using Vedic synastry.</p>
       <div style="margin-bottom:1rem;">
-        <label style="font-size:0.72rem;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:0.4rem;">Person A</label>
+        <label style="font-size:0.72rem;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:0.4rem;">Boy (Groom)</label>
         <select id="compareChartA" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;color:var(--text);background:var(--surface);outline:none;"></select>
       </div>
       <div style="margin-bottom:1.25rem;">
-        <label style="font-size:0.72rem;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:0.4rem;">Person B</label>
+        <label style="font-size:0.72rem;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:0.4rem;">Girl (Bride)</label>
         <select id="compareChartB" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;color:var(--text);background:var(--surface);outline:none;"></select>
       </div>
       <div id="compareError" style="display:none;padding:0.65rem 1rem;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:var(--red);font-size:0.82rem;margin-bottom:1rem;"></div>
-      <button id="compareRunBtn" onclick="runChartComparison()" style="width:100%;padding:0.65rem;background:var(--pink);color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:0.9rem;font-weight:600;cursor:pointer;transition:opacity 0.15s;">Compare Charts</button>
-      <p style="font-size:0.72rem;color:var(--text-3);margin-top:0.6rem;text-align:center;">Uses 1 of your 25 daily AI questions</p>
+      <button id="compareRunBtn" onclick="runChartComparison()" style="width:100%;padding:0.65rem;background:var(--pink);color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:0.9rem;font-weight:600;cursor:pointer;transition:opacity 0.15s;">Match Making</button>
+      <p style="font-size:0.72rem;color:var(--text-3);margin-top:0.6rem;text-align:center;">Uses 2 GrahaGems &nbsp;·&nbsp; Free for saved pairs</p>
     </div>
 
     <!-- Step 2: Loading -->
     <div id="compareLoadingSection" style="display:none;text-align:center;padding:3rem 1rem;">
       <div class="ai-spinner" style="margin:0 auto 1rem;"></div>
       <div style="font-size:0.88rem;color:var(--text-3);">Analyzing astrological compatibility...</div>
+      <div style="font-size:0.75rem;color:var(--text-3);margin-top:0.75rem;opacity:0.7;">This takes about a minute — keep this screen active</div>
     </div>
 
     <!-- Step 3: Results -->
     <div id="compareResultsSection" style="display:none;">
-      <button onclick="resetComparePanel()" style="background:none;border:none;color:var(--accent);font-size:0.82rem;cursor:pointer;padding:0 0 1rem 0;font-family:inherit;">&#8592; Compare different charts</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+        <button onclick="resetComparePanel()" style="background:none;border:none;color:var(--accent);font-size:0.82rem;cursor:pointer;padding:0;font-family:inherit;">&#8592; New match making</button>
+        <div id="compatCachedBadge" style="display:none;font-size:0.72rem;color:var(--text-3);display:flex;align-items:center;gap:0.5rem;">
+          <span style="background:var(--surface-2,#f4f4f4);padding:0.2rem 0.5rem;border-radius:4px;">Saved reading</span>
+          <button id="compatRerunBtn" onclick="rerunChartComparison()" style="background:none;border:none;color:var(--accent);font-size:0.72rem;cursor:pointer;padding:0;font-family:inherit;">Re-run &#8635;</button>
+        </div>
+      </div>
       <div id="compatScoreBlock" style="text-align:center;margin-bottom:1.5rem;"></div>
       <div id="compatSummary" class="ai-reading-section" style="margin-bottom:1rem;"></div>
       <div id="compatStrengths" style="margin-bottom:1rem;"></div>
@@ -3504,8 +3589,7 @@ function updateAuthUI() {
         '<span class="user-name">' + escHtml(currentUser.name || currentUser.email) + '</span>' +
       '</div>' +
       '<a class="header-link" href="#" onclick="openMyCharts();return false;">My Charts</a>' +
-      '<a class="header-link" href="#" onclick="openComparePanel();return false;">Compare Charts</a>' +
-      '<a class="header-link" href="#" onclick="openAIHistory();return false;">Chat History</a>' +
+      '<a class="header-link" href="#" onclick="openComparePanel();return false;">Match Making</a>' +
       '<a class="header-link" href="/auth/logout">Sign Out</a>';
     document.getElementById("saveBtn").style.display = chartData ? "block" : "none";
   } else {
@@ -3535,7 +3619,7 @@ function saveCurrentChart() {
   fetch("/api/charts/save", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ name: name, input_data: lastInputPayload, chart_data: chartData, is_own: isOwn })
+    body: JSON.stringify({ name: name, input_data: lastInputPayload, chart_data: chartData, is_own: isOwn, reading: _cachedReadingData || null })
   })
   .then(function(r) { return r.json(); })
   .then(function(data) {
@@ -3658,55 +3742,6 @@ function loadMyCharts() {
     .catch(function() { document.getElementById("panelBody").innerHTML = '<div class="panel-empty">Failed to load charts.</div>'; });
 }
 
-function openAIHistory() {
-  document.getElementById("historyOverlay").classList.add("open");
-  document.getElementById("historyPanel").classList.add("open");
-  loadAIHistory();
-}
-
-function closeAIHistory() {
-  document.getElementById("historyOverlay").classList.remove("open");
-  document.getElementById("historyPanel").classList.remove("open");
-}
-
-function loadAIHistory() {
-  document.getElementById("historyBody").innerHTML = '<div class="panel-empty">Loading...</div>';
-  fetch("/api/ai-history")
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.error) { document.getElementById("historyBody").innerHTML = '<div class="panel-empty">' + escHtml(data.error) + '</div>'; return; }
-      var items = data.history;
-      document.getElementById("historyCount").textContent = items.length + " readings (last 30 days)";
-      if (items.length === 0) {
-        document.getElementById("historyBody").innerHTML = '<div class="panel-empty">No AI readings yet. Generate a chart and ask a question to get started.</div>';
-        return;
-      }
-      var html = '';
-      var lastGroup = '';
-      var today = new Date(); today.setHours(0,0,0,0);
-      var yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
-      items.forEach(function(item) {
-        var d = new Date(item.created_at);
-        var dDay = new Date(d); dDay.setHours(0,0,0,0);
-        var groupLabel;
-        if (dDay.getTime() === today.getTime()) groupLabel = 'Today';
-        else if (dDay.getTime() === yesterday.getTime()) groupLabel = 'Yesterday';
-        else groupLabel = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        if (groupLabel !== lastGroup) {
-          html += '<div class="history-date-group">' + groupLabel + '</div>';
-          lastGroup = groupLabel;
-        }
-        var timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-        html += '<div class="history-item" onclick="toggleHistoryItem(this)">' +
-          '<div class="history-item-question">' + escHtml(item.question) + '</div>' +
-          '<div class="history-item-meta">' + escHtml(item.category) + ' &middot; ' + timeStr + '</div>' +
-          '<div class="history-item-reading">' + marked.parse(item.reading || '') + '</div>' +
-        '</div>';
-      });
-      document.getElementById("historyBody").innerHTML = html;
-    })
-    .catch(function() { document.getElementById("historyBody").innerHTML = '<div class="panel-empty">Failed to load history.</div>'; });
-}
 
 function toggleHistoryItem(el) {
   el.classList.toggle("expanded");
@@ -3717,12 +3752,15 @@ function toggleHistoryItem(el) {
 // ═══════════════════════════════════════════════════════════════
 
 var _compareChartsCache = null;
+var _compareCurrentIdA = null;
+var _compareCurrentIdB = null;
 
 function openComparePanel() {
   if (!currentUser) { alert("Please sign in to use chart comparison."); return; }
   document.getElementById("compareOverlay").classList.add("open");
   document.getElementById("comparePanel").classList.add("open");
   loadCompareChartList();
+  loadMatchmakingHistory();
 }
 
 function closeComparePanel() {
@@ -3762,6 +3800,89 @@ function loadCompareChartList() {
     .catch(function() { showCompareError("Failed to load charts."); });
 }
 
+function loadMatchmakingHistory() {
+  fetch("/api/matchmaking/history")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error || !data.history || data.history.length === 0) {
+        document.getElementById("compareHistorySection").style.display = "none";
+        return;
+      }
+      var history = data.history;
+      var html = '';
+      history.forEach(function(item) {
+        var score = item.score != null ? item.score : '?';
+        var scoreColor = score >= 76 ? 'var(--green)' : score >= 61 ? 'var(--teal)' : score >= 41 ? 'var(--amber)' : 'var(--red)';
+        var dateStr = item.created_at ? new Date(item.created_at).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'}) : '';
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:0.55rem 0.75rem;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:0.5rem;cursor:pointer;" onclick="loadMatchmakingResult(' + item.id + ',' + item.chart_id_1 + ',' + item.chart_id_2 + ')">' +
+          '<div style="min-width:0;">' +
+            '<div style="font-size:0.83rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(item.chart_name_1) + ' \u2194 ' + escHtml(item.chart_name_2) + '</div>' +
+            '<div style="font-size:0.72rem;color:var(--text-3);margin-top:0.15rem;">' + escHtml(dateStr) + '</div>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">' +
+            '<span style="font-size:0.9rem;font-weight:700;color:' + scoreColor + ';">' + score + '</span>' +
+            '<button onclick="event.stopPropagation();deleteMatchmakingRecord(' + item.id + ',this)" style="background:none;border:none;color:var(--text-3);font-size:1rem;cursor:pointer;padding:0.1rem 0.2rem;line-height:1;" title="Delete">&times;</button>' +
+          '</div>' +
+        '</div>';
+      });
+      document.getElementById("compareHistoryList").innerHTML = html;
+      document.getElementById("compareHistorySection").style.display = "block";
+    })
+    .catch(function() {});
+}
+
+function loadMatchmakingResult(recordId, chartId1, chartId2) {
+  // Find this record's data from a fresh fetch
+  fetch("/api/matchmaking/history")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var item = (data.history || []).find(function(h) { return h.id === recordId; });
+      if (!item) return;
+      _compareCurrentIdA = chartId1;
+      _compareCurrentIdB = chartId2;
+      document.getElementById("compareSelectorSection").style.display = "none";
+      document.getElementById("compareHistorySection").style.display = "none";
+      document.getElementById("compareLoadingSection").style.display = "none";
+      var badge = document.getElementById("compatCachedBadge");
+      if (badge) badge.style.display = "flex";
+      renderCompatibilityResults(item.result, chartId1, chartId2);
+    })
+    .catch(function() {});
+}
+
+function deleteMatchmakingRecord(recordId, btn) {
+  if (!confirm("Delete this match making result?")) return;
+  fetch("/api/matchmaking/" + recordId, {method: "DELETE"})
+    .then(function(r) { return r.json(); })
+    .then(function() { loadMatchmakingHistory(); })
+    .catch(function() {});
+}
+
+function rerunChartComparison() {
+  if (!_compareCurrentIdA || !_compareCurrentIdB) { resetComparePanel(); return; }
+  // Delete the cached record for this pair, then re-run
+  fetch("/api/matchmaking/history")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var item = (data.history || []).find(function(h) {
+        return (h.chart_id_1 === _compareCurrentIdA && h.chart_id_2 === _compareCurrentIdB) ||
+               (h.chart_id_1 === _compareCurrentIdB && h.chart_id_2 === _compareCurrentIdA);
+      });
+      if (item) {
+        return fetch("/api/matchmaking/" + item.id, {method: "DELETE"});
+      }
+    })
+    .then(function() {
+      // Re-run with the same charts
+      document.getElementById("compareResultsSection").style.display = "none";
+      document.getElementById("compareLoadingSection").style.display = "block";
+      var badge = document.getElementById("compatCachedBadge");
+      if (badge) badge.style.display = "none";
+      _runCompareRequest(_compareCurrentIdA, _compareCurrentIdB);
+    })
+    .catch(function() {});
+}
+
 function showCompareError(msg) {
   var el = document.getElementById("compareError");
   el.textContent = msg;
@@ -3776,38 +3897,69 @@ function runChartComparison() {
   hideCompareError();
   var idA = document.getElementById("compareChartA").value;
   var idB = document.getElementById("compareChartB").value;
-  if (!idA) { showCompareError("Please select Person A."); return; }
-  if (!idB) { showCompareError("Please select Person B."); return; }
+  if (!idA) { showCompareError("Please select the Boy's chart."); return; }
+  if (!idB) { showCompareError("Please select the Girl's chart."); return; }
   if (idA === idB) { showCompareError("Please select two different charts to compare."); return; }
-  // gem check happens server-side
+
+  _compareCurrentIdA = parseInt(idA);
+  _compareCurrentIdB = parseInt(idB);
 
   document.getElementById("compareSelectorSection").style.display = "none";
+  document.getElementById("compareHistorySection").style.display = "none";
   document.getElementById("compareResultsSection").style.display = "none";
   document.getElementById("compareLoadingSection").style.display = "block";
   document.getElementById("compareRunBtn").disabled = true;
+  var badge = document.getElementById("compatCachedBadge");
+  if (badge) badge.style.display = "none";
+
+  _runCompareRequest(_compareCurrentIdA, _compareCurrentIdB);
+}
+
+function _runCompareRequest(idA, idB) {
+  // Acquire wake lock to prevent screen sleep during long AI call
+  var _compareLock = null;
+  if (navigator.wakeLock) {
+    navigator.wakeLock.request("screen").then(function(lock) { _compareLock = lock; }).catch(function() {});
+  }
 
   fetch("/api/charts/compare", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({chart_id_1: parseInt(idA), chart_id_2: parseInt(idB)})
   })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
+    .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+    .then(function(resp) {
+      if (_compareLock) { _compareLock.release(); _compareLock = null; }
       document.getElementById("compareLoadingSection").style.display = "none";
-      if (data.error) {
+      document.getElementById("compareRunBtn").disabled = false;
+      var data = resp.data;
+      if (!resp.ok || data.error) {
         document.getElementById("compareSelectorSection").style.display = "block";
-        document.getElementById("compareRunBtn").disabled = false;
-        showCompareError(data.error);
-        if (data.error.indexOf("Daily limit") !== -1) { aiLimitReached = true; }
+        document.getElementById("compareHistorySection").style.display = "block";
+        showCompareError(data.error || "Something went wrong. Please try again.");
         if (data.gems_exhausted) { updateGemBadge(0); }
         return;
       }
-      fetchGemBalance();
-      renderCompatibilityResults(data.compatibility, idA, idB);
+      if (!data.cached) fetchGemBalance();
+      var badge = document.getElementById("compatCachedBadge");
+      if (badge) badge.style.display = data.cached ? "flex" : "none";
+      loadMatchmakingHistory();
+      try {
+        renderCompatibilityResults(data.compatibility, idA, idB);
+      } catch(renderErr) {
+        console.error("renderCompatibilityResults error:", renderErr);
+        document.getElementById("compareResultsSection").style.display = "block";
+        document.getElementById("compatSummary").innerHTML =
+          '<div style="padding:1rem;color:var(--text-2);font-size:0.85rem;">' +
+          '<strong>Reading complete.</strong> There was a display error — please close and reopen the panel to try again.</div>';
+      }
     })
-    .catch(function() {
+    .catch(function(err) {
+      if (_compareLock) { _compareLock.release(); _compareLock = null; }
+      console.error("compare fetch error:", err);
       document.getElementById("compareLoadingSection").style.display = "none";
       document.getElementById("compareSelectorSection").style.display = "block";
+      document.getElementById("compareHistorySection").style.display = "block";
       document.getElementById("compareRunBtn").disabled = false;
       showCompareError("Request failed. Please check your connection and try again.");
     });
@@ -3818,11 +3970,16 @@ function resetComparePanel() {
   document.getElementById("compareLoadingSection").style.display = "none";
   document.getElementById("compareRunBtn").disabled = false;
   document.getElementById("compareSelectorSection").style.display = "block";
+  var badge = document.getElementById("compatCachedBadge");
+  if (badge) badge.style.display = "none";
+  _compareCurrentIdA = null;
+  _compareCurrentIdB = null;
+  loadMatchmakingHistory();
   hideCompareError();
 }
 
 function renderCompatibilityResults(compat, idA, idB) {
-  var nameA = "Person A", nameB = "Person B";
+  var nameA = "Boy", nameB = "Girl";
   if (_compareChartsCache) {
     _compareChartsCache.forEach(function(c) {
       if (String(c.id) === String(idA)) nameA = c.name;
@@ -4717,10 +4874,9 @@ function pollReadingStatus(readingId, stepTimer, loading, tabBtn, errorEl,
           aiConversation.push({role: "user", text: defaultQuestion});
           aiConversation.push({role: "assistant", text: summary});
         }
-        // Cache on chart for instant loading next time
-        if (currentSavedChartId) {
-          _cachedReadingData = readingData;
-        }
+        // Cache in-session so it loads instantly and gets persisted on save,
+        // whether or not the chart is already saved.
+        _cachedReadingData = readingData;
         if (inputRow) inputRow.style.display = "flex";
         if (btn) btn.disabled = false;
         if (input) { input.disabled = false; input.focus(); }
@@ -4818,6 +4974,8 @@ function autoGenerateReading() {
     var readingData = resp.data.reading_data;
     if (readingData && (readingData.categories || readingData.general)) {
       renderReadingGrid(readingData);
+      // Cache in-session so it persists on save even if the chart isn't saved yet.
+      _cachedReadingData = readingData;
       var summaryParts = [];
       if (readingData.general) summaryParts.push("General: " + readingData.general);
       if (readingData.categories) summaryParts = summaryParts.concat(readingData.categories.map(function(c) { return c.title + ": " + c.reading; }));

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your Reading is Ready — GrahaLogic</title>
+</head>
+<body style="margin:0;padding:0;background:#f0f2f8;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:1.6;color:#1e2035;">
+
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">Your {{ reading_type }} Jyotish reading has been computed and is ready to view.&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;</div>
+
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f0f2f8;">
+  <tr>
+    <td align="center" style="padding:36px 16px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;">
+
+        <!-- Logo bar -->
+        <tr>
+          <td style="background:#1a1d27;border-radius:14px 14px 0 0;padding:22px 32px;text-align:center;">
+            <img src="https://jyotish-app-333157384151.us-central1.run.app/static/logo.png"
+                 alt="GrahaLogic" width="120" style="display:block;margin:0 auto;height:auto;">
+          </td>
+        </tr>
+        <tr><td style="height:3px;background:linear-gradient(90deg,#00c9b1,#a78bfa);"></td></tr>
+
+        <!-- Main card -->
+        <tr>
+          <td style="background:#ffffff;border:1px solid #dde1f0;border-top:none;border-radius:0 0 14px 14px;padding:36px 36px 32px;">
+
+            <!-- Icon -->
+            <div style="text-align:center;margin-bottom:20px;">
+              <div style="display:inline-block;background:#f0fdf9;border-radius:50%;width:56px;height:56px;line-height:56px;font-size:26px;text-align:center;">&#10024;</div>
+            </div>
+
+            <h1 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#1e2035;text-align:center;">Your Reading is Ready</h1>
+            <p style="margin:0 0 24px;font-size:14px;color:#6b7194;text-align:center;">Hi {{ name }}, your <strong>{{ reading_type }}</strong> Jyotish reading has been computed.</p>
+
+            <!-- Period pill -->
+            {% if period %}
+            <div style="text-align:center;margin-bottom:24px;">
+              <span style="background:#f0f2f8;color:#6b7194;font-size:12px;padding:5px 16px;border-radius:20px;display:inline-block;">{{ period }}</span>
+            </div>
+            {% endif %}
+
+            <p style="margin:0 0 28px;font-size:13px;color:#4a5070;text-align:center;line-height:1.7;">
+              Open GrahaLogic, select your chart, and tap <strong>View Predictions</strong> to read your personalized forecast.
+            </p>
+
+            <div style="text-align:center;">
+              <a href="https://grahalogic.ai" style="display:inline-block;background:#00c9b1;color:#ffffff;font-weight:700;font-size:13px;text-decoration:none;padding:12px 32px;border-radius:8px;">View My Reading</a>
+            </div>
+
+          </td>
+        </tr>
+
+        <tr><td style="height:24px;"></td></tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="text-align:center;padding:0 16px;">
+            <div style="font-size:11px;color:#b0b4c8;">
+              This is a transactional notification from <a href="https://grahalogic.ai" style="color:#9aa0b8;text-decoration:none;">GrahaLogic</a>.
+            </div>
+          </td>
+        </tr>
+
+        <tr><td style="height:24px;"></td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

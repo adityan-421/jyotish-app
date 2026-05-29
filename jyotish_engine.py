@@ -294,8 +294,9 @@ def get_sidereal_pos(jd, planet_id):
     flags = swe.FLG_SWIEPH | swe.FLG_SIDEREAL | swe.FLG_SPEED
     result = swe.calc_ut(jd, planet_id, flags)
     lon = result[0][0]
+    lat = result[0][1]
     speed = result[0][3]
-    return lon % 360, speed
+    return lon % 360, lat, speed
 
 
 def get_rahu_ketu(jd):
@@ -452,12 +453,12 @@ def calculate_all(jd, lat, lon, ayanamsa):
     data = {"lagna": asc_sidereal, "planets": {}}
 
     for name, pid in PLANETS.items():
-        planet_lon, speed = get_sidereal_pos(jd, pid)
-        data["planets"][name] = {"lon": planet_lon, "speed": speed, "retro": speed < 0}
+        planet_lon, lat, speed = get_sidereal_pos(jd, pid)
+        data["planets"][name] = {"lon": planet_lon, "lat": lat, "speed": speed, "retro": speed < 0}
 
     rahu, ketu = get_rahu_ketu(jd)
-    data["planets"]["Rahu"] = {"lon": rahu, "speed": 0, "retro": True}
-    data["planets"]["Ketu"] = {"lon": ketu, "speed": 0, "retro": True}
+    data["planets"]["Rahu"] = {"lon": rahu, "lat": 0.0, "speed": 0, "retro": True}
+    data["planets"]["Ketu"] = {"lon": ketu, "lat": 0.0, "speed": 0, "retro": True}
 
     return data
 
@@ -835,57 +836,92 @@ def detect_yogas(data):
     def signs_apart(p1, p2):
         return (positions[p2]["sign"] - positions[p1]["sign"]) % 12
 
+    def is_combust(planet):
+        if planet not in COMBUSTION_DEGREES:
+            return False
+        diff = abs(positions[planet]["lon"] - positions["Sun"]["lon"])
+        if diff > 180:
+            diff = 360 - diff
+        return diff <= COMBUSTION_DEGREES[planet]
+
+    def is_debilitated(planet):
+        return planet in DEBILITATION and positions[planet]["sign"] == DEBILITATION[planet]
+
+    def is_own_or_exalt(planet):
+        p_sign = positions[planet]["sign"]
+        return (p_sign in OWN_SIGNS.get(planet, [])) or (EXALTATION.get(planet) == p_sign)
+
     moon_sign = positions["Moon"]["sign"]
 
-    # 1. Gajakesari
+    # 1. Gajakesari — Jupiter in kendra from Moon; skip if Jupiter combust or debilitated
     jup_from_moon = (positions["Jupiter"]["sign"] - moon_sign) % 12
     if jup_from_moon in [0, 3, 6, 9]:
-        yogas_found.append({"name": "Gajakesari Yoga",
-                            "description": "Jupiter in kendra from Moon \u2014 wisdom, fame, good fortune",
-                            "type": "positive"})
+        if not is_combust("Jupiter") and not is_debilitated("Jupiter"):
+            pos_label = "conjunct Moon" if jup_from_moon == 0 else "in kendra from Moon"
+            yogas_found.append({"name": "Gajakesari Yoga",
+                                "description": f"Jupiter {pos_label} \u2014 wisdom, fame, good fortune",
+                                "type": "positive"})
 
-    # 2. Budhaditya
+    # 2. Budhaditya — Sun-Mercury conjunct; skip if Mercury cazimi (<3\u00b0); partial if combust (3-14\u00b0)
     if same_sign("Sun", "Mercury"):
-        yogas_found.append({"name": "Budhaditya Yoga",
-                            "description": "Sun-Mercury conjunction \u2014 intelligence, communication skills",
-                            "type": "positive"})
+        merc_diff = abs(positions["Mercury"]["lon"] - positions["Sun"]["lon"])
+        if merc_diff > 180:
+            merc_diff = 360 - merc_diff
+        if merc_diff >= 3:
+            if merc_diff <= 14:
+                yogas_found.append({"name": "Budhaditya Yoga",
+                                    "description": f"Sun-Mercury conjunction ({merc_diff:.1f}\u00b0 apart, Mercury combust) \u2014 intelligence present but expression suppressed",
+                                    "type": "neutral"})
+            else:
+                yogas_found.append({"name": "Budhaditya Yoga",
+                                    "description": "Sun-Mercury conjunction \u2014 sharp intellect, communication skills, analytical mind",
+                                    "type": "positive"})
 
-    # 3. Chandra-Mangala
-    if same_sign("Moon", "Mars") or signs_apart("Moon", "Mars") == 6:
+    # 3. Chandra-Mangala — Moon-Mars conjunction or opposition; note Mars debilitation
+    mars_from_moon = signs_apart("Moon", "Mars")
+    if mars_from_moon == 0 or mars_from_moon == 6:
+        pos_label = "conjunct Moon" if mars_from_moon == 0 else "opposing Moon"
+        mars_note = " (Mars debilitated in Cancer \u2014 drive frustrated)" if is_debilitated("Mars") else ""
         yogas_found.append({"name": "Chandra-Mangala Yoga",
-                            "description": "Moon-Mars conjunction/aspect \u2014 wealth through enterprise",
+                            "description": f"Moon-Mars {pos_label} \u2014 wealth through enterprise and bold action{mars_note}",
                             "type": "positive"})
 
-    # 4. Amala Yoga
+    # 4. Amala Yoga — benefic in 10th; skip if that benefic is debilitated or combust
     benefics = ["Jupiter", "Venus", "Mercury"]
     for b in benefics:
+        if is_debilitated(b) or is_combust(b):
+            continue
         if positions[b]["house"] == 10:
             yogas_found.append({"name": "Amala Yoga",
-                                "description": f"{b} in 10th house \u2014 virtuous deeds, good reputation",
+                                "description": f"{b} in 10th house \u2014 virtuous deeds, good public reputation",
                                 "type": "positive"})
     for b in benefics:
+        if is_debilitated(b) or is_combust(b):
+            continue
         h_from_moon = (positions[b]["sign"] - moon_sign) % 12
         if h_from_moon == 9:
             yogas_found.append({"name": "Amala Yoga (from Moon)",
-                                "description": f"{b} in 10th from Moon \u2014 good reputation",
+                                "description": f"{b} in 10th from Moon \u2014 good reputation, virtuous conduct",
                                 "type": "positive"})
 
-    # 5. Pancha Mahapurusha
+    # 5. Pancha Mahapurusha — planet in kendra in own/exalt sign; flag combust as partial
     mahapurusha = {"Mars": "Ruchaka", "Mercury": "Bhadra", "Jupiter": "Hamsa",
                    "Venus": "Malavya", "Saturn": "Shasha"}
-    own_signs = {
+    mp_own_signs = {
         "Mars": [0, 7], "Mercury": [2, 5], "Jupiter": [8, 11],
         "Venus": [1, 6], "Saturn": [9, 10]
     }
-    exalt_signs = {"Mars": 9, "Mercury": 5, "Jupiter": 3, "Venus": 11, "Saturn": 6}
+    mp_exalt_signs = {"Mars": 9, "Mercury": 5, "Jupiter": 3, "Venus": 11, "Saturn": 6}
     for planet, yoga_name in mahapurusha.items():
         p_sign = positions[planet]["sign"]
-        if in_kendra(planet) and (p_sign in own_signs[planet] or p_sign == exalt_signs[planet]):
+        if in_kendra(planet) and (p_sign in mp_own_signs[planet] or p_sign == mp_exalt_signs[planet]):
+            sign_name = SIGNS[p_sign]
+            combust_note = " (partial \u2014 planet combust)" if is_combust(planet) else ""
             yogas_found.append({"name": f"{yoga_name} Yoga (Pancha Mahapurusha)",
-                                "description": f"{planet} in kendra in own/exaltation sign \u2014 power and status",
+                                "description": f"{planet} in kendra in {sign_name}{combust_note} \u2014 power, status, exemplary qualities",
                                 "type": "positive"})
 
-    # 6. Raja Yoga
+    # 6. Raja Yoga — kendra lord + trikona lord conjunct; deduplicate pairs; skip if combust
     kendra_houses = [1, 4, 7, 10]
     trikona_houses = [1, 5, 9]
     kendra_lords = set()
@@ -896,33 +932,52 @@ def detect_yogas(data):
     for h in trikona_houses:
         sign_of_house = (lagna_sign + h - 1) % 12
         trikona_lords.add(SIGN_LORDS[sign_of_house])
+    _seen_raja = set()
     for kl in kendra_lords:
         for tl in trikona_lords:
-            if kl != tl and kl in positions and tl in positions and same_sign(kl, tl):
-                yogas_found.append({"name": "Raja Yoga",
-                                    "description": f"{kl} (kendra lord) conjunct {tl} (trikona lord) \u2014 power, authority",
-                                    "type": "positive"})
+            if kl == tl or kl not in positions or tl not in positions:
+                continue
+            if not same_sign(kl, tl):
+                continue
+            pair = frozenset([kl, tl])
+            if pair in _seen_raja:
+                continue
+            _seen_raja.add(pair)
+            if is_combust(kl) or is_combust(tl):
+                continue  # combusted lord \u2014 yoga doesn\u2019t manifest
+            placement = positions[kl]["house"]
+            dusthana_note = f" (placed in H{placement}, dusthana \u2014 delayed)" if placement in [6, 8, 12] else ""
+            yogas_found.append({"name": "Raja Yoga",
+                                "description": f"{kl} (kendra lord) + {tl} (trikona lord) conjunct{dusthana_note} \u2014 power and authority",
+                                "type": "positive"})
 
-    # 7. Dhana Yoga
+    # 7. Dhana Yoga — 2nd/11th lord in kendra/trikona; mark partial if debilitated/combust
     for h in [2, 11]:
         sign_of_house = (lagna_sign + h - 1) % 12
         lord = SIGN_LORDS[sign_of_house]
         if lord in positions and (in_kendra(lord) or in_trikona(lord)):
-            yogas_found.append({"name": "Dhana Yoga",
-                                "description": f"{lord} (lord of house {h}) in kendra/trikona \u2014 wealth",
-                                "type": "positive"})
+            if is_debilitated(lord) or is_combust(lord):
+                yogas_found.append({"name": "Dhana Yoga (partial)",
+                                    "description": f"{lord} (lord of H{h}) in kendra/trikona but debilitated/combust \u2014 wealth potential reduced",
+                                    "type": "neutral"})
+            else:
+                yogas_found.append({"name": "Dhana Yoga",
+                                    "description": f"{lord} (lord of H{h}) in kendra/trikona \u2014 wealth and financial prosperity",
+                                    "type": "positive"})
 
-    # 8. Vipareeta Raja Yoga
+    # 8. Vipareeta Raja Yoga — dusthana lord in dusthana; deduplicate per planet
     dusthana = [6, 8, 12]
+    _seen_vipareeta = set()
     for h in dusthana:
         sign_of_house = (lagna_sign + h - 1) % 12
         lord = SIGN_LORDS[sign_of_house]
-        if lord in positions and positions[lord]["house"] in dusthana:
+        if lord in positions and positions[lord]["house"] in dusthana and lord not in _seen_vipareeta:
+            _seen_vipareeta.add(lord)
             yogas_found.append({"name": "Vipareeta Raja Yoga",
-                                "description": f"{lord} (lord of {h}) in dusthana \u2014 rise after setbacks",
+                                "description": f"{lord} (lord of H{h}) in dusthana \u2014 rise after setbacks, gains through adversity",
                                 "type": "positive"})
 
-    # 9. Kemadruma Yoga
+    # 9. Kemadruma Yoga — no planets in 2nd/12th from Moon; check classical cancellations
     check_planets = ["Mars", "Mercury", "Jupiter", "Venus", "Saturn"]
     sign_2_from_moon = (moon_sign + 1) % 12
     sign_12_from_moon = (moon_sign - 1) % 12
@@ -931,22 +986,150 @@ def detect_yogas(data):
         for cp in check_planets
     )
     if not has_planet_near_moon:
-        yogas_found.append({"name": "Kemadruma Yoga",
-                            "description": "No planets in 2nd/12th from Moon \u2014 potential difficulties (check cancellation)",
-                            "type": "caution"})
+        moon_in_kendra = positions["Moon"]["house"] in [1, 4, 7, 10]
+        moon_aspected_by_benefic = any(
+            (positions[b]["sign"] + 6) % 12 == moon_sign for b in ["Jupiter", "Venus", "Mercury"]
+        )
+        planet_in_kendra_from_lagna = any(
+            positions[cp]["house"] in [1, 4, 7, 10] for cp in check_planets
+        )
+        if moon_in_kendra or moon_aspected_by_benefic or planet_in_kendra_from_lagna:
+            yogas_found.append({"name": "Kemadruma Yoga (cancelled)",
+                                "description": "No planets in 2nd/12th from Moon \u2014 Kemadruma cancelled (Moon in kendra / benefic aspect / planet in kendra)",
+                                "type": "neutral"})
+        else:
+            yogas_found.append({"name": "Kemadruma Yoga",
+                                "description": "No planets in 2nd/12th from Moon \u2014 emotional isolation, difficulty finding support",
+                                "type": "caution"})
 
-    # 10. Vish Yoga
+    # 10. Vish Yoga — Moon + Saturn conjunct; reduced if Saturn in dignity
     if positions["Moon"]["sign"] == positions["Saturn"]["sign"]:
-        yogas_found.append({"name": "Vish Yoga",
-                            "description": "Moon and Saturn conjunct in the same sign — emotional heaviness, delays, karmic lessons; strength depends on sign and house",
-                            "type": "caution"})
+        if is_own_or_exalt("Saturn"):
+            yogas_found.append({"name": "Vish Yoga (reduced)",
+                                "description": "Moon-Saturn conjunct; Saturn in dignity \u2014 karmic discipline, emotional depth (toxicity reduced)",
+                                "type": "neutral"})
+        else:
+            yogas_found.append({"name": "Vish Yoga",
+                                "description": "Moon and Saturn conjunct \u2014 emotional heaviness, delays, karmic lessons",
+                                "type": "caution"})
 
-    # 11. Saraswati Yoga
+    # 11. Saraswati Yoga — Jupiter, Venus, Mercury all in good houses AND at least one in own/exalt
     good_houses = [1, 2, 4, 5, 7, 9, 10]
-    if all(positions[p]["house"] in good_houses for p in ["Jupiter", "Venus", "Mercury"]):
+    if (all(positions[p]["house"] in good_houses for p in ["Jupiter", "Venus", "Mercury"]) and
+            any(is_own_or_exalt(p) for p in ["Jupiter", "Venus", "Mercury"])):
         yogas_found.append({"name": "Saraswati Yoga",
-                            "description": "Jupiter, Venus, Mercury well-placed \u2014 learning, arts, wisdom",
+                            "description": "Jupiter, Venus, Mercury well-placed (at least one in own/exaltation) \u2014 exceptional learning, arts, wisdom",
                             "type": "positive"})
+
+    # 12. Parivartana Yoga (mutual sign exchange — D1 only)
+    _PARIVARTAN_PLANETS = ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"]
+    _seen_pairs = set()
+    for _pa in _PARIVARTAN_PLANETS:
+        for _pb in _PARIVARTAN_PLANETS:
+            if _pa == _pb or frozenset([_pa, _pb]) in _seen_pairs:
+                continue
+            if (SIGN_LORDS[positions[_pa]["sign"]] == _pb and
+                    SIGN_LORDS[positions[_pb]["sign"]] == _pa):
+                _seen_pairs.add(frozenset([_pa, _pb]))
+                _houses_a = sorted([((s - lagna_sign) % 12) + 1
+                                    for s in range(12) if SIGN_LORDS[s] == _pa])
+                _houses_b = sorted([((s - lagna_sign) % 12) + 1
+                                    for s in range(12) if SIGN_LORDS[s] == _pb])
+                _all_h = set(_houses_a + _houses_b)
+                if _all_h & {6, 8, 12}:
+                    _subtype, _ytype = "Dainya Parivartana", "caution"
+                    _effect = "dusthana exchange \u2014 hardship with eventual release"
+                elif _all_h <= {1, 4, 5, 7, 9, 10}:
+                    _subtype, _ytype = "Maha Parivartana", "positive"
+                    _effect = "powerful kendra/trikona exchange \u2014 mutual strength, rise in life"
+                else:
+                    _subtype, _ytype = "Kahala Parivartana", "neutral"
+                    _effect = "mixed results \u2014 depends on dasha and planetary dignity"
+                _ha_str = "/".join(str(h) for h in _houses_a)
+                _hb_str = "/".join(str(h) for h in _houses_b)
+                yogas_found.append({
+                    "name": _subtype + " Yoga",
+                    "description": (f"{_pa} (H{_ha_str}) \u2194 {_pb} (H{_hb_str}) "
+                                    f"mutual sign exchange \u2014 {_effect}"),
+                    "type": _ytype,
+                })
+
+    # 13. Graha Yuddha (planetary war — D1 only)
+    _YUDDHA_PLANETS = ["Mars", "Mercury", "Jupiter", "Venus", "Saturn"]
+    for _i, _pa in enumerate(_YUDDHA_PLANETS):
+        for _pb in _YUDDHA_PLANETS[_i + 1:]:
+            _diff = abs(positions[_pa]["lon"] - positions[_pb]["lon"])
+            if _diff > 180:
+                _diff = 360 - _diff
+            if _diff <= 1.0:
+                _lat_a = data["planets"][_pa].get("lat", 0)
+                _lat_b = data["planets"][_pb].get("lat", 0)
+                _winner = _pa if _lat_a >= _lat_b else _pb
+                _loser  = _pb if _winner == _pa else _pa
+                yogas_found.append({
+                    "name": "Graha Yuddha",
+                    "description": (f"{_pa}\u2013{_pb} planetary war ({_diff:.2f}\u00b0 apart) \u2014 "
+                                    f"{_winner} wins, {_loser} loses strength; "
+                                    f"{_loser}\u2019s significations weakened in this chart"),
+                    "type": "caution",
+                })
+
+    # 14. Gita Yoga — Jupiter + Mercury in same sign
+    if same_sign("Jupiter", "Mercury"):
+        yogas_found.append({
+            "name": "Gita Yoga",
+            "description": "Jupiter-Mercury conjunction \u2014 philosophical intellect, gift for scripture and teaching, wisdom in speech",
+            "type": "positive",
+        })
+
+    # 15. Guru Chandal Yoga — Jupiter + Rahu in same sign
+    if same_sign("Jupiter", "Rahu"):
+        yogas_found.append({
+            "name": "Guru Chandal Yoga",
+            "description": "Jupiter-Rahu conjunction \u2014 unconventional wisdom, foreign/outsider influences on dharma; can accelerate spiritual growth but also bring confusion",
+            "type": "caution",
+        })
+
+    # 16. Paraspara Yoga — two planets in mutual aspect (both look at each other)
+    # Every planet has 7th aspect. Mars also has 4th+8th, Jupiter 5th+9th, Saturn 3rd+10th.
+    # The only mutual non-7th pair possible is Mars (4th) \u2194 Saturn (10th) when 4 signs apart.
+    _PARA_PLANETS = ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"]
+    _PARA_SPECIAL = {
+        "Mars":    {3, 7},   # 4th (offset 3) and 8th (offset 7)
+        "Jupiter": {4, 8},   # 5th and 9th
+        "Saturn":  {2, 9},   # 3rd and 10th
+    }
+    _BENEFIC_SET = {"Jupiter", "Venus", "Mercury", "Moon"}
+
+    def _aspects(p_from, p_to):
+        offset = (positions[p_to]["sign"] - positions[p_from]["sign"]) % 12
+        return offset == 6 or offset in _PARA_SPECIAL.get(p_from, set())
+
+    _seen_para = set()
+    for _i, _pa in enumerate(_PARA_PLANETS):
+        for _pb in _PARA_PLANETS[_i + 1:]:
+            pair = frozenset([_pa, _pb])
+            if pair in _seen_para:
+                continue
+            if _aspects(_pa, _pb) and _aspects(_pb, _pa):
+                _seen_para.add(pair)
+                _ha = positions[_pa]["house"]
+                _hb = positions[_pb]["house"]
+                _offset = (positions[_pb]["sign"] - positions[_pa]["sign"]) % 12
+                if _offset == 6:
+                    _asp_label = "mutual 7th aspect"
+                else:
+                    _asp_label = f"mutual {_offset + 1}th/{(12 - _offset) + 1}th aspect"
+                _both_b = _pa in _BENEFIC_SET and _pb in _BENEFIC_SET
+                _both_m = _pa not in _BENEFIC_SET and _pb not in _BENEFIC_SET
+                _ytype = "positive" if _both_b else ("caution" if _both_m else "neutral")
+                yogas_found.append({
+                    "name": "Paraspara Yoga",
+                    "description": (f"{_pa} (H{_ha}) \u2194 {_pb} (H{_hb}) {_asp_label} \u2014 "
+                                    f"each planet activates the other\u2019s significations; "
+                                    f"effects depend on dignity and house lordship"),
+                    "type": _ytype,
+                })
 
     return yogas_found
 
@@ -1873,7 +2056,7 @@ def compute_btr(year, month, day, hour, minute, lat, lon, tz_offset):
                     offset = step_min * direction
                     test_jd = jd + (offset / 1440.0)
                     if name in PLANETS:
-                        test_lon, _ = get_sidereal_pos(test_jd, PLANETS[name])
+                        test_lon, _, _s = get_sidereal_pos(test_jd, PLANETS[name])
                     elif name == "Rahu":
                         test_lon, _ = get_rahu_ketu(test_jd)
                     else:  # Ketu
@@ -1909,8 +2092,8 @@ def _find_tithi_boundary(jd_ref, tithi_idx, forward):
     step = (15.0 / 1440.0) * (1 if forward else -1)
 
     def get_tidx(jd):
-        s, _ = get_sidereal_pos(jd, swe.SUN)
-        m, _ = get_sidereal_pos(jd, swe.MOON)
+        s, _, _ss = get_sidereal_pos(jd, swe.SUN)
+        m, _, _ms = get_sidereal_pos(jd, swe.MOON)
         return int(((m - s) % 360) / 12)
 
     prev_jd = jd_ref
@@ -1963,8 +2146,8 @@ def compute_panchang(date_str, tz_str="UTC"):
     jd_noon = swe.julday(utc_noon.year, utc_noon.month, utc_noon.day,
                          utc_noon.hour + utc_noon.minute / 60.0)
 
-    sun_lon, _ = get_sidereal_pos(jd_noon, swe.SUN)
-    moon_lon, _ = get_sidereal_pos(jd_noon, swe.MOON)
+    sun_lon, _, _ss = get_sidereal_pos(jd_noon, swe.SUN)
+    moon_lon, _, _ms = get_sidereal_pos(jd_noon, swe.MOON)
 
     # Tithi
     diff = (moon_lon - sun_lon) % 360
@@ -2084,7 +2267,7 @@ def compute_transits_for_date(date_str):
 
     result = []
     for name, pid in PLANETS.items():
-        lon, speed = get_sidereal_pos(jd, pid)
+        lon, _, speed = get_sidereal_pos(jd, pid)
         sign_idx = lon_to_sign(lon)
         nak_idx, pada = lon_to_nakshatra(lon)
         result.append({
@@ -2120,7 +2303,7 @@ def compute_transits():
 
     result = []
     for name, pid in PLANETS.items():
-        lon, speed = get_sidereal_pos(jd_now, pid)
+        lon, _, speed = get_sidereal_pos(jd_now, pid)
         sign_idx = lon_to_sign(lon)
         nak_idx, pada = lon_to_nakshatra(lon)
         result.append({

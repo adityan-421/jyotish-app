@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 from datetime import datetime, timedelta
 from database import (
     init_db, reset_pool, upsert_user, save_chart, get_charts, get_chart, delete_chart,
-    update_chart, update_chart_reading, count_charts, get_question_count_today, save_ai_question, get_ai_history,
+    update_chart, update_chart_reading, count_charts, get_question_count_today, save_ai_question,
     get_all_charts_for_backfill, bulk_update_chart_data, get_cached_value, set_cached_value, get_stats, get_admin_stats,
     create_pending_reading, get_pending_readings_by_status, mark_readings_submitted,
     complete_reading, fail_reading, get_reading_status,
@@ -31,6 +31,7 @@ from database import (
     get_users_for_weekly_email, insert_weekly_email, mark_weekly_emails_submitted,
     get_submitted_weekly_emails, complete_weekly_email, get_ai_ready_weekly_emails,
     mark_weekly_email_sent, fail_weekly_email, unsubscribe_user,
+    get_matchmaking, save_matchmaking, get_matchmaking_history, delete_matchmaking,
 )
 
 from pathlib import Path
@@ -88,13 +89,17 @@ def _run_prompt_chain(model, steps, variables, default_thinking_budget=None):
         # Format the prompt template with current variables
         prompt_text = _safe_substitute(step["prompt"], variables)
 
-        # Build generation config with thinking budget if specified
+        # Build generation config with thinking budget and optional output token cap
         thinking_budget = step.get("thinking_budget", default_thinking_budget)
-        gen_kwargs = {}
+        max_output_tokens = step.get("max_output_tokens")
+        gen_config = {}
         if thinking_budget:
-            gen_kwargs["generation_config"] = {
-                "thinking_config": {"thinking_budget": int(thinking_budget)}
-            }
+            gen_config["thinking_config"] = {"thinking_budget": int(thinking_budget)}
+        if max_output_tokens:
+            gen_config["max_output_tokens"] = int(max_output_tokens)
+        gen_kwargs = {}
+        if gen_config:
+            gen_kwargs["generation_config"] = gen_config
 
         response = model.generate_content(prompt_text, **gen_kwargs)
         # Build result_text from non-thinking parts only.
@@ -144,9 +149,14 @@ def _run_prompt_chain(model, steps, variables, default_thinking_budget=None):
                 try:
                     result, _ = json.JSONDecoder().raw_decode(cleaned, obj_start)
                 except json.JSONDecodeError as je:
-                    logger.error("PROMPT_CHAIN json_decode_error step=%s err=%s preview=%r",
-                                 step.get("name"), je, cleaned[obj_start:obj_start + 300])
-                    result = step.get("json_fallback", {})
+                    # Repair common AI JSON mistakes: invalid \' escape sequences
+                    repaired = cleaned.replace("\\'", "'")
+                    try:
+                        result, _ = json.JSONDecoder().raw_decode(repaired, obj_start)
+                    except json.JSONDecodeError:
+                        logger.error("PROMPT_CHAIN json_decode_error step=%s err=%s preview=%r",
+                                     step.get("name"), je, cleaned[obj_start:obj_start + 300])
+                        result = step.get("json_fallback", {})
             else:
                 logger.error("PROMPT_CHAIN no_json_found step=%s preview=%r",
                              step.get("name"), cleaned[:300])
@@ -264,6 +274,16 @@ def login_required(f):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/terms")
+def terms():
+    return render_template("terms.html")
+
+
+@app.route("/privacy")
+def privacy():
+    return render_template("privacy.html")
 
 
 ADMIN_EMAIL = "adityan@gmail.com"
@@ -472,11 +492,12 @@ def api_save_chart():
         return jsonify({"error": "Missing input_data or chart_data"}), 400
 
     is_own = data.get("is_own", False)
+    reading = data.get("reading")  # optional: reading already generated for this chart in-session
 
     user = session["user"]
     user_id = user["id"]
     upsert_user(user_id, user.get("email", ""), user.get("name", ""), user.get("picture", ""))
-    chart_id, error = save_chart(user_id, name, input_data, chart_data, user_email=user.get("email", ""))
+    chart_id, error = save_chart(user_id, name, input_data, chart_data, user_email=user.get("email", ""), reading=reading)
     if error:
         return jsonify({"error": error}), 400
 
@@ -581,16 +602,24 @@ def api_charts_compare():
     if not chart2:
         return jsonify({"error": "Chart 2 not found"}), 404
 
-    # GrahaGem check — comparisons cost 1 gem
     user_email = session["user"].get("email", "")
-    if not use_gem(user_id, user_email):
-        from datetime import date
-        today = date.today()
-        reset_date = date(today.year + 1, 1, 1) if today.month == 12 else date(today.year, today.month + 1, 1)
+
+    # Check for cached matchmaking result first
+    cached = get_matchmaking(user_id, id1, id2)
+    if cached:
+        return jsonify({"compatibility": cached["result"], "cached": True,
+                        "cached_at": cached["created_at"]})
+
+    # GrahaGem check — verify balance upfront (deduct only after successful AI response)
+    from datetime import date as _date
+    _today = _date.today()
+    _reset_date = _date(_today.year + 1, 1, 1) if _today.month == 12 else _date(_today.year, _today.month + 1, 1)
+    _balance = get_gem_balance(user_id, user_email)
+    if not _balance.get("is_unlimited") and _balance.get("remaining", 0) < 2:
         return jsonify({
-            "error": f"You've used all your GrahaGems for this month. Your 10 gems reset on {reset_date.strftime('1 %b %Y')}.",
+            "error": f"You need 2 GrahaGems for a compatibility reading. Your gems reset on {_reset_date.strftime('1 %b %Y')}.",
             "gems_exhausted": True,
-            "reset_date": reset_date.isoformat(),
+            "reset_date": _reset_date.isoformat(),
         }), 402
 
     try:
@@ -626,6 +655,8 @@ def api_charts_compare():
         variables = {
             "chart_a_name": chart1["name"],
             "chart_b_name": chart2["name"],
+            "chart_a_role": "Boy (Groom)",
+            "chart_b_role": "Girl (Bride)",
             "chart_a_data": json.dumps(slim1, indent=2),
             "chart_b_data": json.dumps(slim2, indent=2),
             "today": datetime.now().strftime("%d-%b-%Y"),
@@ -639,6 +670,13 @@ def api_charts_compare():
 
         raw = _run_prompt_chain(model, steps, variables, prompts_config.get("default_thinking_budget"))
         result = json.loads(raw) if isinstance(raw, str) else raw
+
+        # If AI returned the fallback (empty category_details = parse failed), don't charge gems
+        if isinstance(result, dict) and not result.get("category_details"):
+            return jsonify({"error": "The AI response was incomplete. Please try again — you have not been charged any gems."}), 500
+
+        # Deduct gems now that we have a valid response
+        use_gem(user_id, user_email, count=2)
 
         # Attach authoritative Ashta Kuta scores (engine-computed, not AI-inferred)
         if isinstance(result, dict) and kuta_str != "(kuta scores unavailable)":
@@ -657,6 +695,16 @@ def api_charts_compare():
         save_ai_question(user_id, f"Compare: {chart1['name']} & {chart2['name']}", "compatibility",
                          json.dumps(result) if isinstance(result, dict) else str(result))
 
+        # Cache the result so future lookups for the same pair are instant
+        save_matchmaking(user_id, id1, id2, chart1["name"], chart2["name"],
+                         result.get("score") if isinstance(result, dict) else None,
+                         result)
+
+        if user_email:
+            _send_gem_status_email(user_id, user_email, session["user"].get("name", ""),
+                                   f"Compatibility reading: {chart1['name']} & {chart2['name']}", gems_used=2,
+                                   reading=result, boy_name=chart1["name"], girl_name=chart2["name"])
+
         return jsonify({"compatibility": result})
 
     except Exception as e:
@@ -665,12 +713,23 @@ def api_charts_compare():
         return jsonify({"error": "Failed to generate compatibility reading. Please try again later."}), 500
 
 
-@app.route("/api/ai-history")
+@app.route("/api/matchmaking/history")
 @login_required
-def api_ai_history():
+def api_matchmaking_history():
     user_id = session["user"]["id"]
-    history = get_ai_history(user_id)
+    history = get_matchmaking_history(user_id)
     return jsonify({"history": history})
+
+
+@app.route("/api/matchmaking/<int:record_id>", methods=["DELETE"])
+@login_required
+def api_delete_matchmaking(record_id):
+    user_id = session["user"]["id"]
+    deleted = delete_matchmaking(record_id, user_id)
+    if not deleted:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({"ok": True})
+
 
 
 @app.route("/api/chart", methods=["POST"])
@@ -1167,7 +1226,7 @@ def _send_weekly_email(to_email, name, ai_content, week_label, user_id):
             unsubscribe_url=unsub_url,
         )
         msg = Mail(
-            from_email=("noreply@grahalogic.com", "GrahaLogic"),
+            from_email=("noreply@grahalogic.ai", "GrahaLogic"),
             to_emails=to_email,
             subject=f"Your Weekly Jyotish Reading — {week_label}",
             html_content=html_body,
@@ -1178,6 +1237,87 @@ def _send_weekly_email(to_email, name, ai_content, week_label, user_id):
     except Exception as e:
         logger.error("SendGrid error for %s: %s", to_email, e)
         return False
+
+
+def _send_gem_status_email(user_id, user_email, user_name, action_label, gems_used=1, reading=None, boy_name=None, girl_name=None):
+    """Send a gem-usage notification email in a background thread (non-blocking)."""
+    import threading
+    _app = app  # capture reference for app context
+    def _bg():
+        with _app.app_context():
+            _send_gem_status_email_sync(user_id, user_email, user_name, action_label, gems_used, reading, boy_name, girl_name)
+    threading.Thread(target=_bg, daemon=False).start()
+
+
+def _send_gem_status_email_sync(user_id, user_email, user_name, action_label, gems_used=1, reading=None, boy_name=None, girl_name=None):
+    """Send a gem-usage notification email synchronously (called from background thread)."""
+    try:
+        import sendgrid
+        from sendgrid.helpers.mail import Mail
+        from datetime import date
+        balance = get_gem_balance(user_id, user_email)
+        today = date.today()
+        reset_date = date(today.year + 1, 1, 1) if today.month == 12 else date(today.year, today.month + 1, 1)
+        is_unlimited = balance.get("is_unlimited", False)
+        html_body = render_template(
+            "gem_status_email.html",
+            name=user_name or "there",
+            action_label=action_label,
+            gems_used=gems_used,
+            gems_used_total="∞" if is_unlimited else balance["used"],
+            gems_remaining="∞" if is_unlimited else balance["remaining"],
+            gems_total="∞" if is_unlimited else (balance["used"] + balance["remaining"]),
+            reset_date=reset_date.strftime("1 %b %Y"),
+            is_unlimited=is_unlimited,
+            reading=reading,
+            boy_name=boy_name,
+            girl_name=girl_name,
+        )
+        subject = (f"Match Making: {boy_name} & {girl_name} — GrahaLogic" if reading and boy_name
+                   else f"GrahaGems update — {'unlimited' if is_unlimited else str(balance['remaining']) + ' remaining this month'}")
+        msg = Mail(
+            from_email=("noreply@grahalogic.ai", "GrahaLogic"),
+            to_emails=user_email,
+            subject=subject,
+            html_content=html_body,
+        )
+        sg = sendgrid.SendGridAPIClient(os.environ.get("SENDGRID_API_KEY", ""))
+        sg.send(msg)
+    except Exception as e:
+        logger.error("gem_status_email error for %s: %s", user_email, e)
+
+
+def _send_reading_ready_email(user_email, user_name, reading_type, period=None):
+    """Send a 'your reading is ready' notification email in background thread."""
+    import threading
+    _app = app
+    def _bg():
+        with _app.app_context():
+            _send_reading_ready_email_sync(user_email, user_name, reading_type, period)
+    threading.Thread(target=_bg, daemon=False).start()
+
+
+def _send_reading_ready_email_sync(user_email, user_name, reading_type, period=None):
+    """Synchronous send (called from background thread)."""
+    try:
+        import sendgrid
+        from sendgrid.helpers.mail import Mail
+        html_body = render_template(
+            "reading_ready_email.html",
+            name=user_name or "there",
+            reading_type=reading_type,
+            period=period,
+        )
+        msg = Mail(
+            from_email=("noreply@grahalogic.ai", "GrahaLogic"),
+            to_emails=user_email,
+            subject=f"Your {reading_type} reading is ready — GrahaLogic",
+            html_content=html_body,
+        )
+        sg = sendgrid.SendGridAPIClient(os.environ.get("SENDGRID_API_KEY", ""))
+        sg.send(msg)
+    except Exception as e:
+        logger.error("reading_ready_email error for %s: %s", user_email, e)
 
 
 # ── Prediction API endpoints ──────────────────────────────────────────────
@@ -1489,6 +1629,14 @@ def cron_check_predictions():
 
                 complete_prediction(p["id"], result_text)
                 completed_count += 1
+                # Notify user their reading is ready
+                if p.get("email"):
+                    reading_type_label = {"daily_week": "daily", "weekly": "weekly", "monthly": "monthly"}.get(p.get("type", ""), p.get("type", ""))
+                    _send_reading_ready_email(
+                        p["email"], p.get("name"),
+                        reading_type=reading_type_label,
+                        period=str(p.get("period_start", "")),
+                    )
             except Exception as e:
                 logger.error("Failed to process prediction %s: %s", p["id"], e)
                 fail_prediction(p["id"], str(e))
@@ -1911,7 +2059,7 @@ def extract_relevant_chart_data(chart_data, category):
     elif cat == "siblings":
         extra_charts = ["D3"]
     elif cat in ("spirituality", "other"):
-        extra_charts = ["D60"]
+        extra_charts = ["D20", "D60"]
 
     result = _strip_chart_for_ai(chart_data, extra_charts=extra_charts)
 
@@ -2043,7 +2191,7 @@ def _strip_chart_for_ai(chart_data, extra_charts=None):
     - Strips panchang display-only strings and karaka abbreviations
     """
     result = {}
-    keep_charts = ({"D1", "D9"} | set(extra_charts or [])) - {"D12", "D20"}
+    keep_charts = ({"D1", "D9"} | set(extra_charts or [])) - {"D12"}
 
     # birth — strip computation artifacts
     if "birth" in chart_data:
@@ -2104,9 +2252,11 @@ def _strip_chart_for_ai(chart_data, extra_charts=None):
             for lk, lv in chart_data["panchang"].items()
         }
 
-    # dasha — trim maha/antar/pratyantar
+    # dasha — include full maha + antar; exclude pratyantar (too granular)
     if "dasha" in chart_data:
-        result["dasha"] = _trim_dasha(dict(chart_data["dasha"]))
+        d = dict(chart_data["dasha"])
+        d.pop("pratyantar", None)
+        result["dasha"] = d
 
     # sadesati — slim to current cycle only
     if "sadesati" in chart_data:
@@ -2169,7 +2319,7 @@ def api_ask():
             else:
                 reset_date = date(today.year, today.month + 1, 1)
             return jsonify({
-                "error": f"You've used all your GrahaGems for this month. Your 10 gems reset on {reset_date.strftime('1 %b %Y')}.",
+                "error": f"You've used all your GrahaGems for this month. Your 20 gems reset on {reset_date.strftime('1 %b %Y')}.",
                 "gems_exhausted": True,
                 "reset_date": reset_date.isoformat(),
             }), 402
@@ -2177,6 +2327,15 @@ def api_ask():
     # Ensure user exists in DB
     upsert_user(user_id, user.get("email", ""), user.get("name", ""), user.get("picture", ""))
     chart_id = data.get("chart_id")  # optional: cache reading back to saved chart
+
+    # If chart already has a stored reading, return it directly — no AI needed
+    if initial_reading and chart_id:
+        try:
+            existing = get_chart(chart_id, user_id)
+            if existing and existing.get("reading") and existing["reading"].get("categories"):
+                return jsonify({"reading_data": existing["reading"]})
+        except Exception:
+            pass  # fall through to AI generation
 
     try:
         prompts_config = load_prompts()
@@ -2194,7 +2353,7 @@ def api_ask():
 
             # Initial reading needs all major divisional charts
             full_chart = _strip_chart_for_ai(
-                chart_data, extra_charts=["D2", "D7", "D10"]
+                chart_data, extra_charts=["D2", "D7", "D10", "D20"]
             )
             full_chart["current_date"] = datetime.now().strftime("%d-%b-%Y")
 
@@ -2272,6 +2431,10 @@ def api_ask():
 
         # Save to DB
         save_ai_question(user_id, question, category, reading)
+
+        if user_email:
+            _send_gem_status_email(user_id, user_email, user.get("name", ""),
+                                   f"Follow-up question: {question[:60]}{'…' if len(question) > 60 else ''}")
 
         return jsonify({"category": category, "reading": reading})
 

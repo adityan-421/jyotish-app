@@ -215,6 +215,24 @@ def init_db():
                     unsubscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS matchmaking_readings (
+                    id SERIAL PRIMARY KEY,
+                    user_id TEXT NOT NULL REFERENCES users(id),
+                    chart_id_1 INTEGER NOT NULL,
+                    chart_id_2 INTEGER NOT NULL,
+                    chart_name_1 TEXT NOT NULL,
+                    chart_name_2 TEXT NOT NULL,
+                    score INTEGER,
+                    result_json TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, chart_id_1, chart_id_2)
+                );
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_matchmaking_user
+                ON matchmaking_readings(user_id, created_at DESC);
+            """)
             conn.commit()
             cur.close()
         _db_initialized = True
@@ -245,14 +263,16 @@ def count_charts(user_id):
         return row["cnt"]
 
 
-def save_chart(user_id, name, input_data, chart_data, user_email=None):
+def save_chart(user_id, name, input_data, chart_data, user_email=None, reading=None):
     if user_email not in UNLIMITED_CHART_EMAILS and count_charts(user_id) >= MAX_CHARTS:
         return None, f"Limit reached: you can save up to {MAX_CHARTS} charts."
+    # Only persist a reading that looks real (has categories), never a fallback/empty payload.
+    reading_json = json.dumps(reading) if isinstance(reading, dict) and reading.get("categories") else None
     with get_db() as conn:
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO saved_charts (user_id, name, input_data, chart_data) VALUES (%s, %s, %s, %s) RETURNING id",
-            (user_id, name, json.dumps(input_data), json.dumps(chart_data)),
+            "INSERT INTO saved_charts (user_id, name, input_data, chart_data, reading) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (user_id, name, json.dumps(input_data), json.dumps(chart_data), reading_json),
         )
         chart_id = cur.fetchone()[0]
         conn.commit()
@@ -394,11 +414,12 @@ def get_question_count_today(user_id):
 
 
 def save_ai_question(user_id, question, category, reading):
+    """Store only telemetry (user_id + category + timestamp). Question text and reading are not retained."""
     with get_db() as conn:
         cur = conn.cursor()
         cur.execute(
             "INSERT INTO ai_questions (user_id, question, category, reading) VALUES (%s, %s, %s, %s)",
-            (user_id, question, category, reading),
+            (user_id, "", category, ""),
         )
         conn.commit()
         cur.close()
@@ -729,12 +750,16 @@ def mark_predictions_submitted(prediction_ids, batch_name):
 
 
 def get_submitted_predictions():
-    """Return all prediction rows with status 'submitted'."""
+    """Return all prediction rows with status 'submitted', including user email/name."""
     with get_db() as conn:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT id, user_id, type, period_start, batch_name, batch_index "
-            "FROM user_predictions WHERE status = 'submitted' ORDER BY id"
+            """SELECT p.id, p.user_id, p.type, p.period_start, p.batch_name, p.batch_index,
+                      u.email, u.name
+               FROM user_predictions p
+               JOIN users u ON u.id = p.user_id
+               WHERE p.status = 'submitted'
+               ORDER BY p.id"""
         )
         rows = cur.fetchall()
         cur.close()
@@ -819,7 +844,7 @@ def get_users_with_push_tokens_and_charts():
 
 # ── GrahaGems ─────────────────────────────────────────────────────────────
 
-GEMS_PER_MONTH = 10
+GEMS_PER_MONTH = 20
 UNLIMITED_GEM_EMAILS = {"adityan@gmail.com", "anu.namjoshi@gmail.com"}
 
 
@@ -846,15 +871,14 @@ def get_gem_balance(user_id, user_email=None):
     }
 
 
-def use_gem(user_id, user_email=None):
-    """Attempt to deduct 1 gem. Returns True if successful, False if exhausted."""
+def use_gem(user_id, user_email=None, count=1):
+    """Attempt to deduct `count` gems atomically. Returns True if successful, False if exhausted."""
     if user_email in UNLIMITED_GEM_EMAILS:
         return True
     from datetime import date
     month_start = date.today().replace(day=1).isoformat()
     with get_db() as conn:
         cur = conn.cursor()
-        # Upsert: insert row if not exists, then increment only if under limit
         cur.execute(
             """INSERT INTO gem_usage (user_id, month_start, used)
                VALUES (%s, %s, 0)
@@ -862,15 +886,15 @@ def use_gem(user_id, user_email=None):
             (user_id, month_start),
         )
         cur.execute(
-            """UPDATE gem_usage SET used = used + 1
-               WHERE user_id = %s AND month_start = %s AND used < %s
+            """UPDATE gem_usage SET used = used + %s
+               WHERE user_id = %s AND month_start = %s AND used + %s <= %s
                RETURNING used""",
-            (user_id, month_start, GEMS_PER_MONTH),
+            (count, user_id, month_start, count, GEMS_PER_MONTH),
         )
         row = cur.fetchone()
         conn.commit()
         cur.close()
-    return row is not None  # None means limit already reached
+    return row is not None  # None means not enough gems remaining
 
 
 # ── App Settings ───────────────────────────────────────────────────────────
@@ -913,9 +937,10 @@ def get_users_for_weekly_email(week_start_str, test_email=None):
             cur.execute("""
                 SELECT u.id AS user_id, u.email, u.name, sc.chart_data
                 FROM users u
-                JOIN saved_charts sc ON sc.id = u.own_chart_id
+                JOIN saved_charts sc ON sc.id = u.own_chart_id AND sc.user_id = u.id
                 WHERE u.email = %s
                   AND u.email IS NOT NULL
+                  AND u.own_chart_id IS NOT NULL
                   AND NOT EXISTS (SELECT 1 FROM email_unsubscribes eu WHERE eu.user_id = u.id)
                   AND NOT EXISTS (
                     SELECT 1 FROM weekly_emails we
@@ -926,8 +951,9 @@ def get_users_for_weekly_email(week_start_str, test_email=None):
             cur.execute("""
                 SELECT u.id AS user_id, u.email, u.name, sc.chart_data
                 FROM users u
-                JOIN saved_charts sc ON sc.id = u.own_chart_id
+                JOIN saved_charts sc ON sc.id = u.own_chart_id AND sc.user_id = u.id
                 WHERE u.email IS NOT NULL
+                  AND u.own_chart_id IS NOT NULL
                   AND NOT EXISTS (SELECT 1 FROM email_unsubscribes eu WHERE eu.user_id = u.id)
                   AND NOT EXISTS (
                     SELECT 1 FROM weekly_emails we
@@ -1007,7 +1033,7 @@ def complete_weekly_email(email_id, ai_content_json):
 
 
 def get_ai_ready_weekly_emails():
-    """Return all weekly_email rows with status='ai_ready', including user info."""
+    """Return all weekly_email rows ready to send (ai_ready or failed-during-send)."""
     with get_db() as conn:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("""
@@ -1015,7 +1041,7 @@ def get_ai_ready_weekly_emails():
                    u.email, u.name
             FROM weekly_emails we
             JOIN users u ON u.id = we.user_id
-            WHERE we.status = 'ai_ready'
+            WHERE we.status IN ('ai_ready', 'failed') AND we.ai_content IS NOT NULL
             ORDER BY we.id
         """)
         rows = cur.fetchall()
@@ -1059,3 +1085,107 @@ def unsubscribe_user(user_id):
         )
         conn.commit()
         cur.close()
+
+
+# ── Matchmaking Readings ──────────────────────────────────────────────────────
+
+def _canonical_chart_pair(chart_id_1, chart_id_2):
+    """Return (smaller_id, larger_id) to normalize lookup regardless of order."""
+    a, b = int(chart_id_1), int(chart_id_2)
+    return (a, b) if a < b else (b, a)
+
+
+def get_matchmaking(user_id, chart_id_1, chart_id_2):
+    """Return cached matchmaking result for this chart pair, or None."""
+    c1, c2 = _canonical_chart_pair(chart_id_1, chart_id_2)
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            """SELECT id, chart_id_1, chart_id_2, chart_name_1, chart_name_2,
+                      score, result_json, created_at
+               FROM matchmaking_readings
+               WHERE user_id = %s AND chart_id_1 = %s AND chart_id_2 = %s""",
+            (user_id, c1, c2),
+        )
+        row = cur.fetchone()
+        cur.close()
+    if not row:
+        return None
+    result = json.loads(row["result_json"])
+    return {
+        "id": row["id"],
+        "chart_id_1": row["chart_id_1"],
+        "chart_id_2": row["chart_id_2"],
+        "chart_name_1": row["chart_name_1"],
+        "chart_name_2": row["chart_name_2"],
+        "score": row["score"],
+        "result": result,
+        "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+    }
+
+
+def save_matchmaking(user_id, chart_id_1, chart_id_2, name1, name2, score, result):
+    """Upsert a matchmaking result. Names/score/result always reflect actual boy/girl order."""
+    c1, c2 = _canonical_chart_pair(chart_id_1, chart_id_2)
+    # If the canonical order swapped the charts, swap names too
+    if c1 != int(chart_id_1):
+        name1, name2 = name2, name1
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO matchmaking_readings
+                   (user_id, chart_id_1, chart_id_2, chart_name_1, chart_name_2, score, result_json)
+               VALUES (%s, %s, %s, %s, %s, %s, %s)
+               ON CONFLICT (user_id, chart_id_1, chart_id_2)
+               DO UPDATE SET chart_name_1=EXCLUDED.chart_name_1,
+                             chart_name_2=EXCLUDED.chart_name_2,
+                             score=EXCLUDED.score,
+                             result_json=EXCLUDED.result_json,
+                             created_at=CURRENT_TIMESTAMP""",
+            (user_id, c1, c2, name1, name2, score, json.dumps(result)),
+        )
+        conn.commit()
+        cur.close()
+
+
+def get_matchmaking_history(user_id):
+    """Return all matchmaking readings for a user, newest first."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            """SELECT id, chart_id_1, chart_id_2, chart_name_1, chart_name_2,
+                      score, result_json, created_at
+               FROM matchmaking_readings
+               WHERE user_id = %s
+               ORDER BY created_at DESC""",
+            (user_id,),
+        )
+        rows = cur.fetchall()
+        cur.close()
+    return [
+        {
+            "id": r["id"],
+            "chart_id_1": r["chart_id_1"],
+            "chart_id_2": r["chart_id_2"],
+            "chart_name_1": r["chart_name_1"],
+            "chart_name_2": r["chart_name_2"],
+            "score": r["score"],
+            "result": json.loads(r["result_json"]),
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+        }
+        for r in rows
+    ]
+
+
+def delete_matchmaking(record_id, user_id):
+    """Delete a matchmaking record (only if it belongs to this user)."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM matchmaking_readings WHERE id = %s AND user_id = %s",
+            (record_id, user_id),
+        )
+        deleted = cur.rowcount > 0
+        conn.commit()
+        cur.close()
+    return deleted

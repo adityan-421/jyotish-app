@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your Jyotish Reading — GrahaLogic</title>
+</head>
+<body style="margin:0;padding:0;background:#f0f2f8;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:1.6;color:#1e2035;">
+
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">Your personalized Jyotish birth chart reading from GrahaLogic.&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;</div>
+
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f0f2f8;">
+  <tr>
+    <td align="center" style="padding:36px 16px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;">
+
+        <!-- Logo bar -->
+        <tr>
+          <td style="background:#1a1d27;border-radius:14px 14px 0 0;padding:22px 32px;text-align:center;">
+            <img src="https://jyotish-app-333157384151.us-central1.run.app/static/logo.png"
+                 alt="GrahaLogic" width="120" style="display:block;margin:0 auto;height:auto;">
+          </td>
+        </tr>
+        <tr><td style="height:3px;background:linear-gradient(90deg,#00c9b1,#a78bfa);"></td></tr>
+
+        <!-- Main card -->
+        <tr>
+          <td style="background:#ffffff;border:1px solid #dde1f0;border-top:none;border-radius:0 0 14px 14px;padding:36px 36px 32px;">
+
+            <!-- Title -->
+            <div style="text-align:center;margin-bottom:4px;">
+              <div style="display:inline-block;background:#f0fdf9;border-radius:50%;width:56px;height:56px;line-height:56px;font-size:28px;text-align:center;">🔮</div>
+            </div>
+            <h1 style="margin:16px 0 4px;font-size:22px;font-weight:700;color:#1e2035;text-align:center;">Your Personalized Jyotish Reading</h1>
+            <p style="margin:0 0 6px;font-size:14px;color:#6b7194;text-align:center;">Hi <strong style="color:#1e2035;">{{ name }}</strong> — here is your birth chart reading for <strong style="color:#1e2035;">{{ chart_name }}</strong>.</p>
+            <p style="margin:0 0 28px;font-size:12px;color:#b0b4c8;text-align:center;">Generated {{ generated_date }}</p>
+
+            <!-- Divider -->
+            <hr style="border:none;border-top:1px solid #eef0f8;margin:0 0 28px;">
+
+            <!-- General Overview -->
+            <h2 style="margin:0 0 10px;font-size:12px;font-weight:700;color:#00c9b1;letter-spacing:1.2px;text-transform:uppercase;">✨ General Overview</h2>
+            <div style="font-size:14px;line-height:1.75;color:#2e3352;">{{ general_html }}</div>
+
+            <!-- Life Categories -->
+            <hr style="border:none;border-top:1px solid #eef0f8;margin:28px 0;">
+            <h2 style="margin:0 0 16px;font-size:12px;font-weight:700;color:#00c9b1;letter-spacing:1.2px;text-transform:uppercase;">📋 Life Area Readings</h2>
+
+            {% for cat in categories %}
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:12px;border-radius:8px;border:1px solid #eef0f8;background:#f8f9fd;">
+              <tr>
+                <td style="padding:14px 18px;">
+                  <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1e2035;">{{ cat.icon }} {{ cat.title }}</p>
+                  <div style="font-size:13px;line-height:1.7;color:#4a5070;">{{ cat.reading_html }}</div>
+                </td>
+              </tr>
+            </table>
+            {% endfor %}
+
+            <!-- Dasha Advice -->
+            <hr style="border:none;border-top:1px solid #eef0f8;margin:24px 0;">
+            <h2 style="margin:0 0 10px;font-size:12px;font-weight:700;color:#a78bfa;letter-spacing:1.2px;text-transform:uppercase;">⏳ Current Dasha Guidance</h2>
+            <div style="font-size:14px;line-height:1.75;color:#2e3352;">{{ dasha_html }}</div>
+
+            <!-- Remedies -->
+            <hr style="border:none;border-top:1px solid #eef0f8;margin:24px 0;">
+            <h2 style="margin:0 0 10px;font-size:12px;font-weight:700;color:#f59e0b;letter-spacing:1.2px;text-transform:uppercase;">🪬 Remedies &amp; Guidance</h2>
+            <div style="font-size:14px;line-height:1.75;color:#2e3352;">{{ remedies_html }}</div>
+
+            <!-- CTA -->
+            <hr style="border:none;border-top:1px solid #eef0f8;margin:28px 0 24px;">
+            <div style="text-align:center;">
+              <a href="https://grahalogic.ai" style="display:inline-block;background:#00c9b1;color:#ffffff;font-weight:700;font-size:13px;text-decoration:none;padding:12px 32px;border-radius:8px;">Open GrahaLogic →</a>
+            </div>
+
+          </td>
+        </tr>
+
+        <tr><td style="height:24px;"></td></tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="text-align:center;padding:0 16px;">
+            <div style="font-size:11px;color:#b0b4c8;line-height:1.8;">
+              You received this because you saved a birth chart on
+              <a href="https://grahalogic.ai" style="color:#9aa0b8;text-decoration:none;">GrahaLogic</a>.<br>
+              <a href="{{ unsubscribe_url }}" style="color:#9aa0b8;text-decoration:none;">Unsubscribe</a>
+            </div>
+          </td>
+        </tr>
+
+        <tr><td style="height:24px;"></td></tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

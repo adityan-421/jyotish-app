@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% if reading %}Match Making Results{% else %}GrahaGems Update{% endif %} — GrahaLogic</title>
+</head>
+<body style="margin:0;padding:0;background:#f0f2f8;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:1.6;color:#1e2035;">
+
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">{{ gems_remaining }} GrahaGems remaining this month.&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;</div>
+
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f0f2f8;">
+  <tr>
+    <td align="center" style="padding:36px 16px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;">
+
+        <!-- Logo bar -->
+        <tr>
+          <td style="background:#1a1d27;border-radius:14px 14px 0 0;padding:22px 32px;text-align:center;">
+            <img src="https://jyotish-app-333157384151.us-central1.run.app/static/logo.png"
+                 alt="GrahaLogic" width="120" style="display:block;margin:0 auto;height:auto;">
+          </td>
+        </tr>
+        <tr><td style="height:3px;background:linear-gradient(90deg,#00c9b1,#a78bfa);"></td></tr>
+
+        <!-- Main card -->
+        <tr>
+          <td style="background:#ffffff;border:1px solid #dde1f0;border-top:none;border-radius:0 0 14px 14px;padding:32px 36px;">
+
+            <p style="margin:0 0 6px;font-size:15px;color:#1e2035;">Hi {{ name }},</p>
+            <p style="margin:0 0 24px;font-size:14px;color:#4a5070;">You just used <strong>{{ gems_used }} GrahaGem{% if gems_used != 1 %}s{% endif %}</strong> for a <em>{{ action_label }}</em>.</p>
+
+            <!-- Gem balance -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f7f8fc;border-radius:10px;margin-bottom:24px;">
+              <tr>
+                <td style="padding:18px 20px;text-align:center;border-right:1px solid #eaecf5;width:50%;">
+                  <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:#9aa0b8;margin-bottom:6px;">Used this month</div>
+                  <div style="font-size:28px;font-weight:700;color:#f59e0b;">{{ gems_used_total }}</div>
+                  <div style="font-size:11px;color:#9aa0b8;">of {{ gems_total }}</div>
+                </td>
+                <td style="padding:18px 20px;text-align:center;width:50%;">
+                  <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:#9aa0b8;margin-bottom:6px;">Remaining</div>
+                  {% if is_unlimited %}
+                  <div style="font-size:28px;font-weight:700;color:#a78bfa;">&#8734;</div>
+                  <div style="font-size:11px;color:#9aa0b8;">unlimited</div>
+                  {% elif gems_remaining == 0 %}
+                  <div style="font-size:28px;font-weight:700;color:#ef4444;">0</div>
+                  <div style="font-size:11px;color:#9aa0b8;">resets {{ reset_date }}</div>
+                  {% elif gems_remaining|int <= 3 %}
+                  <div style="font-size:28px;font-weight:700;color:#f59e0b;">{{ gems_remaining }}</div>
+                  <div style="font-size:11px;color:#9aa0b8;">resets {{ reset_date }}</div>
+                  {% else %}
+                  <div style="font-size:28px;font-weight:700;color:#00a896;">{{ gems_remaining }}</div>
+                  <div style="font-size:11px;color:#9aa0b8;">resets {{ reset_date }}</div>
+                  {% endif %}
+                </td>
+              </tr>
+            </table>
+
+            {% if not is_unlimited and gems_remaining == 0 %}
+            <p style="margin:0 0 20px;font-size:13px;color:#6b7194;background:#fff8f0;border-left:3px solid #f59e0b;padding:10px 14px;border-radius:6px;">
+              You've used all your gems for this month. They reset on <strong>{{ reset_date }}</strong>.
+            </p>
+            {% elif not is_unlimited and gems_remaining|int <= 3 %}
+            <p style="margin:0 0 20px;font-size:13px;color:#6b7194;background:#fff8f0;border-left:3px solid #f59e0b;padding:10px 14px;border-radius:6px;">
+              Running low — only <strong>{{ gems_remaining }} gem{% if gems_remaining|int != 1 %}s{% endif %}</strong> left this month.
+            </p>
+            {% endif %}
+
+            {% if reading %}
+            <!-- Compatibility score -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;">
+              <tr>
+                <td style="text-align:center;padding:20px;background:#f7f8fc;border-radius:10px;">
+                  <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:#9aa0b8;margin-bottom:8px;">{{ boy_name }} ↔ {{ girl_name }}</div>
+                  <div style="font-size:42px;font-weight:700;
+                    color:{% if reading.score >= 76 %}#00a896{% elif reading.score >= 61 %}#00a896{% elif reading.score >= 41 %}#f59e0b{% else %}#ef4444{% endif %};">
+                    {{ reading.score }}<span style="font-size:20px;color:#9aa0b8;">/100</span>
+                  </div>
+                  <div style="font-size:14px;font-weight:600;color:#4a5070;margin-top:4px;">{{ reading.score_label }}</div>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Overview -->
+            {% if reading.overall_summary %}
+            <div style="margin-bottom:18px;">
+              <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#7c5ce8;font-weight:700;margin-bottom:8px;">&#9733; Compatibility Overview</div>
+              <div style="font-size:13px;color:#2d3055;line-height:1.7;">{{ reading.overall_summary }}</div>
+            </div>
+            {% endif %}
+
+            <!-- Strengths & Challenges -->
+            {% if reading.strengths or reading.challenges %}
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:18px;">
+              <tr>
+                {% if reading.strengths %}
+                <td width="50%" valign="top" style="padding-right:10px;">
+                  <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#00a896;font-weight:700;margin-bottom:8px;">Strengths</div>
+                  {% for s in reading.strengths %}
+                  <div style="font-size:12px;color:#2d3055;margin-bottom:6px;padding-left:14px;position:relative;">
+                    <span style="position:absolute;left:0;color:#00c9b1;">&#10003;</span>{{ s }}
+                  </div>
+                  {% endfor %}
+                </td>
+                {% endif %}
+                {% if reading.challenges %}
+                <td width="50%" valign="top" style="padding-left:10px;border-left:2px solid #f0f2f8;">
+                  <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#c9820a;font-weight:700;margin-bottom:8px;">Challenges</div>
+                  {% for c in reading.challenges %}
+                  <div style="font-size:12px;color:#2d3055;margin-bottom:6px;padding-left:14px;position:relative;">
+                    <span style="position:absolute;left:0;color:#f59e0b;">&#9888;</span>{{ c }}
+                  </div>
+                  {% endfor %}
+                </td>
+                {% endif %}
+              </tr>
+            </table>
+            {% endif %}
+
+            <!-- Category details -->
+            {% if reading.category_details %}
+            <div style="margin-bottom:18px;">
+              <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#6b7194;font-weight:700;margin-bottom:10px;">Detailed Analysis</div>
+              {% for cat in reading.category_details %}
+              <div style="margin-bottom:12px;padding:12px 14px;background:#f7f8fc;border-radius:8px;border-left:3px solid #dde1f0;">
+                <div style="font-size:13px;font-weight:600;color:#1e2035;margin-bottom:4px;">{{ cat.icon }} {{ cat.title }}</div>
+                <div style="font-size:12px;color:#4a5070;line-height:1.65;">{{ cat.reading }}</div>
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Remedies -->
+            {% if reading.remedies %}
+            <div style="margin-bottom:18px;">
+              <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#7c5ce8;font-weight:700;margin-bottom:10px;">Recommended Remedies</div>
+              {% for rem in reading.remedies %}
+              <div style="margin-bottom:10px;padding:10px 14px;background:#faf8ff;border-radius:8px;border-left:3px solid #a78bfa;">
+                <div style="font-size:13px;font-weight:600;color:#1e2035;margin-bottom:3px;">{{ rem.title }}</div>
+                <div style="font-size:12px;color:#4a5070;line-height:1.65;">{{ rem.description }}</div>
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Timing -->
+            {% if reading.timing_advice %}
+            <div style="margin-bottom:20px;padding:14px;background:#f0fdf9;border-radius:8px;border-left:3px solid #00c9b1;">
+              <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#00a896;font-weight:700;margin-bottom:6px;">Favorable Timing</div>
+              <div style="font-size:12px;color:#2d3055;line-height:1.7;">{{ reading.timing_advice }}</div>
+            </div>
+            {% endif %}
+            {% endif %}
+
+            <div style="text-align:center;">
+              <a href="https://grahalogic.ai" style="display:inline-block;background:#00c9b1;color:#ffffff;font-weight:700;font-size:13px;text-decoration:none;padding:10px 28px;border-radius:8px;">Open GrahaLogic</a>
+            </div>
+
+          </td>
+        </tr>
+
+        <tr><td style="height:24px;"></td></tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="text-align:center;padding:0 16px;">
+            <div style="font-size:11px;color:#b0b4c8;">
+              This is a transactional notification from <a href="https://grahalogic.ai" style="color:#9aa0b8;text-decoration:none;">GrahaLogic</a>.
+            </div>
+          </td>
+        </tr>
+
+        <tr><td style="height:24px;"></td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>
