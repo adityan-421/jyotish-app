@@ -24,3 +24,6 @@ DerivedData/
 
 # Claude internal
 .claude/
+
+# scratch / ad-hoc DB queries
+query_tmp.py
