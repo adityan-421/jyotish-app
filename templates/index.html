@@ -1325,6 +1325,14 @@ footer strong { color: #FF6B00; }
         <label>Time</label>
         <input type="time" id="birthTime">
       </div>
+      <div class="form-group">
+        <label>Gender</label>
+        <select id="birthGender">
+          <option value="" disabled selected>Select…</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
+      </div>
       <div class="form-group place-wrap">
         <label>Place</label>
         <input type="text" id="birthPlace" placeholder="Enter a place" autocomplete="off">
@@ -1896,7 +1904,8 @@ function fetchChart() {
     lat: parseFloat(document.getElementById("birthLat").value),
     lon: parseFloat(document.getElementById("birthLon").value),
     tz_offset: parseFloat(document.getElementById("birthTz").value),
-    place: document.getElementById("birthPlace").value
+    place: document.getElementById("birthPlace").value,
+    gender: document.getElementById("birthGender").value
   };
 
   lastInputPayload = payload;
@@ -3645,6 +3654,7 @@ function editSavedChart(id, name) {
       if (inp.lat !== undefined) document.getElementById("birthLat").value = inp.lat;
       if (inp.lon !== undefined) document.getElementById("birthLon").value = inp.lon;
       if (inp.tz_offset !== undefined) document.getElementById("birthTz").value = inp.tz_offset;
+      document.getElementById("birthGender").value = inp.gender || "";
       _editingChartId = id;
       _editingChartName = name;
       document.getElementById("editBannerName").textContent = name;
@@ -4095,6 +4105,7 @@ function loadSavedChart(id) {
       if (inp.lat !== undefined) document.getElementById("birthLat").value = inp.lat;
       if (inp.lon !== undefined) document.getElementById("birthLon").value = inp.lon;
       if (inp.tz_offset !== undefined) document.getElementById("birthTz").value = inp.tz_offset;
+      document.getElementById("birthGender").value = inp.gender || "";
 
       // Render chart
       chartData = data.chart_data;

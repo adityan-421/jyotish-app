@@ -785,6 +785,9 @@ def api_chart():
         lon = float(data["lon"])
         tz_offset = float(data.get("tz_offset", 5.5))
         place = str(data.get("place", ""))
+        gender = str(data.get("gender", "")).strip().lower()
+        if gender not in ("male", "female"):
+            gender = ""
 
         # Basic validation
         if not (1 <= month <= 12):
@@ -797,6 +800,8 @@ def api_chart():
             return jsonify({"error": "Longitude must be between -180 and 180"}), 400
 
         result = compute_chart(year, month, day, hour, minute, lat, lon, tz_offset, place)
+        if gender:
+            result["gender"] = gender
         return jsonify(result)
 
     except KeyError as e:
@@ -2229,6 +2234,10 @@ def _strip_chart_for_ai(chart_data, extra_charts=None):
     """
     result = {}
     keep_charts = ({"D1", "D9"} | set(extra_charts or [])) - {"D12"}
+
+    # gender — drives the spouse karaka (Venus for male natives, Jupiter for female)
+    if chart_data.get("gender"):
+        result["gender"] = chart_data["gender"]
 
     # birth — strip computation artifacts
     if "birth" in chart_data:
