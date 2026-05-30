@@ -82,6 +82,18 @@ def _safe_substitute(template, variables):
     return re.sub(r'\{(\w+)\}', _replacer, template)
 
 
+def _is_valid_reading(reading):
+    """True if `reading` is a real generated reading, not the empty
+    'Unable to generate reading...' fallback emitted when a prompt step fails.
+    Used to avoid persisting/caching a failed generation."""
+    if not isinstance(reading, dict):
+        return False
+    cats = reading.get("categories")
+    if not cats or not isinstance(cats, list) or not isinstance(cats[0], dict):
+        return False
+    return not (cats[0].get("reading") or "").startswith("Unable to generate reading")
+
+
 def _run_prompt_chain(model, steps, variables, default_thinking_budget=None):
     """Execute a sequence of prompt steps, returning the final output."""
     final_output = None
@@ -97,73 +109,94 @@ def _run_prompt_chain(model, steps, variables, default_thinking_budget=None):
             gen_config["thinking_config"] = {"thinking_budget": int(thinking_budget)}
         if max_output_tokens:
             gen_config["max_output_tokens"] = int(max_output_tokens)
+        is_json = step["response_type"] == "json"
+        if is_json:
+            # Constrain Gemini to emit syntactically valid JSON. This eliminates
+            # the intermittent unescaped-quote / missing-comma decode failures
+            # that otherwise dropped the reading to its empty json_fallback.
+            gen_config["response_mime_type"] = "application/json"
         gen_kwargs = {}
         if gen_config:
             gen_kwargs["generation_config"] = gen_config
 
-        response = model.generate_content(prompt_text, **gen_kwargs)
-        # Build result_text from non-thinking parts only.
+        # JSON steps get one retry if the model still returns unparseable JSON.
+        max_attempts = 2 if is_json else 1
+        result = step.get("json_fallback", {}) if is_json else ""
         result_text = ""
-        try:
-            for part in response.candidates[0].content.parts:
-                if getattr(part, "thought", False):
-                    continue
-                if hasattr(part, "text") and part.text:
-                    result_text += part.text
-            result_text = result_text.strip()
-        except Exception:
-            pass
-        if not result_text:
+        parsed = False
+        last_err = None
+        for attempt in range(max_attempts):
+            response = model.generate_content(prompt_text, **gen_kwargs)
+            # Build result_text from non-thinking parts only.
+            result_text = ""
             try:
-                result_text = response.text.strip()
-            except ValueError:
-                raise
+                for part in response.candidates[0].content.parts:
+                    if getattr(part, "thought", False):
+                        continue
+                    if hasattr(part, "text") and part.text:
+                        result_text += part.text
+                result_text = result_text.strip()
+            except Exception:
+                pass
+            if not result_text:
+                try:
+                    result_text = response.text.strip()
+                except ValueError:
+                    raise
 
-        # Log token usage for cost tracking
-        try:
-            um = response.usage_metadata
-            in_tok    = getattr(um, "prompt_token_count", 0)
-            out_tok   = getattr(um, "candidates_token_count", 0)
-            think_tok = getattr(um, "thoughts_token_count", 0)
-            cost = (in_tok * 0.075 + out_tok * 0.30 + think_tok * 3.50) / 1_000_000
-            print(f"TOKEN_USAGE step={step.get('name')} in={in_tok} out={out_tok} thinking={think_tok} est_cost=${cost:.5f}", flush=True)
-        except Exception:
-            pass
+            # Log token usage for cost tracking
+            try:
+                um = response.usage_metadata
+                in_tok    = getattr(um, "prompt_token_count", 0)
+                out_tok   = getattr(um, "candidates_token_count", 0)
+                think_tok = getattr(um, "thoughts_token_count", 0)
+                cost = (in_tok * 0.075 + out_tok * 0.30 + think_tok * 3.50) / 1_000_000
+                print(f"TOKEN_USAGE step={step.get('name')} in={in_tok} out={out_tok} thinking={think_tok} est_cost=${cost:.5f}", flush=True)
+            except Exception:
+                pass
 
-        logger.info("PROMPT_CHAIN step=%s response_len=%d result_text_preview=%r",
-                    step.get("name"), len(result_text), result_text[:300])
+            logger.info("PROMPT_CHAIN step=%s attempt=%d response_len=%d result_text_preview=%r",
+                        step.get("name"), attempt + 1, len(result_text), result_text[:300])
 
-        # Process response based on type
-        if step["response_type"] == "json":
-            # Find the start of the first JSON object or array, then use
-            # raw_decode to parse exactly that object and ignore any trailing
-            # text (e.g. thinking output that appears after the JSON).
-            cleaned = result_text
+            if not is_json:
+                result = result_text
+                parsed = True
+                break
+
+            # Find the start of the first JSON object/array, then raw_decode it
+            # (ignores any trailing text after the JSON).
             obj_start = -1
-            for i, ch in enumerate(cleaned):
+            for i, ch in enumerate(result_text):
                 if ch in ('{', '['):
                     obj_start = i
                     break
-            result = step.get("json_fallback", {})
-            if obj_start != -1:
+            if obj_start == -1:
+                logger.warning("PROMPT_CHAIN no_json_found step=%s attempt=%d preview=%r",
+                               step.get("name"), attempt + 1, result_text[:300])
+                continue
+            try:
+                result, _ = json.JSONDecoder().raw_decode(result_text, obj_start)
+                parsed = True
+                break
+            except json.JSONDecodeError as je:
+                last_err = je
+                # Repair common AI JSON mistakes: invalid \' escape sequences
+                repaired = result_text.replace("\\'", "'")
                 try:
-                    result, _ = json.JSONDecoder().raw_decode(cleaned, obj_start)
-                except json.JSONDecodeError as je:
-                    # Repair common AI JSON mistakes: invalid \' escape sequences
-                    repaired = cleaned.replace("\\'", "'")
-                    try:
-                        result, _ = json.JSONDecoder().raw_decode(repaired, obj_start)
-                    except json.JSONDecodeError:
-                        logger.error("PROMPT_CHAIN json_decode_error step=%s err=%s preview=%r",
-                                     step.get("name"), je, cleaned[obj_start:obj_start + 300])
-                        result = step.get("json_fallback", {})
-            else:
-                logger.error("PROMPT_CHAIN no_json_found step=%s preview=%r",
-                             step.get("name"), cleaned[:300])
-            variables[step["output_var"]] = result
-        else:
-            result = result_text
-            variables[step["output_var"]] = result
+                    result, _ = json.JSONDecoder().raw_decode(repaired, obj_start)
+                    parsed = True
+                    break
+                except json.JSONDecodeError:
+                    logger.warning("PROMPT_CHAIN json_decode_retry step=%s attempt=%d err=%s",
+                                   step.get("name"), attempt + 1, je)
+                    continue
+
+        if is_json and not parsed:
+            logger.error("PROMPT_CHAIN json_decode_error step=%s err=%s preview=%r",
+                         step.get("name"), last_err, result_text[:300])
+            result = step.get("json_fallback", {})
+
+        variables[step["output_var"]] = result
 
         # Post-processing hooks
         post = step.get("post_process")
@@ -2328,11 +2361,13 @@ def api_ask():
     upsert_user(user_id, user.get("email", ""), user.get("name", ""), user.get("picture", ""))
     chart_id = data.get("chart_id")  # optional: cache reading back to saved chart
 
-    # If chart already has a stored reading, return it directly — no AI needed
+    # If chart already has a *valid* stored reading, return it directly — no AI
+    # needed. A stored fallback ("Unable to generate reading...") must NOT count
+    # as cached, or a one-time failure would block regeneration permanently.
     if initial_reading and chart_id:
         try:
             existing = get_chart(chart_id, user_id)
-            if existing and existing.get("reading") and existing["reading"].get("categories"):
+            if existing and _is_valid_reading(existing.get("reading")):
                 return jsonify({"reading_data": existing["reading"]})
         except Exception:
             pass  # fall through to AI generation
@@ -2379,7 +2414,7 @@ def api_ask():
 
             save_ai_question(user_id, question or "Initial reading", "comprehensive",
                              json.dumps(reading_data) if isinstance(reading_data, dict) else str(reading_data))
-            if chart_id:
+            if chart_id and _is_valid_reading(reading_data):
                 try:
                     update_chart_reading(chart_id, user_id, reading_data)
                 except Exception as e:

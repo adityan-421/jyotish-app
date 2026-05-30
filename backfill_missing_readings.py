@@ -32,12 +32,17 @@ conn = psycopg2.connect(
 )
 cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
+# Charts needing a reading: never generated (NULL) OR stuck on the
+# "Unable to generate reading..." fallback from a past failed generation.
+MISSING_WHERE = ("reading IS NULL OR "
+                 "reading::text LIKE '%Unable to generate reading%'")
+
 # ── Scope report ────────────────────────────────────────────────────────────
 cur.execute("SELECT COUNT(*) AS c FROM saved_charts")
 total = cur.fetchone()["c"]
-cur.execute("SELECT COUNT(*) AS c FROM saved_charts WHERE reading IS NULL")
+cur.execute(f"SELECT COUNT(*) AS c FROM saved_charts WHERE {MISSING_WHERE}")
 missing = cur.fetchone()["c"]
-cur.execute("SELECT COUNT(DISTINCT user_id) AS c FROM saved_charts WHERE reading IS NULL")
+cur.execute(f"SELECT COUNT(DISTINCT user_id) AS c FROM saved_charts WHERE {MISSING_WHERE}")
 missing_users = cur.fetchone()["c"]
 log.info("Scope: total_charts=%d  missing_reading=%d  affected_users=%d",
          total, missing, missing_users)
@@ -54,10 +59,10 @@ from app import (_strip_chart_for_ai, _run_prompt_chain,
                  _format_transits_for_ai, load_prompts)
 from jyotish_engine import compute_transits
 
-cur.execute("""
+cur.execute(f"""
     SELECT id, user_id, name, chart_data
     FROM saved_charts
-    WHERE reading IS NULL
+    WHERE {MISSING_WHERE}
     ORDER BY id
 """)
 rows = cur.fetchall()
