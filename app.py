@@ -174,8 +174,12 @@ def _run_prompt_chain(model, steps, variables, default_thinking_budget=None):
                 logger.warning("PROMPT_CHAIN no_json_found step=%s attempt=%d preview=%r",
                                step.get("name"), attempt + 1, result_text[:300])
                 continue
+            # strict=False tolerates literal control characters (unescaped
+            # newlines/tabs) inside string values, which Gemini emits inside the
+            # long markdown reading text and which otherwise raise
+            # "Invalid control character" / cascade into "Expecting ',' delimiter".
             try:
-                result, _ = json.JSONDecoder().raw_decode(result_text, obj_start)
+                result, _ = json.JSONDecoder(strict=False).raw_decode(result_text, obj_start)
                 parsed = True
                 break
             except json.JSONDecodeError as je:
@@ -183,7 +187,7 @@ def _run_prompt_chain(model, steps, variables, default_thinking_budget=None):
                 # Repair common AI JSON mistakes: invalid \' escape sequences
                 repaired = result_text.replace("\\'", "'")
                 try:
-                    result, _ = json.JSONDecoder().raw_decode(repaired, obj_start)
+                    result, _ = json.JSONDecoder(strict=False).raw_decode(repaired, obj_start)
                     parsed = True
                     break
                 except json.JSONDecodeError:
