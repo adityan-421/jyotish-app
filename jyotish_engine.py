@@ -2211,8 +2211,8 @@ def compute_panchang(date_str, tz_str="UTC"):
     tithi_end_str   = jd_to_hhmm(jd_tithi_end,   tz) if jd_tithi_end   else "—"
 
     try:
-        _, trise = swe.rise_trans(jd_search, swe.SUN, "", swe.CALC_RISE,  geopos, 0, 0)
-        _, tset  = swe.rise_trans(jd_search, swe.SUN, "", swe.CALC_SET,   geopos, 0, 0)
+        _, trise = swe.rise_trans(jd_search, swe.SUN, swe.CALC_RISE, geopos, 0.0, 0.0)
+        _, tset  = swe.rise_trans(jd_search, swe.SUN, swe.CALC_SET,  geopos, 0.0, 0.0)
         jd_rise = trise[0]; jd_set = tset[0]
         day_dur = jd_set - jd_rise
         seg = day_dur / 8.0
