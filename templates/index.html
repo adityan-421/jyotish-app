@@ -4339,9 +4339,11 @@ function renderBTRQuestions(questions) {
       var yesChecked = q.answer === "Yes" ? ' checked' : '';
       var noChecked = q.answer === "No" ? ' checked' : '';
       var unsureChecked = q.answer === "Not sure" ? ' checked' : '';
-      html += '<label><input type="radio" name="btrq_' + idx + '" value="Yes"' + yesChecked + ' onchange="btrAnswerChanged(' + idx + ', \'Yes\')"><span>Yes</span></label>';
-      html += '<label><input type="radio" name="btrq_' + idx + '" value="No"' + noChecked + ' onchange="btrAnswerChanged(' + idx + ', \'No\')"><span>No</span></label>';
-      html += '<label><input type="radio" name="btrq_' + idx + '" value="Not sure"' + unsureChecked + ' onchange="btrAnswerChanged(' + idx + ', \'Not sure\')"><span>Not sure</span></label>';
+      var naChecked = q.answer === "Doesn't apply" ? ' checked' : '';
+      html += '<label><input type="radio" name="btrq_' + idx + '" value="Yes"' + yesChecked + ' onchange="btrAnswerChanged(' + idx + ', this.value)"><span>Yes</span></label>';
+      html += '<label><input type="radio" name="btrq_' + idx + '" value="No"' + noChecked + ' onchange="btrAnswerChanged(' + idx + ', this.value)"><span>No</span></label>';
+      html += '<label><input type="radio" name="btrq_' + idx + '" value="Not sure"' + unsureChecked + ' onchange="btrAnswerChanged(' + idx + ', this.value)"><span>Not sure</span></label>';
+      html += '<label><input type="radio" name="btrq_' + idx + '" value="Doesn&#39;t apply"' + naChecked + ' onchange="btrAnswerChanged(' + idx + ', this.value)"><span>Doesn&#39;t apply</span></label>';
     }
 
     html += '</div></div>';
@@ -4607,9 +4609,10 @@ function renderBTRFollowupResponse(fu) {
           qHtml += '<label><input type="radio" name="btrq_' + idx + '" value="' + opt.replace(/"/g, '&quot;') + '" onchange="btrAnswerChanged(' + idx + ', this.value)"><span>' + opt + '</span></label>';
         });
       } else {
-        qHtml += '<label><input type="radio" name="btrq_' + idx + '" value="Yes" onchange="btrAnswerChanged(' + idx + ', \'Yes\')"><span>Yes</span></label>';
-        qHtml += '<label><input type="radio" name="btrq_' + idx + '" value="No" onchange="btrAnswerChanged(' + idx + ', \'No\')"><span>No</span></label>';
-        qHtml += '<label><input type="radio" name="btrq_' + idx + '" value="Not sure" onchange="btrAnswerChanged(' + idx + ', \'Not sure\')"><span>Not sure</span></label>';
+        qHtml += '<label><input type="radio" name="btrq_' + idx + '" value="Yes" onchange="btrAnswerChanged(' + idx + ', this.value)"><span>Yes</span></label>';
+        qHtml += '<label><input type="radio" name="btrq_' + idx + '" value="No" onchange="btrAnswerChanged(' + idx + ', this.value)"><span>No</span></label>';
+        qHtml += '<label><input type="radio" name="btrq_' + idx + '" value="Not sure" onchange="btrAnswerChanged(' + idx + ', this.value)"><span>Not sure</span></label>';
+        qHtml += '<label><input type="radio" name="btrq_' + idx + '" value="Doesn&#39;t apply" onchange="btrAnswerChanged(' + idx + ', this.value)"><span>Doesn&#39;t apply</span></label>';
       }
 
       qHtml += '</div></div>';
