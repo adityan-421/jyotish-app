@@ -1030,9 +1030,8 @@ footer strong { color: #FF6B00; }
 
   /* Input form: 2 col with buttons spanning full width */
   .input-form { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-  .input-form .form-group:nth-child(3) { grid-column: 1 / -1; } /* Place full width */
-  .input-form .form-group:nth-child(7) { grid-column: 1 / -1; } /* Generate btn full width */
-  .input-form .form-group:nth-child(8) { grid-column: 1 / -1; } /* Save btn full width */
+  .input-form .form-group.place-wrap { grid-column: 1 / -1; } /* Place full width */
+  .input-form .form-group.btn-group { grid-column: 1 / -1; } /* Generate btn full width */
   .input-form input, .input-form select { font-size: 16px; } /* prevent iOS zoom on focus */
   /* iOS date/time inputs: strip native chrome to prevent overflow, restore sizing manually */
   .input-form input[type="date"], .input-form input[type="time"] {
@@ -1338,15 +1337,16 @@ footer strong { color: #FF6B00; }
         <input type="text" id="birthPlace" placeholder="Enter a place" autocomplete="off">
         <div class="place-dropdown" id="placeDropdown"></div>
       </div>
-      <div class="form-group">
+      <!-- Lat/Lon/TZ are auto-filled from the selected place; kept hidden in the DOM. -->
+      <div class="form-group" style="display:none">
         <label>Latitude</label>
         <input type="number" id="birthLat" step="0.0001">
       </div>
-      <div class="form-group">
+      <div class="form-group" style="display:none">
         <label>Longitude</label>
         <input type="number" id="birthLon" step="0.0001">
       </div>
-      <div class="form-group">
+      <div class="form-group" style="display:none">
         <label>TZ Offset</label>
         <input type="number" id="birthTz" step="0.5">
       </div>
