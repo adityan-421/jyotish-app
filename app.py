@@ -94,7 +94,7 @@ def _is_valid_reading(reading):
     return not (cats[0].get("reading") or "").startswith("Unable to generate reading")
 
 
-def _run_prompt_chain(model, steps, variables, default_thinking_budget=None):
+def _run_prompt_chain(model, steps, variables, default_thinking_budget=None, cost_acc=None):
     """Execute a sequence of prompt steps, returning the final output."""
     final_output = None
     for step in steps:
@@ -151,6 +151,8 @@ def _run_prompt_chain(model, steps, variables, default_thinking_budget=None):
                 out_tok   = getattr(um, "candidates_token_count", 0)
                 think_tok = getattr(um, "thoughts_token_count", 0)
                 cost = (in_tok * 0.075 + out_tok * 0.30 + think_tok * 3.50) / 1_000_000
+                if cost_acc is not None:
+                    cost_acc[0] += cost
                 print(f"TOKEN_USAGE step={step.get('name')} in={in_tok} out={out_tok} thinking={think_tok} est_cost=${cost:.5f}", flush=True)
             except Exception:
                 pass
@@ -714,7 +716,8 @@ def api_charts_compare():
         if not steps:
             return jsonify({"error": "Compatibility prompts not configured"}), 500
 
-        raw = _run_prompt_chain(model, steps, variables, prompts_config.get("default_thinking_budget"))
+        cost_acc = [0.0]
+        raw = _run_prompt_chain(model, steps, variables, prompts_config.get("default_thinking_budget"), cost_acc=cost_acc)
         result = json.loads(raw) if isinstance(raw, str) else raw
 
         # If AI returned the fallback (empty category_details = parse failed), don't charge gems
@@ -739,7 +742,8 @@ def api_charts_compare():
                     break
 
         save_ai_question(user_id, f"Compare: {chart1['name']} & {chart2['name']}", "compatibility",
-                         json.dumps(result) if isinstance(result, dict) else str(result))
+                         json.dumps(result) if isinstance(result, dict) else str(result),
+                         cost_usd=cost_acc[0])
 
         # Cache the result so future lookups for the same pair are instant
         save_matchmaking(user_id, id1, id2, chart1["name"], chart2["name"],
@@ -2396,6 +2400,7 @@ def api_ask():
 
     try:
         prompts_config = load_prompts()
+        cost_acc = [0.0]  # accumulates est. AI cost for this request (USD)
 
         if initial_reading and "initial_reading_steps" in prompts_config:
             # Run initial reading synchronously via Vertex AI
@@ -2430,12 +2435,13 @@ def api_ask():
 
             raw = _run_prompt_chain(
                 model, prompts_config["initial_reading_steps"], variables,
-                prompts_config.get("default_thinking_budget")
+                prompts_config.get("default_thinking_budget"), cost_acc=cost_acc
             )
             reading_data = json.loads(raw) if isinstance(raw, str) else raw
 
             save_ai_question(user_id, question or "Initial reading", "comprehensive",
-                             json.dumps(reading_data) if isinstance(reading_data, dict) else str(reading_data))
+                             json.dumps(reading_data) if isinstance(reading_data, dict) else str(reading_data),
+                             cost_usd=cost_acc[0])
             if chart_id and _is_valid_reading(reading_data):
                 try:
                     update_chart_reading(chart_id, user_id, reading_data)
@@ -2483,11 +2489,11 @@ def api_ask():
                 variables["chart_data"] = json.dumps(full_chart, indent=2)
                 thinking_budget = prompts_config.get("default_thinking_budget")
 
-            reading = _run_prompt_chain(model, prompts_config["steps"], variables, thinking_budget)
+            reading = _run_prompt_chain(model, prompts_config["steps"], variables, thinking_budget, cost_acc=cost_acc)
             category = variables.get("category", "other")
 
         # Save to DB
-        save_ai_question(user_id, question, category, reading)
+        save_ai_question(user_id, question, category, reading, cost_usd=cost_acc[0])
 
         if user_email:
             _send_gem_status_email(user_id, user_email, user.get("name", ""),

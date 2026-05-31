@@ -110,6 +110,7 @@ def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
+            cur.execute("ALTER TABLE ai_questions ADD COLUMN IF NOT EXISTS cost_usd DOUBLE PRECISION DEFAULT 0")
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS app_cache (
                     key TEXT PRIMARY KEY,
@@ -413,13 +414,14 @@ def get_question_count_today(user_id):
         return row["cnt"]
 
 
-def save_ai_question(user_id, question, category, reading):
-    """Store only telemetry (user_id + category + timestamp). Question text and reading are not retained."""
+def save_ai_question(user_id, question, category, reading, cost_usd=0.0):
+    """Store only telemetry (user_id + category + timestamp + est. cost).
+    Question text and reading are not retained."""
     with get_db() as conn:
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO ai_questions (user_id, question, category, reading) VALUES (%s, %s, %s, %s)",
-            (user_id, "", category, ""),
+            "INSERT INTO ai_questions (user_id, question, category, reading, cost_usd) VALUES (%s, %s, %s, %s, %s)",
+            (user_id, "", category, "", float(cost_usd or 0.0)),
         )
         conn.commit()
         cur.close()
@@ -498,6 +500,11 @@ def get_admin_stats():
         """)
         rows = cur.fetchall()
 
+        # Per-user AI cost — aggregated separately so the charts×questions join
+        # above doesn't multiply the summed cost.
+        cur.execute("SELECT user_id, COALESCE(SUM(cost_usd), 0) AS cost FROM ai_questions GROUP BY user_id")
+        cost_by_user = {r["user_id"]: float(r["cost"]) for r in cur.fetchall()}
+
         users = []
         for r in rows:
             m = float(r["months_active"])
@@ -510,6 +517,7 @@ def get_admin_stats():
                 "ai_per_month":       round(r["ai_count"] / m, 1),
                 "compares":           int(r["compare_count"]),
                 "compares_per_month": round(r["compare_count"] / m, 1),
+                "ai_cost":            round(cost_by_user.get(r["id"], 0.0), 4),
             })
 
         # Totals
@@ -521,6 +529,8 @@ def get_admin_stats():
         total_queries = cur.fetchone()["cnt"]
         cur.execute("SELECT COUNT(*) AS cnt FROM ai_questions WHERE category = 'compatibility'")
         total_compares = cur.fetchone()["cnt"]
+        cur.execute("SELECT COALESCE(SUM(cost_usd), 0) AS total FROM ai_questions")
+        total_cost = float(cur.fetchone()["total"])
 
         # Monthly trend — queries per calendar month (last 6 months)
         cur.execute("""
@@ -542,6 +552,7 @@ def get_admin_stats():
         "total_charts":   total_charts,
         "total_queries":  total_queries,
         "total_compares": total_compares,
+        "total_cost":     round(total_cost, 4),
         "monthly":        monthly,
     }
 
