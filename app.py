@@ -255,9 +255,18 @@ _tf = None
 def _get_tf():
     global _tf
     if _tf is None:
-        from timezonefinder import TimezoneFinder
-        _tf = TimezoneFinder()
+        # TimezoneFinderL (lite) loads a small in-memory grid instead of the
+        # full polygon dataset — far faster to initialize on a cold instance,
+        # with negligible accuracy loss for cities/birthplaces.
+        from timezonefinder import TimezoneFinderL
+        _tf = TimezoneFinderL(in_memory=True)
     return _tf
+
+
+# Warm the timezone finder in a background thread at startup so the first
+# /api/timezone request (place selection) doesn't pay the one-time load cost.
+import threading as _threading
+_threading.Thread(target=_get_tf, daemon=True).start()
 
 # Google OAuth setup
 oauth = OAuth(app)
