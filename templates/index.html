@@ -1375,7 +1375,7 @@ footer strong { color: #FF6B00; }
 
 <!-- Edit mode banner -->
 <div class="edit-banner" id="editBanner">
-  <div class="edit-banner-label">✏️ Editing: <span id="editBannerName"></span> &mdash; change the fields below and click <strong>Recalculate</strong> to update this saved chart</div>
+  <div class="edit-banner-label">✏️ Editing: <span id="editBannerName"></span> &mdash; change the fields, click <strong>Recalculate</strong> to preview, then <strong>Update Chart</strong> to save</div>
   <button class="btn-cancel-edit" onclick="cancelEdit()" title="Cancel edit">✕</button>
 </div>
 
@@ -1483,7 +1483,7 @@ footer strong { color: #FF6B00; }
   <div id="gemBadge" style="display:none;align-items:center;gap:0.35rem;background:rgba(0,201,177,0.08);border:1px solid rgba(0,201,177,0.2);border-radius:8px;padding:0.25rem 0.7rem;font-size:0.78rem;font-weight:600;color:var(--teal);cursor:default;" title="GrahaGems remaining this month">
     <span>&#9830;</span><span id="gemCount">10</span> GrahaGems
   </div>
-  <button class="save-btn" id="saveBtn" onclick="openSaveModal()">Save Chart</button>
+  <button class="save-btn" id="saveBtn" onclick="onSaveButtonClick()">Save Chart</button>
 </div>
 
 <div class="tab-bar">
@@ -1955,12 +1955,10 @@ function fetchChart() {
     _loadedChartName = '';
     renderAll(data);
     showChartContent();
-    updateSaveButton();  // fresh chart → currentSavedChartId is null → "Save Chart"
-    // Auto-save when in edit mode — no need for a separate "Update Chart" click
-    if (_editingChartId) {
-      updateEditedChart();
-    } else if (saveWanted && name) {
-      // Inline "Save this chart" was checked — save right after generating.
+    // Edit mode → "Update Chart" (user saves explicitly); new chart → "Save Chart".
+    updateSaveButton();
+    // Inline "Save this chart" only applies to new charts, not edit mode.
+    if (!_editingChartId && saveWanted && name) {
       doSaveChart(name, false)
         .then(function() { flashSavedStatus(); })
         .catch(function(err) { alert("Failed to save chart: " + err.message); });
@@ -3675,7 +3673,13 @@ function updateSaveButton() {
   if (!b) return;
   if (!currentUser || !chartData) { b.style.display = "none"; return; }
   b.style.display = "block";
-  if (currentSavedChartId) {
+  b.style.opacity = "";
+  b.style.cursor = "";
+  if (_editingChartId) {
+    // Editing an existing chart — explicit save updates it (no duplicate).
+    b.textContent = "Update Chart";
+    b.disabled = false;
+  } else if (currentSavedChartId) {
     b.textContent = "Saved ✓";
     b.disabled = true;
     b.style.opacity = "0.6";
@@ -3683,9 +3687,14 @@ function updateSaveButton() {
   } else {
     b.textContent = "Save Chart";
     b.disabled = false;
-    b.style.opacity = "";
-    b.style.cursor = "";
   }
+}
+
+// Header save button: update the edited chart in edit mode, else open the
+// Save modal to create a new saved chart.
+function onSaveButtonClick() {
+  if (_editingChartId) { updateEditedChart(); }
+  else { openSaveModal(); }
 }
 
 // Briefly flash a "Saved ✓" confirmation next to the inline checkbox.
@@ -3747,6 +3756,7 @@ function cancelEdit() {
   document.getElementById("generateBtn").textContent = "Generate Chart";
   // Restore the inline "Save this chart" checkbox for normal (non-edit) use.
   if (currentUser) document.getElementById("saveOnGenerateGroup").style.display = "";
+  updateSaveButton();  // drop the "Update Chart" state
 }
 
 function updateEditedChart() {
