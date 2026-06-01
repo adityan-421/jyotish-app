@@ -1955,7 +1955,7 @@ function fetchChart() {
     _loadedChartName = '';
     renderAll(data);
     showChartContent();
-    if (currentUser) document.getElementById("saveBtn").style.display = "block";
+    updateSaveButton();  // fresh chart → currentSavedChartId is null → "Save Chart"
     // Auto-save when in edit mode — no need for a separate "Update Chart" click
     if (_editingChartId) {
       updateEditedChart();
@@ -3627,7 +3627,7 @@ function updateAuthUI() {
       '<a class="header-link" href="#" onclick="openMyCharts();return false;">My Charts</a>' +
       '<a class="header-link" href="#" onclick="openComparePanel();return false;">Match Making</a>' +
       '<a class="header-link" href="/auth/logout">Sign Out</a>';
-    document.getElementById("saveBtn").style.display = chartData ? "block" : "none";
+    updateSaveButton();
     document.getElementById("saveOnGenerateGroup").style.display = "";
   } else {
     auth.innerHTML = '<a href="/auth/google" class="google-btn">Sign in with Google</a>';
@@ -3663,8 +3663,29 @@ function doSaveChart(name, isOwn) {
   .then(function(data) {
     if (data.error) { throw new Error(data.error); }
     currentSavedChartId = data.id;
+    updateSaveButton();
     return data.id;
   });
+}
+
+// Reflect saved state on the header button: "Saved ✓" (disabled) once the
+// current chart is saved, otherwise "Save Chart". Prevents duplicate saves.
+function updateSaveButton() {
+  var b = document.getElementById("saveBtn");
+  if (!b) return;
+  if (!currentUser || !chartData) { b.style.display = "none"; return; }
+  b.style.display = "block";
+  if (currentSavedChartId) {
+    b.textContent = "Saved ✓";
+    b.disabled = true;
+    b.style.opacity = "0.6";
+    b.style.cursor = "default";
+  } else {
+    b.textContent = "Save Chart";
+    b.disabled = false;
+    b.style.opacity = "";
+    b.style.cursor = "";
+  }
 }
 
 // Briefly flash a "Saved ✓" confirmation next to the inline checkbox.
@@ -4163,6 +4184,7 @@ function loadSavedChart(id) {
       _loadedChartName = data.name || '';
       renderAll(chartData);
       showChartContent();
+      updateSaveButton();  // already saved → shows "Saved ✓"
       closeMyCharts();
     })
     .catch(function(err) { alert("Failed to load chart: " + err.message); });
