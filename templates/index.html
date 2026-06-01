@@ -1375,7 +1375,7 @@ footer strong { color: #FF6B00; }
 
 <!-- Edit mode banner -->
 <div class="edit-banner" id="editBanner">
-  <div class="edit-banner-label">✏️ Editing: <span id="editBannerName"></span> &mdash; change the fields below and click <strong>Recalculate &amp; Save</strong></div>
+  <div class="edit-banner-label">✏️ Editing: <span id="editBannerName"></span> &mdash; change the fields below and click <strong>Recalculate</strong> to update this saved chart</div>
   <button class="btn-cancel-edit" onclick="cancelEdit()" title="Cancel edit">✕</button>
 </div>
 
@@ -3727,7 +3727,11 @@ function editSavedChart(id, name) {
       _editingChartName = name;
       document.getElementById("editBannerName").textContent = name;
       document.getElementById("editBanner").classList.add("active");
-      document.getElementById("generateBtn").textContent = "Recalculate & Save";
+      document.getElementById("generateBtn").textContent = "Recalculate";
+      // Editing already updates the saved chart, so hide the redundant
+      // "Save this chart" checkbox while in edit mode.
+      document.getElementById("saveOnGenerateGroup").style.display = "none";
+      document.getElementById("saveOnGenerate").checked = false;
       closeMyCharts();
       showHome();
       var inputCard = document.getElementById("inputFormCard");
@@ -3741,6 +3745,8 @@ function cancelEdit() {
   _editingChartName = '';
   document.getElementById("editBanner").classList.remove("active");
   document.getElementById("generateBtn").textContent = "Generate Chart";
+  // Restore the inline "Save this chart" checkbox for normal (non-edit) use.
+  if (currentUser) document.getElementById("saveOnGenerateGroup").style.display = "";
 }
 
 function updateEditedChart() {
