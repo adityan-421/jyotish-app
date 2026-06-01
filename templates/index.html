@@ -3756,7 +3756,9 @@ function updateEditedChart() {
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (data.error) { alert(data.error); return; }
+    currentSavedChartId = _editingChartId;  // edited chart is saved under its id
     cancelEdit();
+    updateSaveButton();  // → "Saved ✓", not "Save Chart"
     var b = document.createElement("div");
     b.textContent = "✓ Chart updated";
     b.style.cssText = "position:fixed;bottom:1.5rem;right:1.5rem;background:#22c55e;color:#fff;padding:0.5rem 1rem;border-radius:8px;font-size:0.82rem;font-weight:600;z-index:999;";
