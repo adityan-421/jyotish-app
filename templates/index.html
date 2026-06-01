@@ -449,6 +449,9 @@ footer strong { color: #FF6B00; }
   max-height: 220px; overflow-y: auto;
 }
 .place-dropdown.open { display: block; }
+/* Let the place suggestions escape the input card instead of being clipped /
+   triggering a scrollbar (.card has overflow:hidden, .card-body overflow-x:auto). */
+#inputFormCard, #inputFormCard .card-body { overflow: visible; }
 .place-option {
   padding: 0.5rem 0.75rem; font-size: 0.78rem; cursor: pointer;
   border-bottom: 1px solid var(--border-light); color: var(--text-2);
