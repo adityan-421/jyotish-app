@@ -801,6 +801,7 @@ def api_chart():
         gender = str(data.get("gender", "")).strip().lower()
         if gender not in ("male", "female"):
             gender = ""
+        person_name = str(data.get("name", "")).strip()[:60]
 
         # Basic validation
         if not (1 <= month <= 12):
@@ -815,6 +816,8 @@ def api_chart():
         result = compute_chart(year, month, day, hour, minute, lat, lon, tz_offset, place)
         if gender:
             result["gender"] = gender
+        if person_name:
+            result["person_name"] = person_name
         return jsonify(result)
 
     except KeyError as e:
@@ -2251,6 +2254,10 @@ def _strip_chart_for_ai(chart_data, extra_charts=None):
     # gender — drives the spouse karaka (Venus for male natives, Jupiter for female)
     if chart_data.get("gender"):
         result["gender"] = chart_data["gender"]
+
+    # person_name — lets the reading address the native by name
+    if chart_data.get("person_name"):
+        result["person_name"] = chart_data["person_name"]
 
     # birth — strip computation artifacts
     if "birth" in chart_data:

@@ -1320,6 +1320,10 @@ footer strong { color: #FF6B00; }
   <div class="card-body">
     <div class="input-form" id="inputForm">
       <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="birthName" placeholder="Person's name" maxlength="60">
+      </div>
+      <div class="form-group">
         <label>Date</label>
         <input type="date" id="birthDate">
       </div>
@@ -1352,6 +1356,12 @@ footer strong { color: #FF6B00; }
       <div class="form-group" style="display:none">
         <label>TZ Offset</label>
         <input type="number" id="birthTz" step="0.5">
+      </div>
+      <div class="form-group" id="saveOnGenerateGroup" style="display:none;">
+        <label><span id="saveOnGenStatus" style="display:none;color:#16a34a;">Saved &#10003;</span></label>
+        <label style="display:flex;align-items:center;gap:0.45rem;height:42px;font-size:0.8rem;color:var(--text-2);cursor:pointer;white-space:nowrap;">
+          <input type="checkbox" id="saveOnGenerate" style="accent-color:#FF6B00;width:16px;height:16px;">Save this chart
+        </label>
       </div>
       <div class="form-group btn-group">
         <label class="btn-label">&nbsp;</label>
@@ -1898,6 +1908,14 @@ function fetchChart() {
   var parts = dateVal.split("-");
   var tparts = timeVal.split(":");
 
+  var name = document.getElementById("birthName").value.trim();
+  var saveWanted = document.getElementById("saveOnGenerate").checked;
+  if (saveWanted && !name) {
+    alert("Please enter a name to save the chart.");
+    document.getElementById("birthName").focus();
+    return;
+  }
+
   var payload = {
     year: parseInt(parts[0]),
     month: parseInt(parts[1]),
@@ -1908,7 +1926,8 @@ function fetchChart() {
     lon: parseFloat(document.getElementById("birthLon").value),
     tz_offset: parseFloat(document.getElementById("birthTz").value),
     place: document.getElementById("birthPlace").value,
-    gender: document.getElementById("birthGender").value
+    gender: document.getElementById("birthGender").value,
+    name: name
   };
 
   lastInputPayload = payload;
@@ -1940,6 +1959,11 @@ function fetchChart() {
     // Auto-save when in edit mode — no need for a separate "Update Chart" click
     if (_editingChartId) {
       updateEditedChart();
+    } else if (saveWanted && name) {
+      // Inline "Save this chart" was checked — save right after generating.
+      doSaveChart(name, false)
+        .then(function() { flashSavedStatus(); })
+        .catch(function(err) { alert("Failed to save chart: " + err.message); });
     }
   })
   .catch(function(err) {
@@ -3604,15 +3628,20 @@ function updateAuthUI() {
       '<a class="header-link" href="#" onclick="openComparePanel();return false;">Match Making</a>' +
       '<a class="header-link" href="/auth/logout">Sign Out</a>';
     document.getElementById("saveBtn").style.display = chartData ? "block" : "none";
+    document.getElementById("saveOnGenerateGroup").style.display = "";
   } else {
     auth.innerHTML = '<a href="/auth/google" class="google-btn">Sign in with Google</a>';
     document.getElementById("saveBtn").style.display = "none";
+    var sg = document.getElementById("saveOnGenerateGroup");
+    sg.style.display = "none";
+    document.getElementById("saveOnGenerate").checked = false;
   }
 }
 
 function openSaveModal() {
   if (!chartData) return;
-  document.getElementById("saveChartName").value = "";
+  // Prefill with the inline Name field if the user typed one.
+  document.getElementById("saveChartName").value = (document.getElementById("birthName").value || "").trim();
   document.getElementById("saveChartIsOwn").checked = false;
   document.getElementById("saveModalOverlay").classList.add("open");
   setTimeout(function() { document.getElementById("saveChartName").focus(); }, 100);
@@ -3622,25 +3651,39 @@ function closeSaveModal() {
   document.getElementById("saveModalOverlay").classList.remove("open");
 }
 
-function saveCurrentChart() {
-  var name = document.getElementById("saveChartName").value.trim();
-  if (!name) { alert("Please enter a name for the chart."); return; }
-  if (!chartData || !lastInputPayload) { alert("No chart to save. Generate a chart first."); return; }
-  var isOwn = document.getElementById("saveChartIsOwn").checked;
-
-  fetch("/api/charts/save", {
+// Shared save — used by both the Save modal and the inline "Save this chart".
+// Resolves with the new chart id; rejects with an Error on failure.
+function doSaveChart(name, isOwn) {
+  return fetch("/api/charts/save", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({ name: name, input_data: lastInputPayload, chart_data: chartData, is_own: isOwn, reading: _cachedReadingData || null })
   })
   .then(function(r) { return r.json(); })
   .then(function(data) {
-    if (data.error) { alert(data.error); return; }
+    if (data.error) { throw new Error(data.error); }
     currentSavedChartId = data.id;
-    closeSaveModal();
-    alert("Chart saved!");
-  })
-  .catch(function(err) { alert("Failed to save: " + err.message); });
+    return data.id;
+  });
+}
+
+// Briefly flash a "Saved ✓" confirmation next to the inline checkbox.
+function flashSavedStatus() {
+  var el = document.getElementById("saveOnGenStatus");
+  if (!el) return;
+  el.style.display = "inline";
+  clearTimeout(flashSavedStatus._t);
+  flashSavedStatus._t = setTimeout(function() { el.style.display = "none"; }, 3000);
+}
+
+function saveCurrentChart() {
+  var name = document.getElementById("saveChartName").value.trim();
+  if (!name) { alert("Please enter a name for the chart."); return; }
+  if (!chartData || !lastInputPayload) { alert("No chart to save. Generate a chart first."); return; }
+  var isOwn = document.getElementById("saveChartIsOwn").checked;
+  doSaveChart(name, isOwn)
+    .then(function() { closeSaveModal(); alert("Chart saved!"); })
+    .catch(function(err) { alert("Failed to save: " + err.message); });
 }
 
 function editSavedChart(id, name) {
@@ -3658,6 +3701,7 @@ function editSavedChart(id, name) {
       if (inp.lon !== undefined) document.getElementById("birthLon").value = inp.lon;
       if (inp.tz_offset !== undefined) document.getElementById("birthTz").value = inp.tz_offset;
       document.getElementById("birthGender").value = inp.gender || "";
+      document.getElementById("birthName").value = name || inp.name || "";
       _editingChartId = id;
       _editingChartName = name;
       document.getElementById("editBannerName").textContent = name;
@@ -4109,6 +4153,7 @@ function loadSavedChart(id) {
       if (inp.lon !== undefined) document.getElementById("birthLon").value = inp.lon;
       if (inp.tz_offset !== undefined) document.getElementById("birthTz").value = inp.tz_offset;
       document.getElementById("birthGender").value = inp.gender || "";
+      document.getElementById("birthName").value = data.name || inp.name || "";
 
       // Render chart
       chartData = data.chart_data;
