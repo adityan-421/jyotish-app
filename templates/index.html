@@ -4354,6 +4354,18 @@ function applyRectifiedTime(hhmm) {
   fetchChart();
 }
 
+// Clear event-rectification inputs/results so they don't carry across charts.
+function clearBTREventState() {
+  var list = document.getElementById("btrEventList");
+  if (list) list.innerHTML = "";
+  var res = document.getElementById("btrRectifyResult");
+  if (res) res.innerHTML = "";
+  var err = document.getElementById("btrRectifyError");
+  if (err) err.classList.remove("active");
+  var btn = document.getElementById("btrRectifyBtn");
+  if (btn) { btn.disabled = false; btn.textContent = "Rectify from Events"; }
+}
+
 function fetchBTR() {
   var dateVal = document.getElementById("birthDate").value;
   var timeVal = document.getElementById("birthTime").value;
@@ -4860,6 +4872,7 @@ function applyBTRCorrection(offsetMins) {
   document.getElementById("btrChatThread").innerHTML = "";
   document.getElementById("btrChatInput").value = "";
   document.getElementById("btrFollowupSection").classList.remove("active");
+  clearBTREventState();
 
   // Re-generate chart and BTR
   fetchChart();
@@ -4942,6 +4955,7 @@ renderAll = function(data) {
   document.getElementById("btrChatThread").innerHTML = "";
   document.getElementById("btrChatInput").value = "";
   document.getElementById("btrFollowupSection").classList.remove("active");
+  clearBTREventState();
   fetchBTR();
 };
 
