@@ -4356,6 +4356,8 @@ function applyRectifiedTime(hhmm) {
 
 // Clear event-rectification inputs/results so they don't carry across charts.
 function clearBTREventState() {
+  var addl = document.getElementById("btrAdditionalInfo");
+  if (addl) addl.value = "";
   var list = document.getElementById("btrEventList");
   if (list) list.innerHTML = "";
   var res = document.getElementById("btrRectifyResult");
