@@ -4925,6 +4925,9 @@ renderAll = function(data) {
   // Reset AI conversation when a new chart is loaded
   aiConversation = [];
   _aiReadingRequested = false;
+  // New chart → reset per-mode reading cache, seed with any reading already loaded.
+  _readingsByMode = {};
+  rememberReading(_cachedReadingData);
   document.getElementById("aiChatThread").innerHTML = "";
   document.getElementById("aiError").classList.remove("active");
   document.getElementById("aiLoading").classList.remove("active");
@@ -5075,6 +5078,9 @@ var _aiReadingRequested = false;
 
 // AI reading style: "expert" (default) or "layman". Set from /api/me on load.
 var aiMode = "expert";
+// Per-chart, per-mode reading cache (in-memory) so toggling between styles
+// regenerates each style at most once and is instant thereafter. Reset per chart.
+var _readingsByMode = {};
 
 function updateAiModeToggle() {
   var l = document.getElementById("aiModeLayman");
@@ -5088,6 +5094,38 @@ function updateAiModeToggle() {
   });
 }
 
+// Remember a generated reading for its mode (so toggling back is instant).
+function rememberReading(data) {
+  if (data && data.categories && data.categories.length &&
+      data.categories[0].reading !== 'Unable to generate reading. Please try again.') {
+    _readingsByMode[data._mode || aiMode] = data;
+  }
+}
+
+// Render an already-generated reading into the AI tab without a server call.
+function displayReading(data) {
+  var thread = document.getElementById("aiChatThread");
+  if (thread) thread.innerHTML = "";
+  aiConversation = [];
+  renderReadingGrid(data);
+  var parts = [];
+  if (data.general) parts.push("General: " + data.general);
+  if (data.categories) parts = parts.concat(data.categories.map(function(c) { return c.title + ": " + c.reading; }));
+  if (data.dasha_advice) parts.push("Dasha: " + data.dasha_advice);
+  if (data.remedies) parts.push("Remedies: " + data.remedies);
+  aiConversation.push({role: "user", text: "Comprehensive birth chart reading"});
+  aiConversation.push({role: "assistant", text: parts.join("\n\n")});
+  var generatePrompt = document.getElementById("aiGeneratePrompt");
+  var inputRow = document.getElementById("aiInputRow");
+  if (generatePrompt) generatePrompt.style.display = "none";
+  if (inputRow) inputRow.style.display = "flex";
+  document.getElementById("aiAskBtn").disabled = false;
+  document.getElementById("aiQuestion").disabled = false;
+  document.getElementById("aiError").classList.remove("active");
+  _cachedReadingData = data;
+  _aiReadingRequested = true;
+}
+
 function setAiMode(mode) {
   if ((mode !== "layman" && mode !== "expert") || mode === aiMode) return;
   aiMode = mode;
@@ -5098,17 +5136,20 @@ function setAiMode(mode) {
       body: JSON.stringify({mode: mode})
     }).catch(function() { /* non-fatal */ });
   }
-  // If a reading is already shown for this chart, regenerate it in the new style.
+  if (!currentUser || !chartData) return;
   var thread = document.getElementById("aiChatThread");
   var hasReading = (thread && thread.children.length > 0) ||
                    (_cachedReadingData && _cachedReadingData.categories);
-  if (currentUser && chartData && hasReading) {
+  if (!hasReading) return;  // no reading shown yet — nothing to switch
+  if (_readingsByMode[mode] && _readingsByMode[mode].categories) {
+    displayReading(_readingsByMode[mode]);  // instant — already generated this style
+  } else {
     _cachedReadingData = null;
     aiConversation = [];
     _aiReadingRequested = false;
     if (thread) thread.innerHTML = "";
     document.getElementById("aiError").classList.remove("active");
-    autoGenerateReading();
+    autoGenerateReading();  // generate this style once
   }
 }
 
@@ -5164,6 +5205,7 @@ function pollReadingStatus(readingId, stepTimer, loading, tabBtn, errorEl,
         // Cache in-session so it loads instantly and gets persisted on save,
         // whether or not the chart is already saved.
         _cachedReadingData = readingData;
+        rememberReading(readingData);
         if (inputRow) inputRow.style.display = "flex";
         if (btn) btn.disabled = false;
         if (input) { input.disabled = false; input.focus(); }
@@ -5264,6 +5306,7 @@ function autoGenerateReading() {
       renderReadingGrid(readingData);
       // Cache in-session so it persists on save even if the chart isn't saved yet.
       _cachedReadingData = readingData;
+      rememberReading(readingData);
       var summaryParts = [];
       if (readingData.general) summaryParts.push("General: " + readingData.general);
       if (readingData.categories) summaryParts = summaryParts.concat(readingData.categories.map(function(c) { return c.title + ": " + c.reading; }));
