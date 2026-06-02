@@ -100,6 +100,7 @@ def init_db():
             """)
             cur.execute("ALTER TABLE saved_charts ADD COLUMN IF NOT EXISTS reading TEXT DEFAULT NULL")
             cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS own_chart_id INTEGER DEFAULT NULL")
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reading_mode TEXT DEFAULT 'expert'")
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS ai_questions (
                     id SERIAL PRIMARY KEY,
@@ -399,6 +400,29 @@ def get_own_chart_id(user_id):
         row = cur.fetchone()
         cur.close()
     return row["own_chart_id"] if row else None
+
+
+def get_reading_mode(user_id):
+    """Return the user's AI reading mode ('expert' or 'layman'); default 'expert'."""
+    with get_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT reading_mode FROM users WHERE id = %s", (user_id,))
+        row = cur.fetchone()
+        cur.close()
+    mode = (row["reading_mode"] if row else None) or "expert"
+    return mode if mode in ("expert", "layman") else "expert"
+
+
+def set_reading_mode(user_id, mode):
+    """Persist the user's AI reading mode. Ignores invalid values."""
+    if mode not in ("expert", "layman"):
+        return False
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("UPDATE users SET reading_mode = %s WHERE id = %s", (mode, user_id))
+        conn.commit()
+        cur.close()
+    return True
 
 
 def get_question_count_today(user_id):

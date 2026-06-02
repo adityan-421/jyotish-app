@@ -21,7 +21,7 @@ from database import (
     get_all_charts_for_backfill, bulk_update_chart_data, get_cached_value, set_cached_value, get_stats, get_admin_stats,
     create_pending_reading, get_pending_readings_by_status, mark_readings_submitted,
     complete_reading, fail_reading, get_reading_status,
-    set_own_chart, get_own_chart_id,
+    set_own_chart, get_own_chart_id, get_reading_mode, set_reading_mode,
     get_users_with_own_chart, insert_user_prediction, get_pending_predictions,
     mark_predictions_submitted, get_submitted_predictions, complete_prediction,
     fail_prediction, get_user_predictions,
@@ -80,6 +80,36 @@ def _safe_substitute(template, variables):
             return val if isinstance(val, str) else str(val)
         return match.group(0)
     return re.sub(r'\{(\w+)\}', _replacer, template)
+
+
+# AI reading tone, selectable per user (expert is the default / legacy behavior).
+TONE_INSTRUCTIONS = {
+    "expert": (
+        "The reader is familiar with Vedic astrology. You may use standard Jyotish "
+        "terms (Lagna, nakshatra, dasha, karaka, house lords, yogas) directly without "
+        "over-explaining them."
+    ),
+    "layman": (
+        "The reader has NO astrology background. Write in plain, everyday language and "
+        "avoid jargon. If a Sanskrit or technical term is truly unavoidable, immediately "
+        "explain it in simple words in the same sentence. For each area, clearly state "
+        "(1) what it means for the person's life in practical terms, and (2) simple, "
+        "concrete remedies or steps they can actually follow. Use short sentences and a "
+        "warm, reassuring tone. Do not assume any prior knowledge of charts or planets."
+    ),
+}
+
+
+def _resolve_mode(data, user_id):
+    """Resolve the AI reading mode: explicit request value, else the user's stored
+    preference, else 'expert'. Always returns 'expert' or 'layman'."""
+    mode = (data or {}).get("mode")
+    if mode not in ("expert", "layman"):
+        try:
+            mode = get_reading_mode(user_id)
+        except Exception:
+            mode = "expert"
+    return mode if mode in ("expert", "layman") else "expert"
 
 
 def _is_valid_reading(reading):
@@ -519,8 +549,23 @@ def api_me():
             own_chart_id = get_own_chart_id(user["id"])
         except Exception:
             own_chart_id = None
+        try:
+            user = {**user, "reading_mode": get_reading_mode(user["id"])}
+        except Exception:
+            user = {**user, "reading_mode": "expert"}
         return jsonify({"user": user, "own_chart_id": own_chart_id})
     return jsonify({"user": None})
+
+
+@app.route("/api/settings/reading-mode", methods=["POST"])
+@login_required
+def api_set_reading_mode():
+    data = request.get_json() or {}
+    mode = data.get("mode")
+    if mode not in ("expert", "layman"):
+        return jsonify({"error": "mode must be 'expert' or 'layman'"}), 400
+    set_reading_mode(session["user"]["id"], mode)
+    return jsonify({"mode": mode})
 
 
 @app.route("/api/charts/save", methods=["POST"])
@@ -710,6 +755,7 @@ def api_charts_compare():
             "today": datetime.now().strftime("%d-%b-%Y"),
             "transit_data": transit_str,
             "kuta_scores": kuta_str,
+            "tone_instructions": TONE_INSTRUCTIONS[_resolve_mode(data, session["user"]["id"])],
         }
 
         steps = prompts_config.get("compatibility_steps", [])
@@ -2472,6 +2518,7 @@ def api_ask():
 
     user = session["user"]
     user_id = user["id"]
+    mode = _resolve_mode(data, user_id)
 
     # GrahaGem check — initial readings are free; follow-up questions cost 1 gem
     user_email = user.get("email", "")
@@ -2504,8 +2551,13 @@ def api_ask():
     if initial_reading and chart_id:
         try:
             existing = get_chart(chart_id, user_id)
-            if existing and _is_valid_reading(existing.get("reading")):
-                return jsonify({"reading_data": existing["reading"]})
+            existing_reading = existing.get("reading") if existing else None
+            # Only reuse the cache when it's valid AND was generated in the same
+            # mode; a mode switch must regenerate. Legacy readings have no _mode
+            # tag and are treated as 'expert'.
+            if (existing and _is_valid_reading(existing_reading)
+                    and existing_reading.get("_mode", "expert") == mode):
+                return jsonify({"reading_data": existing_reading})
         except Exception:
             pass  # fall through to AI generation
 
@@ -2542,6 +2594,7 @@ def api_ask():
                 "today": datetime.now().strftime("%d-%b-%Y"),
                 "chart_data": json.dumps(full_chart, indent=2),
                 "transit_data": transit_str,
+                "tone_instructions": TONE_INSTRUCTIONS[mode],
             }
 
             raw = _run_prompt_chain(
@@ -2549,6 +2602,8 @@ def api_ask():
                 prompts_config.get("default_thinking_budget"), cost_acc=cost_acc
             )
             reading_data = json.loads(raw) if isinstance(raw, str) else raw
+            if isinstance(reading_data, dict):
+                reading_data["_mode"] = mode  # tag so the cache is mode-aware
 
             save_ai_question(user_id, question or "Initial reading", "comprehensive",
                              json.dumps(reading_data) if isinstance(reading_data, dict) else str(reading_data),
@@ -2589,6 +2644,7 @@ def api_ask():
                 "conversation": build_conv_context(conversation),
                 "raw_chart_data": chart_data,
                 "transit_data": transit_str,
+                "tone_instructions": TONE_INSTRUCTIONS[mode],
             }
 
             # For follow-ups (has conversation), skip full chart_data — let

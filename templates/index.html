@@ -1675,6 +1675,13 @@ footer strong { color: #FF6B00; }
 <div class="card accent-teal">
   <div class="card-header"><h2>AI Jyotish Reading</h2><span class="sub">Powered by Gemini</span></div>
   <div class="card-body">
+    <div id="aiModeToggle" style="display:flex;justify-content:flex-end;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
+      <span style="font-size:0.7rem;color:var(--text-3);text-transform:uppercase;letter-spacing:0.04em;font-weight:600;">Style</span>
+      <div style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+        <button type="button" id="aiModeLayman" onclick="setAiMode('layman')" style="border:none;background:var(--surface);color:var(--text-2);font-size:0.76rem;padding:0.32rem 0.7rem;cursor:pointer;" title="Plain language, no jargon">Layman</button>
+        <button type="button" id="aiModeExpert" onclick="setAiMode('expert')" style="border:none;background:var(--surface);color:var(--text-2);font-size:0.76rem;padding:0.32rem 0.7rem;cursor:pointer;" title="Assumes some Jyotish knowledge">Expert</button>
+      </div>
+    </div>
     <div id="aiGeneratePrompt" style="text-align:center;padding:1.5rem 0;">
       <p style="color:var(--text-3);font-size:0.88rem;margin-bottom:1rem;">Get a comprehensive AI-powered Vedic astrology reading for this chart.</p>
       <button class="ai-ask-btn" id="aiGenerateBtn" onclick="autoGenerateReading()" style="padding:0.6rem 1.8rem;font-size:0.9rem;">Generate Reading</button>
@@ -3630,6 +3637,8 @@ function checkAuth() {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       currentUser = data.user;
+      if (currentUser && currentUser.reading_mode) aiMode = currentUser.reading_mode;
+      updateAiModeToggle();
       // gem balance fetched separately via /api/gems when chart loads
       updateAuthUI();
     })
@@ -4043,7 +4052,7 @@ function _runCompareRequest(idA, idB) {
   fetch("/api/charts/compare", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({chart_id_1: parseInt(idA), chart_id_2: parseInt(idB)})
+    body: JSON.stringify({chart_id_1: parseInt(idA), chart_id_2: parseInt(idB), mode: aiMode})
   })
     .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
     .then(function(resp) {
@@ -4923,8 +4932,10 @@ renderAll = function(data) {
   var inputRow = document.getElementById("aiInputRow");
   if (currentUser && chartData && _cachedReadingData &&
              (_cachedReadingData.categories && _cachedReadingData.categories.length > 0 &&
-              _cachedReadingData.categories[0].reading !== 'Unable to generate reading. Please try again.')) {
-    // Display cached reading (only if it has real category data, not a fallback error)
+              _cachedReadingData.categories[0].reading !== 'Unable to generate reading. Please try again.') &&
+             ((_cachedReadingData._mode || 'expert') === aiMode)) {
+    // Display cached reading only if it has real category data (not a fallback)
+    // AND it was generated in the currently-selected style; otherwise regenerate.
     renderReadingGrid(_cachedReadingData);
     var summaryParts = [];
     if (_cachedReadingData.general) summaryParts.push("General: " + _cachedReadingData.general);
@@ -5062,6 +5073,45 @@ function renderReadingGrid(data) {
 
 var _aiReadingRequested = false;
 
+// AI reading style: "expert" (default) or "layman". Set from /api/me on load.
+var aiMode = "expert";
+
+function updateAiModeToggle() {
+  var l = document.getElementById("aiModeLayman");
+  var e = document.getElementById("aiModeExpert");
+  if (!l || !e) return;
+  [["layman", l], ["expert", e]].forEach(function(pair) {
+    var on = aiMode === pair[0];
+    pair[1].style.background = on ? "#0f9d8f" : "var(--surface)";
+    pair[1].style.color = on ? "#fff" : "var(--text-2)";
+    pair[1].style.fontWeight = on ? "700" : "400";
+  });
+}
+
+function setAiMode(mode) {
+  if ((mode !== "layman" && mode !== "expert") || mode === aiMode) return;
+  aiMode = mode;
+  updateAiModeToggle();
+  if (currentUser) {
+    fetch("/api/settings/reading-mode", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({mode: mode})
+    }).catch(function() { /* non-fatal */ });
+  }
+  // If a reading is already shown for this chart, regenerate it in the new style.
+  var thread = document.getElementById("aiChatThread");
+  var hasReading = (thread && thread.children.length > 0) ||
+                   (_cachedReadingData && _cachedReadingData.categories);
+  if (currentUser && chartData && hasReading) {
+    _cachedReadingData = null;
+    aiConversation = [];
+    _aiReadingRequested = false;
+    if (thread) thread.innerHTML = "";
+    document.getElementById("aiError").classList.remove("active");
+    autoGenerateReading();
+  }
+}
+
 function onAITabClick() {
   // Auto-generate reading the first time the AI tab is opened for a chart
   if (!currentUser || !chartData) return;
@@ -5168,7 +5218,8 @@ function autoGenerateReading() {
       chart_data: chartData,
       conversation: [],
       initial_reading: true,
-      chart_id: currentSavedChartId
+      chart_id: currentSavedChartId,
+      mode: aiMode
     })
   })
   .then(function(r) { return r.json().then(function(d) { return {status: r.status, data: d}; }); })
@@ -5282,7 +5333,8 @@ function askAI() {
     body: JSON.stringify({
       question: question,
       chart_data: chartData,
-      conversation: aiConversation.slice(0, -1)  // prior turns (exclude current question)
+      conversation: aiConversation.slice(0, -1),  // prior turns (exclude current question)
+      mode: aiMode
     })
   })
   .then(function(r) { return r.json().then(function(d) { return {status: r.status, data: d}; }); })
