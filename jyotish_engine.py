@@ -2259,6 +2259,158 @@ def compute_panchang(date_str, tz_str="UTC"):
     }
 
 
+# ── Event-based birth-time rectification ────────────────────────────────────
+# Each event type maps to the houses it activates and its primary karaka.
+BTR_EVENT_MAP = {
+    "marriage":         {"houses": [7, 2, 11], "karaka": "Venus",   "label": "Marriage"},
+    "first_job":        {"houses": [10, 6, 2], "karaka": "Saturn",  "label": "First job / career start"},
+    "career_change":    {"houses": [10, 6],    "karaka": "Saturn",  "label": "Major career change"},
+    "first_child":      {"houses": [5, 9],     "karaka": "Jupiter", "label": "Birth of first child"},
+    "father_passing":   {"houses": [9, 4],     "karaka": "Sun",     "label": "Father's passing"},
+    "mother_passing":   {"houses": [4, 11],    "karaka": "Moon",    "label": "Mother's passing"},
+    "accident_surgery": {"houses": [6, 8],     "karaka": "Mars",    "label": "Major accident / surgery"},
+    "moved_abroad":     {"houses": [12, 9, 3], "karaka": "Rahu",    "label": "Moved abroad"},
+    "bought_home":      {"houses": [4],        "karaka": "Mars",    "label": "Bought a home"},
+    "education":        {"houses": [4, 5, 9],  "karaka": "Mercury", "label": "Major education milestone"},
+}
+# Special graha drishti: extra houses (besides the universal 7th) a planet aspects.
+_GRAHA_SPECIAL_ASPECTS = {"Mars": [4, 8], "Jupiter": [5, 9], "Saturn": [3, 10],
+                          "Rahu": [5, 9], "Ketu": [5, 9]}
+
+
+def _parse_btr_date(s):
+    return datetime.strptime(s, "%d-%b-%Y")
+
+
+def _active_dasha_lords(dasha, event_dt):
+    """(maha_lord, antar_lord) active on event_dt, or (None, None)."""
+    maha_lord = None
+    for md in dasha.get("maha", []):
+        try:
+            if _parse_btr_date(md["start"]) <= event_dt < _parse_btr_date(md["end"]):
+                maha_lord = md["lord"]; break
+        except Exception:
+            continue
+    antar_lord = None
+    if maha_lord:
+        for ad in dasha.get("antar", {}).get(maha_lord, []):
+            try:
+                if _parse_btr_date(ad["start"]) <= event_dt < _parse_btr_date(ad["end"]):
+                    antar_lord = ad["lord"]; break
+            except Exception:
+                continue
+    return maha_lord, antar_lord
+
+
+def rectify_by_events(year, month, day, hour, minute, lat, lon, tz_offset,
+                      window_minutes, events, max_candidates=31):
+    """Score candidate birth times across ±window_minutes against dated life
+    events via Vimshottari dasha-lord activation (using equal/bhava houses from
+    the Lagna degree, so it discriminates within a sign) plus major transits.
+    Returns ranked candidates with structured facts for an LLM judge."""
+    window_minutes = float(window_minutes or 15)
+    base_dt = datetime(year, month, day, hour, minute)
+
+    n = max(3, min(int(max_candidates), int(round(window_minutes * 2)) + 1))
+    step = (2 * window_minutes) / (n - 1) if n > 1 else 0.0
+    offsets = [round(-window_minutes + i * step, 2) for i in range(n)]
+
+    resolved, transit_cache = [], {}
+    for ev in events:
+        m = BTR_EVENT_MAP.get(ev.get("type"), {})
+        houses = [int(h) for h in (ev.get("houses") or m.get("houses") or [10])]
+        karaka = ev.get("karaka") or m.get("karaka")
+        label = ev.get("label") or m.get("label") or ev.get("text") or ev.get("type") or "Event"
+        date_str = ev.get("date")
+        try:
+            edt = datetime.strptime(date_str, "%Y-%m-%d")
+        except Exception:
+            continue
+        if date_str not in transit_cache:
+            try:
+                transit_cache[date_str] = compute_transits_for_date(date_str)
+            except Exception:
+                transit_cache[date_str] = []
+        resolved.append({"label": label, "date": date_str, "edt": edt,
+                         "houses": houses, "karaka": karaka})
+
+    if not resolved:
+        return {"error": "No valid dated events provided.", "candidates": []}
+
+    candidates = []
+    for off in offsets:
+        cdt = base_dt + timedelta(minutes=off)
+        chart = compute_chart(cdt.year, cdt.month, cdt.day, cdt.hour, cdt.minute, lat, lon, tz_offset)
+        lagna_lon = chart["lagna"]["lon"]
+        lagna_sign_idx = chart["lagna"]["sign"]
+        dasha = chart.get("dasha", {})
+
+        def house_of(l):
+            return int(((l - lagna_lon) % 360) / 30) + 1
+
+        planet_house = {p["name"]: house_of(p["lon"]) for p in chart["planets"]}
+
+        def touches(planet, target_houses):
+            t = set()
+            for h in range(1, 13):           # rules
+                if SIGN_LORDS[(lagna_sign_idx + h - 1) % 12] == planet:
+                    t.add(h)
+            ph = planet_house.get(planet)
+            if ph:                            # occupies + aspects
+                t.add(ph)
+                for o in [7] + _GRAHA_SPECIAL_ASPECTS.get(planet, []):
+                    t.add(((ph - 1 + o - 1) % 12) + 1)
+            return t & set(target_houses)
+
+        total, ev_facts = 0.0, []
+        for rev in resolved:
+            maha_lord, antar_lord = _active_dasha_lords(dasha, rev["edt"])
+            houses, karaka = rev["houses"], rev["karaka"]
+            sc, reasons = 0.0, []
+            for lord, w, tag in [(maha_lord, 2.0, "Mahadasha"), (antar_lord, 1.5, "Antardasha")]:
+                if not lord:
+                    continue
+                hit = touches(lord, houses)
+                if hit:
+                    sc += w
+                    reasons.append(f"{tag} {lord} activates house(s) {sorted(hit)}")
+                if karaka:
+                    if lord == karaka:
+                        sc += w * 0.5
+                        reasons.append(f"{tag} lord is karaka {karaka}")
+                    else:
+                        kh = planet_house.get(karaka)
+                        if kh and touches(lord, [kh]):
+                            sc += w * 0.5
+                            reasons.append(f"{tag} {lord} connects karaka {karaka} (house {kh})")
+            for tp in transit_cache.get(rev["date"], []):
+                if tp["planet"] not in ("Saturn", "Jupiter", "Rahu", "Ketu"):
+                    continue
+                th = house_of(tp["sign_idx"] * 30 + tp.get("deg_in_sign", 0))
+                tset = {th}
+                for o in [7] + _GRAHA_SPECIAL_ASPECTS.get(tp["planet"], []):
+                    tset.add(((th - 1 + o - 1) % 12) + 1)
+                hit = tset & set(houses)
+                if hit:
+                    sc += 0.5
+                    reasons.append(f"transit {tp['planet']} on house(s) {sorted(hit)}")
+            total += sc
+            ev_facts.append({"event": rev["label"], "date": rev["date"],
+                             "mahadasha": maha_lord, "antardasha": antar_lord,
+                             "target_houses": houses, "karaka": karaka,
+                             "score": round(sc, 2), "reasons": reasons})
+        candidates.append({"offset_min": off, "time": cdt.strftime("%H:%M"),
+                           "lagna": chart["lagna"]["sign_name"],
+                           "navamsha_lagna": SIGNS[divisional_sign(lagna_lon, 9)],
+                           "score": round(total, 2), "events": ev_facts})
+
+    candidates.sort(key=lambda c: -c["score"])
+    return {"window_minutes": window_minutes, "n_candidates": len(candidates),
+            "events": [{"label": r["label"], "date": r["date"],
+                        "houses": r["houses"], "karaka": r["karaka"]} for r in resolved],
+            "candidates": candidates}
+
+
 def compute_transits_for_date(date_str):
     """Return sidereal positions of all 9 grahas for a given date (noon UTC)."""
     swe.set_sid_mode(swe.SIDM_LAHIRI)

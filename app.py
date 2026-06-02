@@ -12,7 +12,7 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_cors import CORS
 from authlib.integrations.flask_client import OAuth
-from jyotish_engine import compute_chart, compute_btr, calculate_sadesati, compute_panchang, compute_transits, compute_transits_for_date, compute_ashta_kuta_scores, format_kuta_scores_for_ai
+from jyotish_engine import compute_chart, compute_btr, rectify_by_events, calculate_sadesati, compute_panchang, compute_transits, compute_transits_for_date, compute_ashta_kuta_scores, format_kuta_scores_for_ai
 from zoneinfo import ZoneInfo
 from datetime import datetime, timedelta
 from database import (
@@ -1034,6 +1034,80 @@ def api_btr_ask():
         error_type = type(e).__name__
         logger.error("BTR AI error (%s): %s", error_type, str(e))
         return jsonify({"error": "Failed to generate BTR analysis. Please try again later."}), 500
+
+
+@app.route("/api/btr/rectify", methods=["POST"])
+@login_required
+def api_btr_rectify():
+    """Event-based birth-time rectification: score candidate times by dasha +
+    transit activation of dated life events, then have an LLM judge pick one."""
+    data = request.get_json() or {}
+    inp = data.get("input_data") or {}
+    try:
+        year = int(inp["year"]); month = int(inp["month"]); day = int(inp["day"])
+        hour = int(inp.get("hour", 12)); minute = int(inp.get("minute", 0))
+        lat = float(inp["lat"]); lon = float(inp["lon"]); tz = float(inp.get("tz_offset", 5.5))
+    except (KeyError, TypeError, ValueError) as e:
+        return jsonify({"error": f"Missing/invalid birth data: {e}"}), 400
+    try:
+        window_minutes = float(data.get("window_minutes", 15))
+    except (TypeError, ValueError):
+        window_minutes = 15.0
+
+    events = data.get("events") or []
+    typed = [e for e in events if e.get("type") and e.get("date")]
+    freetext = [e for e in events if not e.get("type") and e.get("text") and e.get("date")]
+    if not typed and not freetext:
+        return jsonify({"error": "Add at least one dated life event to rectify from."}), 400
+
+    try:
+        rect = rectify_by_events(year, month, day, hour, minute, lat, lon, tz,
+                                 window_minutes, typed)
+    except Exception as e:
+        logger.error("BTR rectify engine error: %s", e)
+        return jsonify({"error": "Rectification failed to compute."}), 500
+    top = rect.get("candidates", [])[:6]
+    if not top:
+        return jsonify({"error": "No candidate times to evaluate."}), 400
+
+    judged = {}
+    try:
+        import vertexai
+        from vertexai.generative_models import GenerativeModel
+        vertexai.init(project=os.environ.get("GCP_PROJECT", "grahalogic"),
+                      location=os.environ.get("GCP_LOCATION", "us-central1"))
+        model = GenerativeModel(load_prompts().get("model", "gemini-2.5-flash"))
+        jp = (
+            "You are an expert Vedic astrologer performing birth-time rectification.\n"
+            f"Stated birth time {hour:02d}:{minute:02d}, uncertain by about ±{int(window_minutes)} minutes.\n"
+            "Each candidate time below was scored by how well the Vimshottari Mahadasha/"
+            "Antardasha lord activates each dated event's houses & karaka, plus major "
+            "transits. Higher score = better fit. Weigh the D1 and D9 (Navamsha) Lagna "
+            "heavily and prefer the candidate whose dasha alignments are strongest and "
+            "most consistent across events.\n\nTOP CANDIDATES (JSON):\n"
+            + json.dumps(top, indent=2) + "\n\n"
+        )
+        if freetext:
+            jp += ("ADDITIONAL FREE-TEXT EVENTS (weigh qualitatively, not pre-scored):\n"
+                   + json.dumps(freetext, indent=2) + "\n\n")
+        jp += ('Return ONLY JSON: {"suggested_time":"HH:MM","suggested_offset_min":<number>,'
+               '"confidence":"low|medium|high","explanation":"2-4 sentences citing the '
+               'strongest dasha/transit alignments and any conflicts","runner_up":"HH:MM or null"}.')
+        resp = model.generate_content(
+            jp, generation_config={"response_mime_type": "application/json",
+                                   "thinking_config": {"thinking_budget": 1024}})
+        raw = (resp.text or "").strip()
+        if raw:
+            judged = json.loads(raw, strict=False)
+    except Exception as e:
+        logger.warning("BTR rectify judge failed: %s", e)
+
+    if not judged.get("suggested_time"):
+        judged = {"suggested_time": top[0]["time"], "suggested_offset_min": top[0]["offset_min"],
+                  "confidence": "medium",
+                  "explanation": "Strongest dasha/transit fit among the candidate times.",
+                  "runner_up": top[1]["time"] if len(top) > 1 else None}
+    return jsonify({"rectification": judged, "candidates": top, "events": rect.get("events", [])})
 
 
 @app.route("/api/reading-status/<reading_id>")

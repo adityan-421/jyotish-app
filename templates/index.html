@@ -1766,6 +1766,18 @@ footer strong { color: #FF6B00; }
         <button class="btr-chat-send" id="btrChatSendBtn" onclick="sendBTRFollowup()">Send</button>
       </div>
     </div>
+    <div id="btrEventRectify" style="margin-top:1.1rem;border-top:1px solid var(--border);padding-top:0.9rem;">
+      <div style="font-weight:700;font-size:0.92rem;margin-bottom:0.25rem;">🎯 Rectify from dated life events</div>
+      <div style="font-size:0.78rem;color:var(--text-3);margin-bottom:0.6rem;line-height:1.45;">Dated events are the strongest anchor. Add what you know — candidate birth times within your selected window (above) are scored by how the Vimshottari dasha &amp; major transits line up with each event.</div>
+      <div id="btrEventList"></div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin:0.5rem 0 0.7rem;">
+        <button class="btr-btn-secondary" onclick="addBTREventRow('preset')">+ Add event</button>
+        <button class="btr-btn-secondary" onclick="addBTREventRow('free')">+ Add custom event</button>
+      </div>
+      <button class="btr-btn" id="btrRectifyBtn" onclick="rectifyFromEvents()">Rectify from Events</button>
+      <div class="btr-error" id="btrRectifyError"></div>
+      <div id="btrRectifyResult" style="margin-top:0.8rem;"></div>
+    </div>
   </div>
 </div>
 </div><!-- end btrAISection -->
@@ -4246,6 +4258,101 @@ function setOwnChart(id) {
 var btrData = null;
 var btrQuestions = [];
 var btrConversation = [];
+
+// ── Event-based BTR rectification ──────────────────────────────────────────
+var BTR_EVENT_TYPES = [
+  ["marriage","Marriage"],["first_job","First job / career start"],
+  ["career_change","Major career change"],["first_child","Birth of first child"],
+  ["father_passing","Father's passing"],["mother_passing","Mother's passing"],
+  ["accident_surgery","Major accident / surgery"],["moved_abroad","Moved abroad"],
+  ["bought_home","Bought a home"],["education","Major education milestone"]
+];
+var _fieldStyle = "font-size:0.8rem;padding:0.4rem 0.55rem;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--text);";
+
+function addBTREventRow(kind) {
+  var list = document.getElementById("btrEventList");
+  var row = document.createElement("div");
+  row.className = "btr-ev-row";
+  row.style.cssText = "display:flex;gap:0.4rem;align-items:center;margin-bottom:0.4rem;flex-wrap:wrap;";
+  var field;
+  if (kind === "free") {
+    field = '<input type="text" class="btr-ev-text" placeholder="Describe the event" style="flex:2;min-width:140px;' + _fieldStyle + '">';
+  } else {
+    var opts = BTR_EVENT_TYPES.map(function(t){ return '<option value="' + t[0] + '">' + t[1] + '</option>'; }).join("");
+    field = '<select class="btr-ev-type" style="flex:2;min-width:140px;' + _fieldStyle + '">' + opts + '</select>';
+  }
+  row.innerHTML = field +
+    '<input type="date" class="btr-ev-date" style="flex:1;min-width:120px;' + _fieldStyle + '">' +
+    '<button onclick="this.parentNode.remove()" title="Remove" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:1rem;line-height:1;">✕</button>';
+  list.appendChild(row);
+}
+
+function collectBTREvents() {
+  var events = [];
+  document.querySelectorAll("#btrEventList .btr-ev-row").forEach(function(row) {
+    var dateEl = row.querySelector(".btr-ev-date");
+    var date = dateEl ? dateEl.value : "";
+    if (!date) return;
+    var typeEl = row.querySelector(".btr-ev-type");
+    var textEl = row.querySelector(".btr-ev-text");
+    if (typeEl) events.push({type: typeEl.value, date: date});
+    else if (textEl && textEl.value.trim()) events.push({text: textEl.value.trim(), date: date});
+  });
+  return events;
+}
+
+function rectifyFromEvents() {
+  if (!lastInputPayload) { alert("Generate a chart first."); return; }
+  var errEl = document.getElementById("btrRectifyError");
+  var events = collectBTREvents();
+  if (!events.length) { errEl.textContent = "Add at least one dated event."; errEl.classList.add("active"); return; }
+  errEl.classList.remove("active");
+  var btn = document.getElementById("btrRectifyBtn");
+  btn.disabled = true; btn.textContent = "Rectifying…";
+  fetch("/api/btr/rectify", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      input_data: lastInputPayload,
+      window_minutes: parseFloat(document.getElementById("btrWindow").value),
+      events: events
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    btn.disabled = false; btn.textContent = "Rectify from Events";
+    if (data.error) { errEl.textContent = data.error; errEl.classList.add("active"); return; }
+    renderRectifyResult(data);
+  })
+  .catch(function(err) { btn.disabled = false; btn.textContent = "Rectify from Events"; errEl.textContent = "Error: " + err.message; errEl.classList.add("active"); });
+}
+
+function renderRectifyResult(data) {
+  var rec = data.rectification || {};
+  var el = document.getElementById("btrRectifyResult");
+  var conf = (rec.confidence || "").toLowerCase();
+  var confColor = conf === "high" ? "#16a34a" : (conf === "medium" ? "#d97706" : "#999");
+  var h = '<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:0.8rem 0.9rem;">';
+  h += '<div style="font-size:1.1rem;font-weight:700;">Suggested time: ' + escHtml(rec.suggested_time || "—") + '</div>';
+  h += '<div style="font-size:0.78rem;margin:0.25rem 0;">Confidence: <strong style="color:' + confColor + ';text-transform:capitalize;">' + escHtml(rec.confidence || "—") + '</strong>' + (rec.runner_up ? (' · runner-up ' + escHtml(rec.runner_up)) : '') + '</div>';
+  h += '<div style="font-size:0.84rem;line-height:1.5;margin-top:0.4rem;">' + escHtml(rec.explanation || "") + '</div>';
+  if (rec.suggested_time) h += '<button class="btr-btn" style="margin-top:0.6rem;" onclick="applyRectifiedTime(\'' + escHtml(rec.suggested_time) + '\')">Apply ' + escHtml(rec.suggested_time) + ' &amp; recalculate</button>';
+  h += '</div>';
+  if (data.candidates && data.candidates.length) {
+    h += '<div style="font-size:0.72rem;color:var(--text-3);margin:0.6rem 0 0.25rem;text-transform:uppercase;letter-spacing:0.04em;font-weight:600;">Candidate scores</div>';
+    h += '<div style="display:flex;flex-direction:column;gap:0.2rem;">';
+    data.candidates.forEach(function(c) {
+      h += '<div style="display:flex;justify-content:space-between;gap:0.5rem;font-size:0.78rem;padding:0.25rem 0.5rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;"><span>' + escHtml(c.time) + ' (' + (c.offset_min > 0 ? '+' : '') + c.offset_min + 'm) · Lagna ' + escHtml(c.lagna) + ' · D9 ' + escHtml(c.navamsha_lagna) + '</span><strong>' + c.score + '</strong></div>';
+    });
+    h += '</div>';
+  }
+  el.innerHTML = h;
+}
+
+function applyRectifiedTime(hhmm) {
+  if (!/^\d{1,2}:\d{2}$/.test(hhmm)) return;
+  document.getElementById("birthTime").value = hhmm;
+  fetchChart();
+}
 
 function fetchBTR() {
   var dateVal = document.getElementById("birthDate").value;
