@@ -90,12 +90,17 @@ TONE_INSTRUCTIONS = {
         "over-explaining them."
     ),
     "layman": (
-        "The reader has NO astrology background. Write in plain, everyday language and "
-        "avoid jargon. If a Sanskrit or technical term is truly unavoidable, immediately "
-        "explain it in simple words in the same sentence. For each area, clearly state "
-        "(1) what it means for the person's life in practical terms, and (2) simple, "
-        "concrete remedies or steps they can actually follow. Use short sentences and a "
-        "warm, reassuring tone. Do not assume any prior knowledge of charts or planets."
+        "LAYMAN MODE — write for someone with NO astrology background, and let these rules "
+        "OVERRIDE any instruction elsewhere in this prompt that tells you to name nakshatras, "
+        "shaktis, deities, dashas, karakas, yogas, house numbers, or divisional charts. Do "
+        "ALL of that astrological reasoning INTERNALLY, but in the OUTPUT translate everything "
+        "into plain, everyday language: do NOT print Sanskrit or technical terms, planet-in-"
+        "house phrasing, or house numbers unless you immediately explain them in one simple "
+        "phrase. For every point, lead with what it concretely means for the person's real "
+        "daily life — personality, work, money, health, relationships, family — and then give "
+        "one or two simple, practical remedies or habits they can actually do. Use short "
+        "sentences and a warm, encouraging tone, and assume zero prior knowledge of charts or "
+        "planets. Someone who has never heard the word 'nakshatra' should understand every line."
     ),
 }
 
