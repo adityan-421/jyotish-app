@@ -1744,6 +1744,16 @@ footer strong { color: #FF6B00; }
       <label style="font-size:0.75rem;color:var(--text-3);display:block;margin-bottom:0.3rem;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;">Additional context (optional)</label>
       <textarea id="btrAdditionalInfo" rows="3" placeholder="Share any relevant life facts that may help — e.g. 'married in 2010', 'no siblings', 'work in finance', 'had a major accident at age 25'..." style="width:100%;box-sizing:border-box;font-size:0.82rem;padding:0.5rem 0.65rem;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);resize:vertical;font-family:inherit;line-height:1.5;"></textarea>
     </div>
+    <div style="margin-top:0.85rem;">
+      <label style="font-size:0.75rem;color:var(--text-3);display:block;margin-bottom:0.3rem;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;">How sure are you of the birth time?</label>
+      <select id="btrWindow" style="width:100%;box-sizing:border-box;font-size:0.82rem;padding:0.5rem 0.65rem;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);">
+        <option value="2">Very sure — to the minute (±2 min)</option>
+        <option value="5">Fairly sure (±5 min)</option>
+        <option value="15" selected>Somewhat unsure (±15 min)</option>
+        <option value="30">Unsure (±30 min)</option>
+        <option value="60">Only know the hour (±60 min)</option>
+      </select>
+    </div>
     <div class="btr-actions" id="btrActions">
       <button class="btr-btn" id="btrGenQuestionsBtn" onclick="generateBTRQuestions()">Generate Questions</button>
       <button class="btr-btn-secondary" id="btrAnalyzeBtn" onclick="submitBTRAnswers()" style="display:none;">Analyze Answers</button>
@@ -4382,7 +4392,8 @@ function generateBTRQuestions() {
       btr_data: btrData,
       conversation: btrConversation,
       age: btrGetAge(),
-      additional_info: additionalInfo
+      additional_info: additionalInfo,
+      window_minutes: parseFloat(document.getElementById("btrWindow").value)
     })
   })
   .then(function(r) { return r.json(); })
@@ -4487,7 +4498,8 @@ function submitBTRAnswers() {
       qa_pairs: qaPairs,
       conversation: btrConversation,
       age: btrGetAge(),
-      additional_info: additionalInfo
+      additional_info: additionalInfo,
+      window_minutes: parseFloat(document.getElementById("btrWindow").value)
     })
   })
   .then(function(r) { return r.json(); })

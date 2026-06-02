@@ -828,6 +828,29 @@ def api_chart():
         return jsonify({"error": str(e)}), 500
 
 
+# BTR varga weights — D1/D9 are the most behaviorally verifiable and astrologically
+# central; D60 changes ~every 2 min so it's a fine-resolution tie-breaker only.
+BTR_VARGA_WEIGHTS = {"D1": 3.0, "D9": 3.0, "D10": 2.0, "D7": 2.0, "D12": 2.0,
+                     "D3": 1.5, "D2": 1.0, "D20": 1.0, "D60": 0.5}
+BTR_TIEBREAK_CHARTS = {"D60"}
+
+
+def _augment_btr_boundaries(btr_data, window_minutes):
+    """Tag each varga boundary with its weight, whether its Lagna actually flips
+    within the birth-time uncertainty window (only those can discriminate), and
+    whether it's a tie-breaker-only chart. Mutates btr_data in place."""
+    if not isinstance(btr_data, dict) or not isinstance(btr_data.get("boundaries"), list):
+        return
+    for b in btr_data["boundaries"]:
+        chart = b.get("chart")
+        b["weight"] = BTR_VARGA_WEIGHTS.get(chart, 1.0)
+        b["tiebreaker_only"] = chart in BTR_TIEBREAK_CHARTS
+        cand = [m for m in (b.get("mins_before"), b.get("mins_after")) if m is not None]
+        nearest = min(cand) if cand else None
+        b["nearest_boundary_mins"] = nearest
+        b["in_window"] = nearest is not None and nearest <= window_minutes
+
+
 @app.route("/api/btr", methods=["POST"])
 def api_btr():
     try:
@@ -883,6 +906,12 @@ def api_btr_ask():
     conversation = data.get("conversation") or []
 
     try:
+        window_minutes = float(data.get("window_minutes", 15))
+    except (TypeError, ValueError):
+        window_minutes = 15.0
+    _augment_btr_boundaries(btr_data, window_minutes)
+
+    try:
         import vertexai
         from vertexai.generative_models import GenerativeModel
 
@@ -916,6 +945,7 @@ def api_btr_ask():
             "conversation": conv_ctx,
             "age_context": age_context,
             "additional_context": additional_context,
+            "window_minutes": int(window_minutes),
         }
 
         if mode == "questions":
