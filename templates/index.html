@@ -63,6 +63,9 @@ header {
   border-bottom: 1px solid rgba(255,255,255,0.08);
   position: sticky; top: 0; z-index: 100;
 }
+/* Native (Capacitor) shell: clear the status bar / notch and home indicator. */
+html.capacitor header { padding-top: env(safe-area-inset-top, 0px); }
+html.capacitor body { padding-bottom: env(safe-area-inset-bottom, 0px); }
 
 .header-inner {
   max-width: 1200px; margin: 0 auto; padding: 0.9rem 2rem;
@@ -1298,6 +1301,73 @@ footer strong { color: #FF6B00; }
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+<script>
+/* ── Capacitor (native app) mode ─────────────────────────────────────────────
+   Active ONLY inside the Capacitor native shell (no-op in a normal browser).
+   Google blocks OAuth in embedded webviews, so we sign in natively via the
+   GoogleAuth plugin and authenticate API calls with a Bearer token (which the
+   backend already accepts) instead of the cookie session. */
+(function () {
+  var Cap = window.Capacitor;
+  if (!(Cap && Cap.isNativePlatform && Cap.isNativePlatform())) return;
+  document.documentElement.classList.add('capacitor');
+
+  var IOS_CLIENT_ID = '333157384151-tbu6skhnta08056eaktdtfpcd0cgkium.apps.googleusercontent.com';
+  var TOKEN_KEY = 'gl_mobile_token';
+  function getToken() { try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return null; } }
+  function setToken(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
+
+  // 1) Attach the Bearer token to same-origin /api and /auth requests.
+  var _fetch = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    init = init || {};
+    var url = (typeof input === 'string') ? input : (input && input.url) || '';
+    var isApi = /(^|\/\/[^/]+)\/(api|auth)\//.test(url) || url.indexOf('/api/') === 0 || url.indexOf('/auth/') === 0;
+    var token = getToken();
+    if (isApi && token) {
+      var headers = new Headers((init && init.headers) || (typeof input !== 'string' && input && input.headers) || {});
+      if (!headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + token);
+      init = Object.assign({}, init, { headers: headers });
+    }
+    return _fetch(input, init);
+  };
+
+  // 2) Native Google sign-in → exchange at /auth/mobile → store Bearer token.
+  window.nativeGoogleSignIn = function () {
+    var GoogleAuth = Cap.Plugins && Cap.Plugins.GoogleAuth;
+    if (!GoogleAuth) { alert('Google sign-in is unavailable in this build.'); return; }
+    Promise.resolve(GoogleAuth.initialize ? GoogleAuth.initialize() : null)
+      .then(function () { return GoogleAuth.signIn(); })
+      .then(function (res) {
+        var body = { client_id: IOS_CLIENT_ID };
+        // Prefer the Google ID token (backend verifies it directly — no code
+        // exchange / client secret needed); fall back to the server auth code.
+        var idToken = res && res.authentication && res.authentication.idToken;
+        if (idToken) body.id_token = idToken;
+        else if (res && res.serverAuthCode) body.auth_code = res.serverAuthCode;
+        return _fetch('/auth/mobile', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+        });
+      })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && data.token) { setToken(data.token); location.reload(); }
+        else { alert('Sign-in failed: ' + ((data && data.error) || 'unknown')); }
+      })
+      .catch(function (err) { alert('Sign-in error: ' + ((err && err.message) || err)); });
+  };
+
+  // 3) Route the web "Sign in with Google" buttons to native sign-in, and clear
+  //    the token on sign-out. Delegated so it works for dynamically-rendered UI.
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    var signin = t.closest && t.closest('a.google-btn, a[href="/auth/google"]');
+    if (signin) { e.preventDefault(); e.stopPropagation(); window.nativeGoogleSignIn(); return; }
+    var signout = t.closest && t.closest('a[href="/auth/logout"]');
+    if (signout) { setToken(null); }  // let navigation to /auth/logout proceed too
+  }, true);
+})();
+</script>
 </head>
 <body>
 

@@ -13,5 +13,13 @@
   "ios": {
     "contentInset": "always",
     "backgroundColor": "#fdf6ec"
+  },
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": ["profile", "email"],
+      "iosClientId": "333157384151-tbu6skhnta08056eaktdtfpcd0cgkium.apps.googleusercontent.com",
+      "serverClientId": "333157384151-a0psnqgcnjqoqnmiquh2sjhh1rrlgkei.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    }
   }
 }
