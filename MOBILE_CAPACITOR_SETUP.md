@@ -16,28 +16,25 @@ API with a **Bearer token** (the backend already supports this).
 - `package.json` adds `@codetrix-studio/capacitor-google-auth`, `@capacitor/status-bar`,
   `@capacitor/app`. `npm install` has been run; `npx cap copy ios` has synced the config.
 
-## Prerequisites (your machine)
-- **Full Xcode** (not just Command Line Tools) + CocoaPods (`sudo gem install cocoapods`).
-- Apple Developer account (the iOS OAuth client `333157384151-tbu6...` already exists).
+## Already done & verified on this machine
+- `npx cap sync ios` ran clean (Xcode 26.2): plugins `@codetrix-studio/capacitor-google-auth`,
+  `@capacitor/status-bar`, `@capacitor/app` linked; pods installed.
+- The **Google sign-in URL scheme** (reversed iOS client ID
+  `com.googleusercontent.apps.333157384151-tbu6skhnta08056eaktdtfpcd0cgkium`) is already added
+  to `ios/App/App/Info.plist`.
+- A simulator build (`xcodebuild ... -sdk iphonesimulator`) returned **BUILD SUCCEEDED**.
 
-## Steps
-1. **Sync native deps (installs the plugin pods):**
+## Prerequisites for release
+- Apple Developer account (the iOS OAuth client `333157384151-tbu6...` already exists).
+- Confirm that iOS OAuth client's bundle id is `com.grahalogic.astrojyoti` in Google Cloud Console.
+
+## Steps (remaining — all in Xcode)
+1. **Open & run:**
    ```bash
    cd jyotish_app
-   npx cap sync ios
-   ```
-2. **Configure the Google sign-in URL scheme** (required by the GoogleAuth plugin so the
-   OAuth redirect returns to the app). In Xcode → `App` target → **Info → URL Types**, add a
-   URL scheme equal to the **reversed iOS client ID**:
-   ```
-   com.googleusercontent.apps.333157384151-tbu6skhnta08056eaktdtfpcd0cgkium
-   ```
-   Confirm the iOS OAuth client in Google Cloud Console has bundle id `com.grahalogic.astrojyoti`.
-3. **Open & run:**
-   ```bash
    npx cap open ios        # opens ios/App/App.xcworkspace in Xcode
    ```
-   Set the Signing **Team**, pick a simulator/device, and Run.
+   Set the Signing **Team** (App target → Signing & Capabilities), pick a simulator/device, Run.
 4. **Test sign-in:** tap "Sign in with Google" → native Google sheet → it should return to the
    app **logged in** (header shows your name). Watch the network log: `POST /auth/mobile`
    returns `{token, user}`, then `/api/me` succeeds with the `Authorization: Bearer` header.
