@@ -26,7 +26,7 @@ API with a **Bearer token** (the backend already supports this).
 
 ## Prerequisites for release
 - Apple Developer account (the iOS OAuth client `333157384151-tbu6...` already exists).
-- Confirm that iOS OAuth client's bundle id is `com.grahalogic.astrojyoti` in Google Cloud Console.
+- Confirm that iOS OAuth client's bundle id is `ai.grahalogic.app` in Google Cloud Console.
 
 ## Steps (remaining — all in Xcode)
 1. **Open & run:**
